@@ -13,10 +13,11 @@ dist/
 *.d.ts.map
 
 # Compiled API files (Vercel will compile these)
-api/*.js
+# But allow api/index.js (our serverless function entry point)
 api/*.d.ts
 api/*.js.map
 api/*.d.ts.map
+api_backup/
 
 # IDE
 .vscode/
