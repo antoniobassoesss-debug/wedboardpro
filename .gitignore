@@ -12,6 +12,12 @@ dist/
 *.js.map
 *.d.ts.map
 
+# Compiled JavaScript files (keep source .ts/.tsx only)
+src/**/*.js
+src/**/*.d.ts
+!src/**/*.config.js
+!api/index.js
+
 # Compiled API files (Vercel will compile these)
 # But allow api/index.js (our serverless function entry point)
 api/*.d.ts
@@ -41,4 +47,16 @@ yarn-error.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Large design files
+*.psd
+sketch*.png
+sketch*.jpg
+layout-maker@*
+nodemon
+
+# Temporary/backup files
+*~
+*.bak
+*.tmp
 
