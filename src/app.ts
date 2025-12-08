@@ -45,6 +45,9 @@ const openaiClient = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
 // Log whether the key was loaded (masked) to help diagnose env issues.
 console.log('OPENAI_API_KEY present:', Boolean(openaiApiKey), openaiApiKey ? `${String(openaiApiKey).slice(0,8)}...` : '');
 
+// Parse JSON bodies for API routes
+app.use(express.json());
+
 // In production, serve built files
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../dist/client')));
