@@ -10,7 +10,7 @@
     "build:server": "tsc",
     "start": "node dist/app.js",
     "dev:client": "vite",
-    "vercel-build": "npm run build"
+    "vercel-build": "npm run build:client"
   },
   "keywords": [],
   "author": "",
