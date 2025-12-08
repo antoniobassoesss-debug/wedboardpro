@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="320" height="500" viewBox="0 0 320 500">
+  <defs>
+    <style>
+      .cls-1 {
+        clip-path: url(#clip-Tamanho_personalizado_1);
+      }
+
+      .cls-2, .cls-3, .cls-5 {
+        fill: #fff;
+      }
+
+      .cls-2 {
+        stroke: #707070;
+      }
+
+      .cls-4, .cls-7 {
+        fill: none;
+      }
+
+      .cls-4 {
+        stroke: #000;
+      }
+
+      .cls-5 {
+        opacity: 0.52;
+      }
+
+      .cls-6 {
+        stroke: none;
+      }
+
+      .cls-8 {
+        filter: url(#Retângulo_3);
+      }
+    </style>
+    <filter id="Retângulo_3" x="-2" y="445" width="323" height="59" filterUnits="userSpaceOnUse">
+      <feOffset dy="3" input="SourceAlpha"/>
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feFlood flood-opacity="0.161"/>
+      <feComposite operator="in" in2="blur"/>
+      <feComposite in="SourceGraphic"/>
+    </filter>
+    <clipPath id="clip-Tamanho_personalizado_1">
+      <rect width="320" height="500"/>
+    </clipPath>
+  </defs>
+  <g id="Tamanho_personalizado_1" data-name="Tamanho personalizado – 1" class="cls-1">
+    <rect class="cls-3" width="320" height="500"/>
+    <g id="Message_area" data-name="Message area" transform="translate(0 56)">
+      <g id="Retângulo_1" data-name="Retângulo 1" class="cls-2">
+        <rect class="cls-6" width="320" height="444" rx="27"/>
+        <rect class="cls-7" x="0.5" y="0.5" width="319" height="443" rx="26.5"/>
+      </g>
+    </g>
+    <g id="header">
+      <rect id="Retângulo_2" data-name="Retângulo 2" width="320" height="47" rx="23.5"/>
+    </g>
+    <circle id="Elipse_1" data-name="Elipse 1" class="cls-3" cx="14" cy="14" r="14" transform="translate(283 10)"/>
+    <line id="Linha_1" data-name="Linha 1" class="cls-4" x2="10" y2="10" transform="translate(293 19)"/>
+    <line id="Linha_2" data-name="Linha 2" class="cls-4" x1="10" y2="10" transform="translate(293 19)"/>
+    <g id="writing_area" data-name="writing area" transform="translate(7 451)">
+      <g class="cls-8" transform="matrix(1, 0, 0, 1, -7, -451)">
+        <rect id="Retângulo_3-2" data-name="Retângulo 3" class="cls-5" width="305" height="41" rx="20.5" transform="translate(7 451)"/>
+      </g>
+    </g>
+    <circle id="Elipse_2" data-name="Elipse 2" cx="14" cy="14" r="14" transform="translate(277 458)"/>
+  </g>
+</svg>

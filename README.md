@@ -72,6 +72,8 @@ A comprehensive SaaS platform for wedding planners to manage events, teams, supp
 
 ## Deploy on Vercel
 
+> **Note**: This project uses Vite + React (frontend) and Express (backend). The backend is deployed as a Vercel serverless function.
+
 ### Prerequisites
 
 - GitHub account
@@ -116,6 +118,8 @@ A comprehensive SaaS platform for wedding planners to manage events, teams, supp
    - **Build Command**: `npm run vercel-build`
    - **Output Directory**: `dist/client`
    - **Install Command**: `npm install`
+
+   > **Note**: You may see TypeScript warnings during build. These are non-blocking and Vercel will still deploy successfully. The frontend build (Vite) completes successfully, and the backend will be compiled by Vercel's serverless function runtime.
 
 4. **Add Environment Variables**:
    Click "Environment Variables" and add all the following:

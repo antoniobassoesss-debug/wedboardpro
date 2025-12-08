@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8" />
+<title>Canvas Grid</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: #e5e5e5;
+  }
+  
+  #canvas-area {
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+  
+  svg#canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+</style>
+</head>
+<body>
+
+<div id="canvas-area">
+  <svg id="canvas"></svg>
+</div>
+
+<script>
+(function() {
+  const svg = document.getElementById('canvas');
+  const gridSize = 20; // 20px grid squares
+  const majorGridSize = 100; // Major grid every 100px
+  
+  // Set viewBox for infinite canvas
+  const viewBox = {
+    x: -2000,
+    y: -2000,
+    width: 4000,
+    height: 4000
+  };
+  
+  svg.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`);
+  
+  // Draw grid
+  function drawGrid() {
+    const vb = viewBox;
+    const startX = Math.floor(vb.x / gridSize) * gridSize;
+    const endX = Math.ceil((vb.x + vb.width) / gridSize) * gridSize;
+    const startY = Math.floor(vb.y / gridSize) * gridSize;
+    const endY = Math.ceil((vb.y + vb.height) / gridSize) * gridSize;
+    
+    // Draw minor grid lines
+    for (let x = startX; x <= endX; x += gridSize) {
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute('x1', x);
+      line.setAttribute('y1', vb.y);
+      line.setAttribute('x2', x);
+      line.setAttribute('y2', vb.y + vb.height);
+      line.setAttribute('stroke', '#d0d0d0');
+      line.setAttribute('stroke-width', '0.5');
+      svg.appendChild(line);
+    }
+    
+    for (let y = startY; y <= endY; y += gridSize) {
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute('x1', vb.x);
+      line.setAttribute('y1', y);
+      line.setAttribute('x2', vb.x + vb.width);
+      line.setAttribute('y2', y);
+      line.setAttribute('stroke', '#d0d0d0');
+      line.setAttribute('stroke-width', '0.5');
+      svg.appendChild(line);
+    }
+    
+    // Draw major grid lines
+    for (let x = startX; x <= endX; x += majorGridSize) {
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute('x1', x);
+      line.setAttribute('y1', vb.y);
+      line.setAttribute('x2', x);
+      line.setAttribute('y2', vb.y + vb.height);
+      line.setAttribute('stroke', '#b0b0b0');
+      line.setAttribute('stroke-width', '1');
+      svg.appendChild(line);
+    }
+    
+    for (let y = startY; y <= endY; y += majorGridSize) {
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute('x1', vb.x);
+      line.setAttribute('y1', y);
+      line.setAttribute('x2', vb.x + vb.width);
+      line.setAttribute('y2', y);
+      line.setAttribute('stroke', '#b0b0b0');
+      line.setAttribute('stroke-width', '1');
+      svg.appendChild(line);
+    }
+  }
+  
+  // Initial draw
+  drawGrid();
+  
+  // Pan with mouse drag
+  let isPanning = false;
+  let panStart = { x: 0, y: 0 };
+  
+  svg.addEventListener('mousedown', (e) => {
+    if (e.button === 0) { // Left mouse button
+      isPanning = true;
+      panStart.x = e.clientX;
+      panStart.y = e.clientY;
+    }
+  });
+  
+  svg.addEventListener('mousemove', (e) => {
+    if (isPanning) {
+      const deltaX = e.clientX - panStart.x;
+      const deltaY = e.clientY - panStart.y;
+      
+      // Convert screen delta to SVG delta
+      const svgRect = svg.getBoundingClientRect();
+      const scaleX = viewBox.width / svgRect.width;
+      const scaleY = viewBox.height / svgRect.height;
+      
+      viewBox.x -= deltaX * scaleX;
+      viewBox.y -= deltaY * scaleY;
+      
+      svg.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`);
+      svg.innerHTML = '';
+      drawGrid();
+      
+      panStart.x = e.clientX;
+      panStart.y = e.clientY;
+    }
+  });
+  
+  svg.addEventListener('mouseup', () => {
+    isPanning = false;
+  });
+  
+  svg.addEventListener('mouseleave', () => {
+    isPanning = false;
+  });
+  
+  // Zoom with wheel
+  svg.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    
+    const svgRect = svg.getBoundingClientRect();
+    const mouseX = e.clientX - svgRect.left;
+    const mouseY = e.clientY - svgRect.top;
+    
+    // Convert mouse position to SVG coordinates
+    const svgX = viewBox.x + (mouseX / svgRect.width) * viewBox.width;
+    const svgY = viewBox.y + (mouseY / svgRect.height) * viewBox.height;
+    
+    // Zoom
+    const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
+    viewBox.width *= zoomFactor;
+    viewBox.height *= zoomFactor;
+    
+    // Adjust position to zoom towards mouse
+    viewBox.x = svgX - (mouseX / svgRect.width) * viewBox.width;
+    viewBox.y = svgY - (mouseY / svgRect.height) * viewBox.height;
+    
+    svg.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`);
+    svg.innerHTML = '';
+    drawGrid();
+  }, { passive: false });
+  
+})();
+</script>
+
+</body>
+</html>

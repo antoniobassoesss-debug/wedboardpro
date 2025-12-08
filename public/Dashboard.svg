@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1920" height="1516" viewBox="0 0 1920 1516">
+  <defs>
+    <clipPath id="clip-Web_1920_1">
+      <rect width="1920" height="1516"/>
+    </clipPath>
+  </defs>
+  <g id="Web_1920_1" data-name="Web 1920 – 1" clip-path="url(#clip-Web_1920_1)">
+    <rect width="1920" height="1516" fill="#fff"/>
+    <g id="Retângulo_1" data-name="Retângulo 1" transform="translate(248 36)" fill="#fff" stroke="#707070" stroke-width="1" opacity="0.599">
+      <rect width="1425" height="69" rx="34.5" stroke="none"/>
+      <rect x="0.5" y="0.5" width="1424" height="68" rx="34" fill="none"/>
+    </g>
+    <rect id="Retângulo_2" data-name="Retângulo 2" width="706" height="405" rx="76" transform="translate(234 204)" fill="#f0f0f0"/>
+    <rect id="Retângulo_3" data-name="Retângulo 3" width="706" height="405" rx="76" transform="translate(980 204)" fill="#f0f0f0"/>
+    <g id="Componente_2_1" data-name="Componente 2 – 1" transform="translate(587 490)">
+      <g id="Retângulo_4" data-name="Retângulo 4" stroke="#707070" stroke-width="1">
+        <rect width="309" height="74" rx="37" stroke="none"/>
+        <rect x="0.5" y="0.5" width="308" height="73" rx="36.5" fill="none"/>
+      </g>
+    </g>
+    <g id="Componente_1_1" data-name="Componente 1 – 1" transform="translate(638 508)">
+      <text id="Layout_Maker" data-name="Layout Maker" transform="translate(0 32)" fill="#fff" font-size="34" font-family="HelveticaNeue, Helvetica Neue"><tspan x="0" y="0">Layout Maker</tspan></text>
+    </g>
+    <text id="Dashboard" transform="translate(314 195)" font-size="44" font-family="HelveticaNeue, Helvetica Neue"><tspan x="0" y="0">Dashboard</tspan></text>
+  </g>
+</svg>

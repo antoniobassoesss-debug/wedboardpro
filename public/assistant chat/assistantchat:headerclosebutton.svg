@@ -1,0 +1,23 @@
+<svg id="Componente_1_3" data-name="Componente 1 – 3" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #fff;
+      }
+
+      .cls-2, .cls-3 {
+        fill: none;
+        stroke: #000;
+        stroke-linecap: round;
+        stroke-width: 2px;
+      }
+
+      .cls-3 {
+        stroke-linejoin: round;
+      }
+    </style>
+  </defs>
+  <circle id="Elipse_1" data-name="Elipse 1" class="cls-1" cx="14" cy="14" r="14"/>
+  <line id="Linha_1" data-name="Linha 1" class="cls-2" x2="10" y2="10" transform="translate(10 9)"/>
+  <path id="Caminho_1" data-name="Caminho 1" class="cls-3" d="M10,0,5.625,4.375,0,10" transform="translate(10 9)"/>
+</svg>

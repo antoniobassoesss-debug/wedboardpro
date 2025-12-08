@@ -1,9 +1,6 @@
-// Vercel serverless function - using .js extension to avoid TypeScript runtime detection issues
-const handler = async (req, res) => {
-  // Dynamically import the Express app
-  const { default: app } = await import('../dist/app.js');
+// Vercel serverless function for Express app
+module.exports = async (req, res) => {
+  // Import the compiled Express app
+  const app = (await import('../dist/app.js')).default;
   return app(req, res);
 };
-
-export default handler;
-
