@@ -101,7 +101,7 @@ const HeroSection: React.FC = () => {
         <div className="landing-hero-left">
           <p className="landing-eyebrow">For professional wedding planners</p>
           <h1 className="landing-hero-title">
-            Run every wedding from one beautiful workspace.
+            The all‑in‑one platform for modern wedding planners
           </h1>
           <p className="landing-hero-subtitle">
             WedBoardPro centralizes your timelines, tasks, quotes, vendors and team so every event
