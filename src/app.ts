@@ -4,6 +4,10 @@ import express from 'express';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
 
+// Get __dirname equivalent for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Load environment variables first
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 dotenv.config();
