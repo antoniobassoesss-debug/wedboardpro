@@ -1,7 +1,9 @@
 // Vercel serverless function wrapper for Express app
-// Note: In Vercel, this will be compiled, so we import from source
-// The build process will handle the compilation
-import app from '../src/app.js';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-export default app;
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Dynamically import the Express app
+  const { default: app } = await import('../src/app.js');
+  return app(req, res);
+}
 
