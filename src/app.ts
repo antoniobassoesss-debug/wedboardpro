@@ -22,8 +22,12 @@ app.use((req, res, next) => {
     origin.includes('localhost:3000') || 
     origin.includes('127.0.0.1') ||
     origin.includes('vercel.app') ||
-    origin.includes('vercel.com')
+    origin.includes('vercel.com') ||
+    origin.includes('vercel.sh')
   )) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (origin) {
+    // In production, allow the request origin if it's a valid domain
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
