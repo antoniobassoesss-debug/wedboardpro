@@ -1,6 +1,6 @@
 // Vercel serverless function for Express app
-module.exports = async (req, res) => {
+export default async (req, res) => {
   // Import the compiled Express app
-  const app = (await import('../dist/app.js')).default;
+  const { default: app } = await import('../dist/app.js');
   return app(req, res);
 };
