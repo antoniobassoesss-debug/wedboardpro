@@ -1,23 +1,23 @@
 {
   "version": 2,
-  "buildCommand": "npm run vercel-build",
-  "outputDirectory": "dist/client",
-  "installCommand": "npm install",
-  "framework": null,
-  "functions": {
-    "api/index.ts": {
-      "runtime": "nodejs20.x"
-    }
-  },
-  "rewrites": [
+  "builds": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index"
+      "src": "api/index.ts",
+      "use": "@vercel/node"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "dist/client/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.ts"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/dist/client/index.html"
     }
   ]
 }
-
