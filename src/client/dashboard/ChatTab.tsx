@@ -24,6 +24,19 @@ type Conversation = {
   unread?: number;
 };
 
+type TeamMember = {
+  id: string;
+  user_id: string;
+  role: string;
+  profile?: {
+    full_name?: string | null;
+    email?: string | null;
+    avatar_url?: string | null;
+  } | null;
+  displayEmail?: string | null;
+  displayName?: string | null;
+};
+
 const safeParse = (raw: string | null) => {
   if (!raw) return null;
   try {
@@ -67,6 +80,12 @@ const SendIcon = () => (
   </svg>
 );
 
+const CloseIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 6 6 18M6 6l12 12" />
+  </svg>
+);
+
 export default function ChatTab() {
   const [team, setTeam] = useState<{ id: string; name: string } | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -83,6 +102,9 @@ export default function ChatTab() {
   const [profileCache, setProfileCache] = useState<
     Record<string, { full_name?: string | null; email?: string | null; avatar_url?: string | null }>
   >({});
+  const [showNewChatModal, setShowNewChatModal] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
   const channelRef = useRef<ReturnType<NonNullable<typeof browserSupabaseClient>['channel']> | null>(null);
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -394,6 +416,58 @@ export default function ChatTab() {
     [],
   );
 
+  const fetchTeamMembers = useCallback(async () => {
+    if (!accessToken) return;
+    setMembersLoading(true);
+    try {
+      const res = await fetch('/api/teams/members', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        cache: 'no-store',
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.error || 'Failed to load team members');
+      setTeamMembers(Array.isArray(body.members) ? body.members : []);
+    } catch (err: any) {
+      console.error('Failed to fetch team members:', err);
+    } finally {
+      setMembersLoading(false);
+    }
+  }, [accessToken]);
+
+  const handleOpenNewChatModal = useCallback(() => {
+    setShowNewChatModal(true);
+    fetchTeamMembers();
+  }, [fetchTeamMembers]);
+
+  const handleStartDirectChat = useCallback(
+    (member: TeamMember) => {
+      const recipientId = member.user_id;
+      // Check if conversation already exists
+      const existingConv = conversations.find(
+        (c) => c.type === 'direct' && c.id === `direct-${recipientId}`
+      );
+      if (existingConv) {
+        handleSelectConversation(existingConv.id);
+      } else {
+        // Create a new direct conversation entry locally
+        const memberName = member.displayName || member.profile?.full_name || member.displayEmail || 'Unknown';
+        const newConv: Conversation = {
+          type: 'direct',
+          id: `direct-${recipientId}`,
+          name: memberName,
+        };
+        setConversations((prev) => {
+          if (prev.some((c) => c.id === newConv.id)) return prev;
+          return [...prev, newConv];
+        });
+        handleSelectConversation(newConv.id);
+      }
+      setShowNewChatModal(false);
+      setFilterType('direct');
+    },
+    [conversations, handleSelectConversation],
+  );
+
   useEffect(() => {
     if (messageListRef.current) {
       messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
@@ -488,7 +562,7 @@ export default function ChatTab() {
         <div className="chat-sidebar-header">
           <div className="chat-sidebar-title-row">
             <h2 className="chat-sidebar-title">Messages</h2>
-            <button type="button" className="chat-new-btn">
+            <button type="button" className="chat-new-btn" onClick={handleOpenNewChatModal}>
               <PlusIcon /> New
             </button>
           </div>
@@ -666,12 +740,62 @@ export default function ChatTab() {
             <div className="chat-empty-icon">💬</div>
             <h3 className="chat-empty-title">Select a conversation</h3>
             <p className="chat-empty-text">Choose a conversation from the list to start messaging, or create a new one.</p>
-            <button type="button" className="chat-empty-btn">
+            <button type="button" className="chat-empty-btn" onClick={handleOpenNewChatModal}>
               <PlusIcon /> Start New Chat
             </button>
           </div>
         )}
       </div>
+
+      {/* New Chat Modal */}
+      {showNewChatModal && (
+        <div className="chat-modal-overlay" onClick={() => setShowNewChatModal(false)}>
+          <div className="chat-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="chat-modal-header">
+              <h3 className="chat-modal-title">New Direct Message</h3>
+              <button
+                type="button"
+                className="chat-modal-close"
+                onClick={() => setShowNewChatModal(false)}
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="chat-modal-content">
+              <p className="chat-modal-subtitle">Select a team member to start a conversation</p>
+              {membersLoading ? (
+                <div className="chat-modal-loading">Loading team members...</div>
+              ) : teamMembers.filter((m) => m.user_id !== authedUserId).length === 0 ? (
+                <div className="chat-modal-empty">No other team members found.</div>
+              ) : (
+                <div className="chat-member-list">
+                  {teamMembers
+                    .filter((m) => m.user_id !== authedUserId)
+                    .map((member) => {
+                      const name = member.displayName || member.profile?.full_name || member.displayEmail || 'Unknown';
+                      const email = member.displayEmail || member.profile?.email || '';
+                      return (
+                        <button
+                          key={member.id}
+                          type="button"
+                          className="chat-member-item"
+                          onClick={() => handleStartDirectChat(member)}
+                        >
+                          <div className="chat-member-avatar">{getInitials(name)}</div>
+                          <div className="chat-member-info">
+                            <span className="chat-member-name">{name}</span>
+                            {email && <span className="chat-member-email">{email}</span>}
+                          </div>
+                          <span className="chat-member-role">{member.role}</span>
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

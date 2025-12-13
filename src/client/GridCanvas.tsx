@@ -307,6 +307,27 @@ const GridCanvas = forwardRef<{
     const spaces = shapes.filter(isSpaceShape);
     currentSpaceRef.current = spaces.length > 0 ? spaces[spaces.length - 1]! : null;
   }, [shapes]);
+  // Force save on unmount to prevent data loss
+  useEffect(() => {
+    return () => {
+      // Component is unmounting - force immediate save of current state
+      if (onDataChange && currentProjectIdRef.current && hasInitializedRef.current) {
+        try {
+          onDataChange({
+            drawings: JSON.parse(JSON.stringify(drawingsRef.current)),
+            shapes: JSON.parse(JSON.stringify(shapesRef.current)),
+            textElements: JSON.parse(JSON.stringify(textElementsRef.current)),
+            walls: JSON.parse(JSON.stringify(wallsRef.current)),
+            doors: JSON.parse(JSON.stringify(doorsRef.current)),
+            viewBox: { ...viewBoxRef.current },
+          }, currentProjectIdRef.current);
+          console.log('GridCanvas unmounting - emergency save completed');
+        } catch (err) {
+          console.error('Failed to save on unmount:', err);
+        }
+      }
+    };
+  }, [onDataChange]);
   // Clear selection when switching away from hand tool so highlight doesn't persist while drawing
   useEffect(() => {
     if (activeTool !== 'hand') {
@@ -1723,13 +1744,19 @@ const GridCanvas = forwardRef<{
         const id = `drawing-${Date.now()}`;
         currentPathIdRef.current = id;
         currentPathRef.current = `M ${svgCoords.x} ${svgCoords.y}`;
-        // Create initial path with current brush settings so first point is visible
-        setDrawings(prev => [...prev, {
-          id: id,
+
+        // Create initial drawing in state so it's managed by React and persisted
+        const newDrawing: DrawingPath = {
+          id,
           d: currentPathRef.current,
           stroke: brushColor,
-          strokeWidth: brushSize
-        }]);
+          strokeWidth: brushSize,
+        };
+        setDrawings(prev => {
+          const updated = [...prev, newDrawing];
+          drawingsRef.current = updated;
+          return updated;
+        });
         e.preventDefault();
       }
     } else if (activeTool === 'eraser') {
@@ -1969,14 +1996,15 @@ const GridCanvas = forwardRef<{
       const svgCoords = screenToSvg(e.clientX, e.clientY);
       if (svgCoords && isPointOnCanvas(svgCoords.x, svgCoords.y)) {
         currentPathRef.current += ` L ${svgCoords.x} ${svgCoords.y}`;
+        const id = currentPathIdRef.current;
+        if (!id) return;
+        // Update the current drawing in state so redraws always include it
         setDrawings(prev => {
-          const updated = prev.filter(d => d.id !== currentPathIdRef.current);
-          return [...updated, {
-            id: currentPathIdRef.current,
-            d: currentPathRef.current,
-            stroke: brushColor,
-            strokeWidth: brushSize
-          }];
+          const updated = prev.map(d =>
+            d.id === id ? { ...d, d: currentPathRef.current } : d
+          );
+          drawingsRef.current = updated;
+          return updated;
         });
       }
     } else if (isDrawingRef.current && activeTool === 'eraser') {
@@ -2102,11 +2130,19 @@ const GridCanvas = forwardRef<{
 
     if (isDrawingRef.current && activeTool === 'brush') {
       isDrawingRef.current = false;
+
+      // Clear current path refs (the final path is already in state)
       currentPathRef.current = '';
+      currentPathIdRef.current = '';
+
+      // Save state immediately after drawing ends to persist the brush stroke
+      saveState();
+      // Force save to parent immediately
+      saveCurrentStateImmediately();
       // Reset user interaction flag after drawing ends
       setTimeout(() => {
         isUserInteractingRef.current = false;
-      }, 100);
+      }, 50);
     } else if (isDrawingRef.current && activeTool === 'eraser') {
       isDrawingRef.current = false;
       // Reset user interaction flag after erasing ends
@@ -2120,9 +2156,11 @@ const GridCanvas = forwardRef<{
         cancelAnimationFrame(eraserRafRef.current);
         eraserRafRef.current = null;
       }
+      // Save state after erasing
+      saveCurrentStateImmediately();
       setTimeout(() => {
         isUserInteractingRef.current = false;
-      }, 100);
+      }, 50);
     } else if (shapeStartRef.current && activeTool === 'shapes') {
       const svgCoords = screenToSvg(e.clientX, e.clientY);
       if (svgCoords && isPointOnCanvas(svgCoords.x, svgCoords.y)) {

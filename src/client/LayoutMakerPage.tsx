@@ -5,6 +5,8 @@ import Toolbar from './Toolbar';
 import ProjectTabs from './ProjectTabs';
 import InfiniteGridBackground from './InfiniteGridBackground';
 import AssistantChat from './AssistantChat';
+import AssociateProjectModal from './AssociateProjectModal';
+import { saveLayout, saveMultipleLayouts, type SaveLayoutInput, type LayoutRecord } from './api/layoutsApi';
 import type { Wall, Door } from './types/wall.js';
 
 export interface Project {
@@ -18,6 +20,12 @@ export interface Project {
     doors?: Door[];
     viewBox: { x: number; y: number; width: number; height: number };
   };
+  // Supabase linkage
+  supabaseLayoutId?: string;  // UUID from Supabase layouts table
+  eventId?: string;           // Optional link to WedBoardPro event
+  category?: string;
+  tags?: string[];
+  description?: string;
 }
 
 const STORAGE_KEY = 'layout-maker-projects';
@@ -102,6 +110,15 @@ const LayoutMakerPage: React.FC = () => {
     addWalls: (walls: Wall[], doors?: Door[]) => void;
   } | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  
+  // Save to Supabase state
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveError, setSaveError] = useState<string | null>(null);
+  
+  // Associate with project modal state
+  const [showAssociateModal, setShowAssociateModal] = useState<boolean>(false);
+  const [recentlySavedLayoutIds, setRecentlySavedLayoutIds] = useState<string[]>([]);
 
   // Always show the loading logo briefly on initial mount (covers refresh navigation)
   useEffect(() => {
@@ -109,7 +126,7 @@ const LayoutMakerPage: React.FC = () => {
     const t = setTimeout(() => setIsLoading(false), minDisplayMs);
     return () => clearTimeout(t);
   }, []);
-
+  
   // We'll render a non-blocking overlay in the main return so the Layout Maker mounts beneath it.
 
   const activeProject = projects.find(p => p.id === activeProjectId) || projects[0] || {
@@ -137,10 +154,174 @@ const LayoutMakerPage: React.FC = () => {
     };
   }, []);
 
-  const handleSaveLayout = () => {
-    console.log('Save Layout clicked');
-    // TODO: Implement save functionality
-  };
+  // Save current layout to Supabase
+  const handleSaveCurrentLayout = useCallback(async () => {
+    if (isSaving) return;
+    
+    setIsSaving(true);
+    setSaveStatus('saving');
+    setSaveError(null);
+    setShowSaveDropdown(false);
+    
+    try {
+      // Get the latest canvas data
+      const latestData = currentCanvasDataRef.current || activeProject.canvasData;
+      
+      const input: SaveLayoutInput = {
+        layoutId: activeProject.supabaseLayoutId,
+        name: activeProject.name,
+        description: activeProject.description,
+        category: activeProject.category,
+        tags: activeProject.tags,
+        canvasData: deepCopyCanvasData(latestData),
+        eventId: activeProject.eventId,
+      };
+      
+      const result = await saveLayout(input);
+      
+      if (result.error) {
+        console.error('[LayoutMakerPage] Save error:', result.error);
+        setSaveStatus('error');
+        setSaveError(result.error);
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      } else if (result.data) {
+        const savedId = result.data.id;
+        
+        // Update the project with the Supabase ID
+        setProjects(prev => {
+          const updated = prev.map(p =>
+            p.id === activeProjectId
+              ? { ...p, supabaseLayoutId: savedId }
+              : p
+          );
+          saveProjectsToStorage(updated);
+          return updated;
+        });
+        
+        setSaveStatus('saved');
+        console.log('[LayoutMakerPage] Layout saved to Supabase:', savedId);
+        
+        // Check if this layout already has an event linked
+        const hasEventLinked = !!activeProject.eventId;
+        
+        if (!hasEventLinked) {
+          // Trigger the associate project modal
+          setRecentlySavedLayoutIds([savedId]);
+          setShowAssociateModal(true);
+        }
+        
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      }
+    } catch (err: any) {
+      console.error('[LayoutMakerPage] Save exception:', err);
+      setSaveStatus('error');
+      setSaveError(err.message || 'Failed to save');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [isSaving, activeProject, activeProjectId, deepCopyCanvasData]);
+  
+  // Save all layouts to Supabase
+  const handleSaveAllLayouts = useCallback(async () => {
+    if (isSaving) return;
+    
+    setIsSaving(true);
+    setSaveStatus('saving');
+    setSaveError(null);
+    setShowSaveDropdown(false);
+    
+    try {
+      // Prepare all projects for saving
+      const inputs: SaveLayoutInput[] = projects.map(p => {
+        // Use current canvas data for active project
+        const canvasData = p.id === activeProjectId && currentCanvasDataRef.current
+          ? currentCanvasDataRef.current
+          : p.canvasData;
+        
+        return {
+          layoutId: p.supabaseLayoutId,
+          name: p.name,
+          description: p.description,
+          category: p.category,
+          tags: p.tags,
+          canvasData: deepCopyCanvasData(canvasData),
+          eventId: p.eventId,
+        };
+      });
+      
+      const result = await saveMultipleLayouts(inputs);
+      
+      if (result.error && !result.data) {
+        console.error('[LayoutMakerPage] Save all error:', result.error);
+        setSaveStatus('error');
+        setSaveError(result.error);
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      } else if (result.data) {
+        // Collect all saved layout IDs
+        const savedIds = result.data.map((saved: LayoutRecord) => saved.id);
+        
+        // Update projects with Supabase IDs
+        setProjects(prev => {
+          const updated = prev.map((p, i) => {
+            const supabaseId = result.data![i]?.id;
+            return supabaseId ? { ...p, supabaseLayoutId: supabaseId } : p;
+          });
+          saveProjectsToStorage(updated);
+          return updated;
+        });
+        
+        setSaveStatus('saved');
+        console.log('[LayoutMakerPage] All layouts saved to Supabase:', result.data.length);
+        
+        if (result.error) {
+          // Partial success
+          setSaveError(result.error);
+        }
+        
+        // Check if any layout doesn't have an event linked
+        const anyWithoutEvent = projects.some(p => !p.eventId);
+        
+        if (anyWithoutEvent && savedIds.length > 0) {
+          // Trigger the associate project modal
+          setRecentlySavedLayoutIds(savedIds);
+          setShowAssociateModal(true);
+        }
+        
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      }
+    } catch (err: any) {
+      console.error('[LayoutMakerPage] Save all exception:', err);
+      setSaveStatus('error');
+      setSaveError(err.message || 'Failed to save');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [isSaving, projects, activeProjectId, deepCopyCanvasData]);
+
+  // Handle when layouts are associated with a project
+  const handleLayoutsAssociated = useCallback((eventId: string) => {
+    // Update local project state with the event ID
+    setProjects(prev => {
+      const updated = prev.map(p =>
+        recentlySavedLayoutIds.includes(p.supabaseLayoutId || '')
+          ? { ...p, eventId }
+          : p
+      );
+      saveProjectsToStorage(updated);
+      return updated;
+    });
+    
+    setShowAssociateModal(false);
+    setRecentlySavedLayoutIds([]);
+    console.log('[LayoutMakerPage] Layouts associated with event:', eventId);
+  }, [recentlySavedLayoutIds]);
+  
+  const handleCloseAssociateModal = useCallback(() => {
+    setShowAssociateModal(false);
+    setRecentlySavedLayoutIds([]);
+  }, []);
 
   const handleAIPlanner = () => {
     console.log('AI Planner clicked');
@@ -306,6 +487,34 @@ const LayoutMakerPage: React.FC = () => {
     refProjectIdRef.current = activeProjectId;
   }, [activeProjectId, activeProject.canvasData, deepCopyCanvasData]);
 
+  // Force save current project data before page unload (refresh, close, navigate away)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Save current project's canvas data immediately before unload
+      if (currentCanvasDataRef.current && refProjectIdRef.current) {
+        const dataCopy = deepCopyCanvasData(currentCanvasDataRef.current);
+        const projectId = refProjectIdRef.current;
+        
+        // Get current projects from state
+        const currentProjects = projects;
+        const updated = currentProjects.map(project =>
+          project.id === projectId
+            ? { ...project, canvasData: dataCopy }
+            : project
+        );
+        
+        // Force synchronous save to localStorage
+        saveProjectsToStorage(updated);
+        console.log('Emergency save before unload completed for project:', projectId);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [projects, deepCopyCanvasData]);
+
   // Keyboard shortcuts: Cmd/Ctrl + Left/Right to navigate between projects, Cmd/Ctrl + + to create new project
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -370,7 +579,14 @@ const LayoutMakerPage: React.FC = () => {
         zIndex: 10000,
         isolation: 'isolate',
       }}>
-        <HeaderBar />
+        <HeaderBar
+          onSaveCurrentLayout={handleSaveCurrentLayout}
+          onSaveAllLayouts={handleSaveAllLayouts}
+          isSaving={isSaving}
+          saveStatus={saveStatus}
+          projectCount={projects.length}
+        />
+        
         <Toolbar
           activeTool={activeTool}
           onToolChange={setActiveTool}
@@ -394,6 +610,15 @@ const LayoutMakerPage: React.FC = () => {
         />
       </div>
       {!isLoading && <AssistantChat />}
+      
+      {/* Associate with Project Modal */}
+      <AssociateProjectModal
+        isOpen={showAssociateModal}
+        onClose={handleCloseAssociateModal}
+        layoutIds={recentlySavedLayoutIds}
+        onAssociated={handleLayoutsAssociated}
+      />
+      
       {/* Loading overlay */}
       {isLoading && (
         <div
