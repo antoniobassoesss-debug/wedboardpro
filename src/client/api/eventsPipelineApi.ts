@@ -273,6 +273,27 @@ export async function updateEvent(
   }
 }
 
+export async function deleteEvent(eventId: string): Promise<Result<null>> {
+  try {
+    const token = getAccessToken();
+    if (!token) return { data: null, error: 'Not authenticated' };
+
+    const res = await fetch(`/api/events/${eventId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { data: null, error: body.error || `Request failed (${res.status})` };
+    }
+
+    return { data: null, error: null };
+  } catch (err: any) {
+    return { data: null, error: err?.message || 'Failed to delete event' };
+  }
+}
+
 // ===== Stages =====
 
 export async function fetchStages(eventId: string): Promise<Result<PipelineStage[]>> {
@@ -482,6 +503,72 @@ export async function createEventFile(eventId: string, input: CreateEventFileInp
     return { data: data.file as EventFile, error: null };
   } catch (err: any) {
     return { data: null, error: err?.message || 'Failed to create file record' };
+  }
+}
+
+// ===== Client =====
+
+export interface CreateClientInput {
+  bride_name: string;
+  groom_name: string;
+  email: string;
+  phone: string;
+  address?: string | null;
+  preferences?: any;
+  communication_notes?: string | null;
+}
+
+export interface UpdateClientInput extends Partial<CreateClientInput> {}
+
+export async function createClient(eventId: string, input: CreateClientInput): Promise<Result<Client>> {
+  try {
+    const token = getAccessToken();
+    if (!token) return { data: null, error: 'Not authenticated' };
+
+    const res = await fetch(`/api/events/${eventId}/client`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(input),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { data: null, error: body.error || `Request failed (${res.status})` };
+    }
+
+    const data = await res.json();
+    return { data: data.client as Client, error: null };
+  } catch (err: any) {
+    return { data: null, error: err?.message || 'Failed to create client' };
+  }
+}
+
+export async function updateClient(eventId: string, input: UpdateClientInput): Promise<Result<Client>> {
+  try {
+    const token = getAccessToken();
+    if (!token) return { data: null, error: 'Not authenticated' };
+
+    const res = await fetch(`/api/events/${eventId}/client`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(input),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { data: null, error: body.error || `Request failed (${res.status})` };
+    }
+
+    const data = await res.json();
+    return { data: data.client as Client, error: null };
+  } catch (err: any) {
+    return { data: null, error: err?.message || 'Failed to update client' };
   }
 }
 

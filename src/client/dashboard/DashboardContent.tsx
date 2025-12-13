@@ -3,12 +3,12 @@ import HomeSection from './HomeSection';
 import {
   CalendarSection,
   LayoutsSection,
-  QuotesSection,
   TodoSection,
   WorkSection,
   SuppliersSection,
 } from './sections';
-import TeamsSection from './TeamsSection';
+import TeamsSection from './teams/TeamsSection';
+import CrmSection from './crm/CrmSection';
 import ChatSection from './ChatTab';
 
 interface DashboardContentProps {
@@ -26,8 +26,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ active, onNavigate 
       return <CalendarSection />;
     case 'layouts':
       return <LayoutsSection />;
-    case 'quotes':
-      return <QuotesSection />;
+    case 'crm':
+      return <CrmSection />;
     case 'todo':
       return <TodoSection />;
     case 'suppliers':

@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import LandingPage from './LandingPage';
+import MarketingHome from './MarketingHome';
+import { DebugClickProbe } from './components/DebugClickProbe';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
 import LayoutMakerPage from './LayoutMakerPage';
@@ -37,10 +38,26 @@ const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
 );
 
 const App: React.FC = () => {
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      // log basic info about clicks for debugging
+      // eslint-disable-next-line no-console
+      console.log('[GlobalClickDebug] click', {
+        tag: (e.target as Element)?.tagName,
+        id: (e.target as Element)?.id,
+        classes: (e.target as Element)?.className,
+        x: e.clientX,
+        y: e.clientY,
+      });
+    };
+    document.addEventListener('click', handler, true);
+    return () => document.removeEventListener('click', handler, true);
+  }, []);
   return (
     <BrowserRouter>
+      <DebugClickProbe />
       <Routes>
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={<MarketingHome />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/dashboard" element={<WeddingDashboard />} />

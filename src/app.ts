@@ -1919,6 +1919,49 @@ app.get('/api/events/:id', async (req, res) => {
   }
 });
 
+// Delete an event for current planner
+app.delete('/api/events/:id', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const eventId = req.params.id;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    // Ensure the event belongs to the current planner
+    const { data: event, error: fetchError } = await supabase
+      .from('events')
+      .select('id, planner_id')
+      .eq('id', eventId)
+      .single();
+
+    if (fetchError || !event) {
+      console.error('[DELETE /api/events/:id] Failed to load event:', fetchError);
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    if (event.planner_id !== user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { error: deleteError } = await supabase.from('events').delete().eq('id', eventId);
+    if (deleteError) {
+      console.error('[DELETE /api/events/:id] Error deleting event:', deleteError);
+      return res.status(500).json({ error: deleteError.message });
+    }
+
+    return res.status(204).send();
+  } catch (error: any) {
+    console.error('[DELETE /api/events/:id] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
 // Update event high-level fields
 app.patch('/api/events/:id', express.json(), async (req, res) => {
   try {
@@ -2854,6 +2897,163 @@ app.post('/api/events/:id/files', express.json(), async (req, res) => {
   }
 });
 
+// Create or update client for an event
+app.post('/api/events/:id/client', express.json(), async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const eventId = req.params.id;
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const { data: event, error: eventError } = await supabase
+      .from('events')
+      .select('id')
+      .eq('id', eventId)
+      .eq('planner_id', user.id)
+      .single();
+
+    if (eventError || !event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    const { bride_name, groom_name, email, phone, address, preferences, communication_notes } = req.body ?? {};
+    if (!bride_name || !groom_name || !email || !phone) {
+      return res.status(400).json({ error: 'bride_name, groom_name, email, and phone are required' });
+    }
+
+    // Check if client already exists
+    const { data: existing } = await supabase.from('clients').select('id').eq('event_id', eventId).maybeSingle();
+
+    let clientRow;
+    if (existing) {
+      // Update existing
+      const { data, error } = await supabase
+        .from('clients')
+        .update({
+          bride_name,
+          groom_name,
+          email,
+          phone,
+          address: address ?? null,
+          preferences: preferences ?? null,
+          communication_notes: communication_notes ?? null,
+        })
+        .eq('id', existing.id)
+        .select('*')
+        .single();
+      if (error) {
+        console.error('[POST /api/events/:id/client] Update error:', error);
+        return res.status(500).json({ error: error.message || 'Failed to update client' });
+      }
+      clientRow = data;
+    } else {
+      // Create new
+      const { data, error } = await supabase
+        .from('clients')
+        .insert({
+          event_id: eventId,
+          bride_name,
+          groom_name,
+          email,
+          phone,
+          address: address ?? null,
+          preferences: preferences ?? null,
+          communication_notes: communication_notes ?? null,
+        })
+        .select('*')
+        .single();
+      if (error) {
+        console.error('[POST /api/events/:id/client] Create error:', error);
+        return res.status(500).json({ error: error.message || 'Failed to create client' });
+      }
+      clientRow = data;
+    }
+
+    await logEventActivity(supabase, eventId, user.id, `Client contact updated: ${bride_name} & ${groom_name}`);
+
+    return res.json({ client: clientRow });
+  } catch (error: any) {
+    console.error('[POST /api/events/:id/client] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Update client for an event
+app.patch('/api/events/:id/client', express.json(), async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const eventId = req.params.id;
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const { data: event, error: eventError } = await supabase
+      .from('events')
+      .select('id')
+      .eq('id', eventId)
+      .eq('planner_id', user.id)
+      .single();
+
+    if (eventError || !event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    const { data: existing, error: findError } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('event_id', eventId)
+      .maybeSingle();
+
+    if (findError) {
+      return res.status(500).json({ error: 'Failed to find client' });
+    }
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Client not found. Use POST to create.' });
+    }
+
+    const body = req.body ?? {};
+    const patch: any = {};
+    if (body.bride_name !== undefined) patch.bride_name = body.bride_name;
+    if (body.groom_name !== undefined) patch.groom_name = body.groom_name;
+    if (body.email !== undefined) patch.email = body.email;
+    if (body.phone !== undefined) patch.phone = body.phone;
+    if (body.address !== undefined) patch.address = body.address;
+    if (body.preferences !== undefined) patch.preferences = body.preferences;
+    if (body.communication_notes !== undefined) patch.communication_notes = body.communication_notes;
+
+    const { data: updated, error } = await supabase
+      .from('clients')
+      .update(patch)
+      .eq('id', existing.id)
+      .select('*')
+      .single();
+
+    if (error || !updated) {
+      console.error('[PATCH /api/events/:id/client] Error:', error);
+      return res.status(500).json({ error: error?.message || 'Failed to update client' });
+    }
+
+    await logEventActivity(supabase, eventId, user.id, `Client contact updated`);
+
+    return res.json({ client: updated });
+  } catch (error: any) {
+    console.error('[PATCH /api/events/:id/client] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
 // ===== TASKS API =====
 
 // Get tasks for current user's team
@@ -3472,6 +3672,847 @@ async function notifyTaskAssignment(
     // Don't throw - notifications are non-critical
   }
 }
+
+// ===== CRM Module API Routes =====
+
+// POST /api/crm/pipelines/default - Get or create default pipeline
+app.post('/api/crm/pipelines/default', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase service client unavailable' });
+    }
+
+    // Check if user has a default pipeline
+    const { data: existing, error: checkError } = await supabase
+      .from('crm_pipelines')
+      .select('*')
+      .eq('account_id', user.id)
+      .eq('is_default', true)
+      .maybeSingle();
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      throw checkError;
+    }
+
+    if (existing) {
+      return res.json({ pipeline: existing });
+    }
+
+    // Create default pipeline using the helper function
+    const { data: pipelineId, error: initError } = await supabase.rpc('init_default_crm_pipeline', {
+      p_account_id: user.id,
+    });
+
+    if (initError) {
+      // If RPC fails, create manually
+      const { data: newPipeline, error: createError } = await supabase
+        .from('crm_pipelines')
+        .insert({
+          account_id: user.id,
+          name: 'Wedding Pipeline',
+          is_default: true,
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        throw createError;
+      }
+
+      // Create default stages
+      const defaultStages = [
+        { name: 'New Lead', position: 0, color: '#94a3b8' },
+        { name: 'Discovery Call', position: 1, color: '#60a5fa' },
+        { name: 'Proposal Sent', position: 2, color: '#fbbf24' },
+        { name: 'Contract Signed', position: 3, color: '#34d399' },
+        { name: 'Lost', position: 4, color: '#f87171' },
+      ];
+
+      for (const stage of defaultStages) {
+        await supabase.from('crm_stages').insert({
+          pipeline_id: newPipeline.id,
+          ...stage,
+        });
+      }
+
+      return res.json({ pipeline: newPipeline });
+    }
+
+    // Fetch the created pipeline
+    const { data: pipeline, error: fetchError } = await supabase
+      .from('crm_pipelines')
+      .select('*')
+      .eq('id', pipelineId)
+      .single();
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
+    res.json({ pipeline });
+  } catch (error: any) {
+    console.error('[POST /api/crm/pipelines/default] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to get/create pipeline' });
+  }
+});
+
+// GET /api/crm/pipelines/:id/stages - List stages for a pipeline
+app.get('/api/crm/pipelines/:id/stages', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase service client unavailable' });
+    }
+
+    const { id } = req.params;
+
+    const { data: stages, error } = await supabase
+      .from('crm_stages')
+      .select('*')
+      .eq('pipeline_id', id)
+      .order('position', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({ stages: stages || [] });
+  } catch (error: any) {
+    console.error('[GET /api/crm/pipelines/:id/stages] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to load stages' });
+  }
+});
+
+// GET /api/crm/pipelines/:id/deals - List deals with filters
+app.get('/api/crm/pipelines/:id/deals', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase service client unavailable' });
+    }
+
+    const { id: pipelineId } = req.params;
+    const { q, stageIds, ownerId, minValue, maxValue, weddingDateFrom, weddingDateTo, createdDateFrom, createdDateTo } = req.query;
+
+    let query = supabase
+      .from('crm_deals')
+      .select(`
+        *,
+        contact:crm_contacts(*),
+        stage:crm_stages(*)
+      `)
+      .eq('account_id', user.id)
+      .eq('pipeline_id', pipelineId)
+      .eq('is_lost', false)
+      .eq('is_won', false);
+
+    // Search filter - we'll filter client-side for now since Supabase doesn't support complex joins in OR conditions easily
+    // For better performance, this could be moved to a database function
+
+    // Stage filter
+    if (stageIds && typeof stageIds === 'string') {
+      const ids = stageIds.split(',').filter(Boolean);
+      if (ids.length > 0) {
+        query = query.in('stage_id', ids);
+      }
+    }
+
+    // Owner filter
+    if (ownerId && typeof ownerId === 'string') {
+      query = query.eq('owner_id', ownerId);
+    }
+
+    // Value filters
+    if (minValue) {
+      query = query.gte('value_cents', parseInt(String(minValue)));
+    }
+    if (maxValue) {
+      query = query.lte('value_cents', parseInt(String(maxValue)));
+    }
+
+    // Wedding date filters
+    if (weddingDateFrom) {
+      query = query.gte('wedding_date', String(weddingDateFrom));
+    }
+    if (weddingDateTo) {
+      query = query.lte('wedding_date', String(weddingDateTo));
+    }
+
+    // Created date filters
+    if (createdDateFrom) {
+      query = query.gte('created_at', String(createdDateFrom));
+    }
+    if (createdDateTo) {
+      query = query.lte('created_at', String(createdDateTo));
+    }
+
+    const { data: deals, error } = await query.order('position', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    // Format deals with couple names and apply search filter
+    let formattedDeals = (deals || []).map((deal: any) => {
+      const contact = deal.contact;
+      let coupleNames = 'Unknown';
+      if (contact) {
+        const primary = [contact.primary_first_name, contact.primary_last_name].filter(Boolean).join(' ').trim();
+        const partner = [contact.partner_first_name, contact.partner_last_name].filter(Boolean).join(' ').trim();
+        if (primary && partner) coupleNames = `${primary} & ${partner}`;
+        else if (primary) coupleNames = primary;
+        else if (partner) coupleNames = partner;
+        else if (contact.email) coupleNames = contact.email;
+      }
+      return { ...deal, coupleNames };
+    });
+
+    // Apply search filter client-side
+    if (q && typeof q === 'string' && q.trim()) {
+      const searchTerm = q.trim().toLowerCase();
+      formattedDeals = formattedDeals.filter((deal: any) => {
+        const titleMatch = deal.title?.toLowerCase().includes(searchTerm);
+        const coupleMatch = deal.coupleNames?.toLowerCase().includes(searchTerm);
+        const emailMatch = deal.contact?.email?.toLowerCase().includes(searchTerm);
+        return titleMatch || coupleMatch || emailMatch;
+      });
+    }
+
+    res.json({ deals: formattedDeals });
+  } catch (error: any) {
+    console.error('[GET /api/crm/pipelines/:id/deals] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to load deals' });
+  }
+});
+
+// GET /api/crm/pipelines/:id/metrics - Get CRM metrics/KPIs
+app.get('/api/crm/pipelines/:id/metrics', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase service client unavailable' });
+    }
+
+    const { id: pipelineId } = req.params;
+    const { q, stageIds, ownerId, minValue, maxValue, weddingDateFrom, weddingDateTo, createdDateFrom, createdDateTo } = req.query;
+
+    // Build base query
+    let query = supabase
+      .from('crm_deals')
+      .select('id, stage_id, value_cents, is_lost, is_won')
+      .eq('account_id', user.id)
+      .eq('pipeline_id', pipelineId);
+
+    // Apply same filters as deals endpoint (search will be filtered client-side after fetch)
+    if (stageIds && typeof stageIds === 'string') {
+      const ids = stageIds.split(',').filter(Boolean);
+      if (ids.length > 0) query = query.in('stage_id', ids);
+    }
+    if (ownerId && typeof ownerId === 'string') {
+      query = query.eq('owner_id', ownerId);
+    }
+    if (minValue) query = query.gte('value_cents', parseInt(String(minValue)));
+    if (maxValue) query = query.lte('value_cents', parseInt(String(maxValue)));
+    if (weddingDateFrom) query = query.gte('wedding_date', String(weddingDateFrom));
+    if (weddingDateTo) query = query.lte('wedding_date', String(weddingDateTo));
+    if (createdDateFrom) query = query.gte('created_at', String(createdDateFrom));
+    if (createdDateTo) query = query.lte('created_at', String(createdDateTo));
+
+    const { data: deals, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    // Apply search filter if provided
+    let filteredDeals = deals || [];
+    if (q && typeof q === 'string' && q.trim()) {
+      const searchTerm = q.trim().toLowerCase();
+      // Note: For metrics, we'd need to join with contacts to search properly
+      // For now, we'll just filter by title
+      filteredDeals = filteredDeals.filter((d: any) => {
+        // This is a simplified search - full search would require joining contacts
+        return true; // We'll do proper search when we have contact data joined
+      });
+    }
+
+    // Calculate metrics
+    const activeDeals = filteredDeals.filter((d: any) => !d.is_lost && !d.is_won);
+    const totalDeals = activeDeals.length;
+    const totalValueCents = activeDeals.reduce((sum: number, d: any) => sum + (d.value_cents || 0), 0);
+    const wonDeals = (deals || []).filter((d: any) => d.is_won).length;
+    const lostDeals = (deals || []).filter((d: any) => d.is_lost).length;
+
+    // Get stages for grouping
+    const { data: stages } = await supabase
+      .from('crm_stages')
+      .select('id, name, color')
+      .eq('pipeline_id', pipelineId);
+
+    // Group by stage
+    const byStageMap: Record<string, { count: number; valueCents: number; name: string; color: string | null }> = {};
+    (stages || []).forEach((s: any) => {
+      byStageMap[s.id] = { count: 0, valueCents: 0, name: s.name, color: s.color };
+    });
+
+    activeDeals.forEach((deal: any) => {
+      const stageStats = byStageMap[deal.stage_id];
+      if (stageStats) {
+        stageStats.count++;
+        stageStats.valueCents += deal.value_cents || 0;
+      }
+    });
+
+    const byStage = Object.entries(byStageMap).map(([stageId, stats]) => ({
+      stageId,
+      stageName: stats.name,
+      stageColor: stats.color,
+      count: stats.count,
+      valueCents: stats.valueCents,
+    }));
+
+    res.json({
+      metrics: {
+        totalDeals,
+        totalValueCents,
+        wonDeals,
+        lostDeals,
+        byStage,
+      },
+    });
+  } catch (error: any) {
+    console.error('[GET /api/crm/pipelines/:id/metrics] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to load metrics' });
+  }
+});
+
+// POST /api/crm/deals - Create a new deal
+app.post('/api/crm/deals', express.json(), async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase service client unavailable' });
+    }
+
+    const {
+      pipelineId,
+      stageId,
+      title,
+      weddingDate,
+      valueCents,
+      currency = 'EUR',
+      priority = 'medium',
+      nextAction,
+      ownerId,
+      primaryFirstName,
+      primaryLastName,
+      partnerFirstName,
+      partnerLastName,
+      email,
+      phone,
+    } = req.body;
+
+    if (!pipelineId || !stageId || !title) {
+      return res.status(400).json({ error: 'pipelineId, stageId, and title are required' });
+    }
+
+    let contactId: string | null = null;
+
+    // Create contact if provided
+    if (primaryFirstName || primaryLastName || email || phone) {
+      const { data: contact, error: contactError } = await supabase
+        .from('crm_contacts')
+        .insert({
+          account_id: user.id,
+          primary_first_name: primaryFirstName || null,
+          primary_last_name: primaryLastName || null,
+          partner_first_name: partnerFirstName || null,
+          partner_last_name: partnerLastName || null,
+          email: email || null,
+          phone: phone || null,
+        })
+        .select()
+        .single();
+
+      if (contactError) {
+        throw contactError;
+      }
+      contactId = contact.id;
+    }
+
+    // Create deal
+    const { data: deal, error: dealError } = await supabase
+      .from('crm_deals')
+      .insert({
+        account_id: user.id,
+        pipeline_id: pipelineId,
+        stage_id: stageId,
+        primary_contact_id: contactId,
+        title,
+        wedding_date: weddingDate || null,
+        value_cents: valueCents || null,
+        currency,
+        priority,
+        next_action: nextAction || null,
+        owner_id: ownerId || user.id,
+      })
+      .select(`
+        *,
+        contact:crm_contacts(*),
+        stage:crm_stages(*)
+      `)
+      .single();
+
+    if (dealError) {
+      throw dealError;
+    }
+
+    // Format couple names
+    const contact = deal.contact;
+    let coupleNames = 'Unknown';
+    if (contact) {
+      const primary = [contact.primary_first_name, contact.primary_last_name].filter(Boolean).join(' ').trim();
+      const partner = [contact.partner_first_name, contact.partner_last_name].filter(Boolean).join(' ').trim();
+      if (primary && partner) coupleNames = `${primary} & ${partner}`;
+      else if (primary) coupleNames = primary;
+      else if (partner) coupleNames = partner;
+      else if (contact.email) coupleNames = contact.email;
+    }
+
+    res.json({ deal: { ...deal, coupleNames } });
+  } catch (error: any) {
+    console.error('[POST /api/crm/deals] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to create deal' });
+  }
+});
+
+// PATCH /api/crm/deals/:id/stage - Update deal stage
+app.patch('/api/crm/deals/:id/stage', express.json(), async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase service client unavailable' });
+    }
+
+    const { id } = req.params;
+    const { stageId } = req.body;
+
+    if (!stageId) {
+      return res.status(400).json({ error: 'stageId is required' });
+    }
+
+    const { data: deal, error } = await supabase
+      .from('crm_deals')
+      .update({ stage_id: stageId })
+      .eq('id', id)
+      .eq('account_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({ deal });
+  } catch (error: any) {
+    console.error('[PATCH /api/crm/deals/:id/stage] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to update deal stage' });
+  }
+});
+
+// PATCH /api/crm/deals/:id - Update deal fields
+app.patch('/api/crm/deals/:id', express.json(), async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase service client unavailable' });
+    }
+
+    const { id } = req.params;
+    const updates: any = {};
+
+    if (req.body.title !== undefined) updates.title = req.body.title;
+    if (req.body.weddingDate !== undefined) updates.wedding_date = req.body.weddingDate;
+    if (req.body.valueCents !== undefined) updates.value_cents = req.body.valueCents;
+    if (req.body.currency !== undefined) updates.currency = req.body.currency;
+    if (req.body.priority !== undefined) updates.priority = req.body.priority;
+    if (req.body.nextAction !== undefined) updates.next_action = req.body.nextAction;
+    if (req.body.ownerId !== undefined) updates.owner_id = req.body.ownerId;
+    if (req.body.isLost !== undefined) updates.is_lost = req.body.isLost;
+    if (req.body.lostReason !== undefined) updates.lost_reason = req.body.lostReason;
+
+    const { data: deal, error } = await supabase
+      .from('crm_deals')
+      .update(updates)
+      .eq('id', id)
+      .eq('account_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({ deal });
+  } catch (error: any) {
+    console.error('[PATCH /api/crm/deals/:id] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to update deal' });
+  }
+});
+
+// DELETE /api/crm/deals/:id - Delete deal
+app.delete('/api/crm/deals/:id', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase service client unavailable' });
+    }
+
+    const { id } = req.params;
+
+    const { error } = await supabase
+      .from('crm_deals')
+      .delete()
+      .eq('id', id)
+      .eq('account_id', user.id);
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[DELETE /api/crm/deals/:id] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to delete deal' });
+  }
+});
+
+// GET /api/crm/deals/:id/details - Get full deal details
+app.get('/api/crm/deals/:id/details', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase service client unavailable' });
+    }
+
+    const { id } = req.params;
+
+    // Get deal with contact and stage
+    const { data: deal, error: dealError } = await supabase
+      .from('crm_deals')
+      .select(`
+        *,
+        contact:crm_contacts(*),
+        stage:crm_stages(*)
+      `)
+      .eq('id', id)
+      .eq('account_id', user.id)
+      .single();
+
+    if (dealError) {
+      throw dealError;
+    }
+
+    // Get activities
+    const { data: activities } = await supabase
+      .from('crm_activities')
+      .select('*')
+      .eq('deal_id', id)
+      .order('happened_at', { ascending: false });
+
+    // Get linked tasks
+    const { data: taskLinks } = await supabase
+      .from('crm_deal_tasks')
+      .select('task_id')
+      .eq('deal_id', id);
+
+    let tasks: any[] = [];
+    if (taskLinks && taskLinks.length > 0) {
+      const taskIds = taskLinks.map((tl: any) => tl.task_id);
+      const { data: tasksData } = await supabase
+        .from('tasks')
+        .select('id, title, status, priority, due_date, event_id')
+        .in('id', taskIds);
+      tasks = tasksData || [];
+    }
+
+    // Get linked files
+    const { data: fileLinks } = await supabase
+      .from('crm_deal_files')
+      .select('file_id')
+      .eq('deal_id', id);
+
+    let files: any[] = [];
+    if (fileLinks && fileLinks.length > 0) {
+      const fileIds = fileLinks.map((fl: any) => fl.file_id);
+      const { data: filesData } = await supabase
+        .from('project_files')
+        .select('id, file_name, extension, mime_type, size_bytes, storage_path, created_at')
+        .in('id', fileIds);
+      files = filesData || [];
+    }
+
+    // Format couple names
+    const contact = deal.contact;
+    let coupleNames = 'Unknown';
+    if (contact) {
+      const primary = [contact.primary_first_name, contact.primary_last_name].filter(Boolean).join(' ').trim();
+      const partner = [contact.partner_first_name, contact.partner_last_name].filter(Boolean).join(' ').trim();
+      if (primary && partner) coupleNames = `${primary} & ${partner}`;
+      else if (primary) coupleNames = primary;
+      else if (partner) coupleNames = partner;
+      else if (contact.email) coupleNames = contact.email;
+    }
+
+    res.json({
+      deal: {
+        ...deal,
+        activities: activities || [],
+        tasks: tasks || [],
+        files: files || [],
+        coupleNames,
+      },
+    });
+  } catch (error: any) {
+    console.error('[GET /api/crm/deals/:id/details] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to load deal details' });
+  }
+});
+
+// POST /api/crm/deals/:id/activities - Create activity
+app.post('/api/crm/deals/:id/activities', express.json(), async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase service client unavailable' });
+    }
+
+    const { id: dealId } = req.params;
+    const { type, summary, happenedAt } = req.body;
+
+    if (!type || !summary) {
+      return res.status(400).json({ error: 'type and summary are required' });
+    }
+
+    const { data: activity, error } = await supabase
+      .from('crm_activities')
+      .insert({
+        deal_id: dealId,
+        type,
+        summary,
+        happened_at: happenedAt || new Date().toISOString(),
+        created_by: user.id,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({ activity });
+  } catch (error: any) {
+    console.error('[POST /api/crm/deals/:id/activities] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to create activity' });
+  }
+});
+
+// GET /api/crm/deals/:id/activities - List activities
+app.get('/api/crm/deals/:id/activities', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase service client unavailable' });
+    }
+
+    const { id: dealId } = req.params;
+
+    const { data: activities, error } = await supabase
+      .from('crm_activities')
+      .select('*')
+      .eq('deal_id', dealId)
+      .order('happened_at', { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({ activities: activities || [] });
+  } catch (error: any) {
+    console.error('[GET /api/crm/deals/:id/activities] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to load activities' });
+  }
+});
+
+// PATCH /api/crm/deals/:id/next-action - Update next action
+app.patch('/api/crm/deals/:id/next-action', express.json(), async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase service client unavailable' });
+    }
+
+    const { id } = req.params;
+    const { nextAction, nextActionDueAt } = req.body;
+
+    const updates: any = {};
+    if (nextAction !== undefined) updates.next_action = nextAction;
+    if (nextActionDueAt !== undefined) updates.next_action_due_at = nextActionDueAt;
+
+    const { data: deal, error } = await supabase
+      .from('crm_deals')
+      .update(updates)
+      .eq('id', id)
+      .eq('account_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({ deal });
+  } catch (error: any) {
+    console.error('[PATCH /api/crm/deals/:id/next-action] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to update next action' });
+  }
+});
+
+// POST /api/crm/deals/:id/lost - Mark deal as lost
+app.post('/api/crm/deals/:id/lost', express.json(), async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase service client unavailable' });
+    }
+
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const { data: deal, error } = await supabase
+      .from('crm_deals')
+      .update({
+        is_lost: true,
+        lost_reason: reason || null,
+      })
+      .eq('id', id)
+      .eq('account_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({ deal });
+  } catch (error: any) {
+    console.error('[POST /api/crm/deals/:id/lost] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to mark deal as lost' });
+  }
+});
+
+// POST /api/crm/deals/:id/won - Mark deal as won
+app.post('/api/crm/deals/:id/won', express.json(), async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase service client unavailable' });
+    }
+
+    const { id } = req.params;
+
+    const { data: deal, error } = await supabase
+      .from('crm_deals')
+      .update({
+        is_won: true,
+        is_lost: false,
+      })
+      .eq('id', id)
+      .eq('account_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({ deal });
+  } catch (error: any) {
+    console.error('[POST /api/crm/deals/:id/won] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to mark deal as won' });
+  }
+});
 
 // Export app for Vercel serverless functions
 export default app;

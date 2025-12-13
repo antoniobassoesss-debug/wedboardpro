@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   CalendarIcon,
   ChatIcon,
@@ -13,10 +13,10 @@ import {
 
 const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: HomeIcon },
-  { id: 'work', label: 'The Work', icon: WorkIcon },
-  { id: 'calendar', label: 'The Calendar', icon: CalendarIcon },
-  { id: 'layouts', label: 'The Layouts', icon: LayoutIcon },
-  { id: 'quotes', label: 'The Quotes', icon: QuotesIcon },
+  { id: 'work', label: 'Work', icon: WorkIcon },
+  { id: 'calendar', label: 'Calendar', icon: CalendarIcon },
+  { id: 'layouts', label: 'Layouts', icon: LayoutIcon },
+  { id: 'crm', label: 'CRM', icon: QuotesIcon },
   { id: 'todo', label: 'To-Do List', icon: TodoIcon },
   { id: 'suppliers', label: 'Suppliers', icon: SuppliersIcon },
   { id: 'chat', label: 'Chat', icon: ChatIcon },
@@ -32,10 +32,7 @@ interface SidebarProps {
   avatarUrl?: string | null;
 }
 
-import { AccountModal } from '../components/AccountModal'
-
-const Sidebar: React.FC<SidebarProps> = ({ active, collapsed, onToggle, onSelect, userName, avatarUrl }) => {
-  const [accountOpen, setAccountOpen] = useState(false)
+const Sidebar: React.FC<SidebarProps> = ({ active, collapsed, onToggle, onSelect }) => {
 
   return (
     <aside className={`wp-sidebar ${collapsed ? 'collapsed' : ''}`}>
@@ -44,13 +41,16 @@ const Sidebar: React.FC<SidebarProps> = ({ active, collapsed, onToggle, onSelect
     <div className="wp-sidebar-logo">
       <img src="/logo/iconlogo.png" alt="Logo" style={{ width: 36, height: 36, objectFit: 'contain' }} />
       <div>
-        <div style={{ fontWeight: 700 }}>WedBoarPro</div>
-        <span style={{ fontSize: 12, color: '#7b7b7b' }}>Wedding Planner</span>
+        <div style={{ fontWeight: 700 }}>WedBoardPro</div>
       </div>
     </div>
       )}
-      <button type="button" className="wp-toggle" onClick={onToggle}>
-        {collapsed ? '▶' : '◀'}
+      <button type="button" className="wp-toggle" onClick={onToggle} aria-label="Toggle sidebar">
+        <span className="wp-toggle-lines">
+          <span />
+          <span />
+          <span />
+        </span>
       </button>
     </div>
     <nav className="wp-sidebar-menu">
@@ -66,56 +66,6 @@ const Sidebar: React.FC<SidebarProps> = ({ active, collapsed, onToggle, onSelect
         </button>
       ))}
     </nav>
-    <div className="wp-sidebar-footer">
-      <div
-        className="wp-dropdown"
-        role="button"
-        tabIndex={0}
-        onClick={() => setAccountOpen(true)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') setAccountOpen(true)
-        }}
-        style={{
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'flex-start',
-          gap: 8,
-          padding: collapsed ? 8 : '8px 12px',
-        }}
-        title="Open account settings"
-      >
-        {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt="Profile avatar"
-            style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }}
-          />
-        ) : (
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: '50%',
-              background: '#efefef',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              color: '#111',
-            }}
-          >
-            {(userName || 'U')
-              .split(' ')
-              .map((s) => s[0])
-              .slice(0, 2)
-              .join('')
-              .toUpperCase()}
-          </div>
-        )}
-      </div>
-    </div>
-    <AccountModal open={accountOpen} onOpenChange={setAccountOpen} />
     </aside>
   );
 };

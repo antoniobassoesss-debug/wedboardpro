@@ -1,12 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import './landing-page.css';
+// Top-of-page marketing header/hero use the original CSS-based components below
+// New marketing components are used for the mid-page sections
+import { SiteHeader } from './components/marketing/SiteHeader';
+import { HeroSection as NewHeroSection } from './components/marketing/HeroSection';
+import { TrustedByStrip } from './components/marketing/TrustedByStrip';
+import { SolutionsSection } from './components/marketing/SolutionsSection';
+import { ROISection } from './components/marketing/ROISection';
+import { ResourcesSection } from './components/marketing/ResourcesSection';
+import { FinalCTASection } from './components/marketing/FinalCTASection';
+import { SiteFooter } from './components/marketing/SiteFooter';
 
 const PRIMARY_CTA_HREF = '/signup';
 const DEMO_HREF = '/demo';
 
-const LandingPage: React.FC = () => {
+type NavItem = {
+  label: string;
+  href: string;
+};
+
+const NAV_ITEMS: NavItem[] = [
+  { label: 'Product', href: '#product' },
+  { label: 'Pricing', href: '#pricing' },
+  { label: 'For planners', href: '#for-planners' },
+];
+
+const MarketingHome: React.FC = () => {
   useEffect(() => {
+    console.log('%c HELLO FROM WEDBOARDPRO LANDING PAGE v2 ', 'background: #222; color: #bada55; font-size: 20px');
     // Enable scrolling on landing page
     const html = document.documentElement;
     const body = document.body;
@@ -43,28 +65,47 @@ const LandingPage: React.FC = () => {
 
   return (
     <div className="landing-shell">
-      <LandingHeader />
       <main className="landing-main">
+        {/* Use original header + hero + social proof which match landing-page.css styling */}
+        <LandingHeader />
         <HeroSection />
         <SocialProofStrip />
+
+        {/* Mid-page sections use the new marketing components */}
         <FeatureGrid />
+        <SolutionsSection />
         <WorkflowSection />
         <ScreenshotsSection />
+        <ROISection />
+        <ResourcesSection />
         <TestimonialsSection />
         <PricingTeaser />
         <FAQSection />
-        <FinalCTA />
+        <FinalCTASection />
       </main>
-      <LandingFooter />
+      <SiteFooter />
     </div>
   );
 };
 
-export default LandingPage;
+export default MarketingHome;
 
 /* ----------------------------- Header / Nav ----------------------------- */
 
 const LandingHeader: React.FC = () => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const handleAnchorClick = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!href.startsWith('#')) return;
+    event.preventDefault();
+    const targetId = href.slice(1);
+    const el = document.getElementById(targetId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setIsMobileMenuOpen(false);
+    }
+  };
+
   return (
     <header className="landing-header">
       <div className="landing-header-inner">
@@ -73,20 +114,69 @@ const LandingHeader: React.FC = () => {
           <span className="landing-logo-text">WedBoardPro</span>
         </Link>
 
-        <nav className="landing-nav">
-          <a href="#product">Product</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#for-planners">For planners</a>
+        <nav className="landing-nav" aria-label="Main">
+          {NAV_ITEMS.map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              onClick={handleAnchorClick(item.href)}
+              className={item.label === 'Pricing' ? 'landing-nav-link landing-nav-link-pricing' : 'landing-nav-link'}
+            >
+              {item.label}
+            </a>
+          ))}
           <Link to="/login" className="landing-nav-login">
-            Login
+            Log in
           </Link>
         </nav>
 
-        <div className="landing-header-cta">
-          <Link to={PRIMARY_CTA_HREF} className="landing-btn-primary">
-            Start Free Trial
-          </Link>
+        <div className="landing-header-right">
+          <p className="landing-header-microcopy">14-day free trial · No credit card</p>
+          <div className="landing-header-cta">
+            <Link to={PRIMARY_CTA_HREF} className="landing-btn-primary">
+              Start Free Trial
+            </Link>
+          </div>
+          <button
+            type="button"
+            className="landing-menu-toggle"
+            aria-label="Toggle navigation menu"
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="landing-mobile-nav"
+            onClick={() => setIsMobileMenuOpen((open) => !open)}
+          >
+            <span className="landing-menu-toggle-bar" />
+          </button>
         </div>
+      </div>
+
+      <div
+        id="landing-mobile-nav"
+        className={`landing-mobile-nav ${isMobileMenuOpen ? 'open' : ''}`}
+        aria-label="Mobile navigation"
+      >
+        <nav className="landing-mobile-nav-inner">
+          <div className="landing-mobile-nav-links">
+            {NAV_ITEMS.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={handleAnchorClick(item.href)}
+                className="landing-mobile-link"
+              >
+                {item.label}
+              </a>
+            ))}
+            <Link to="/login" className="landing-mobile-link landing-mobile-login">
+              Log in
+            </Link>
+          </div>
+          <div className="landing-mobile-cta">
+            <Link to={PRIMARY_CTA_HREF} className="landing-btn-primary landing-btn-full">
+              Start Free Trial
+            </Link>
+          </div>
+        </nav>
       </div>
     </header>
   );
@@ -99,7 +189,6 @@ const HeroSection: React.FC = () => {
     <section id="for-planners" className="landing-section">
       <div className="landing-hero">
         <div className="landing-hero-left">
-          <p className="landing-eyebrow">For professional wedding planners</p>
           <h1 className="landing-hero-title">
             The all‑in‑one platform for modern wedding planners
           </h1>

@@ -1,11 +1,12 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import SectionCard from './SectionCard';
 import { useNavigate } from 'react-router-dom';
 import TodoPage from '../todo/TodoPage';
 import Calendar from '../components/Calendar';
 import EventProjectPage from './pipeline/EventProjectPage';
-import { listEvents, createEvent, type Event } from '../api/eventsPipelineApi';
+import { listEvents, createEvent, deleteEvent, type Event } from '../api/eventsPipelineApi';
 import SuppliersPage from '../suppliers/SuppliersPage';
+import { NewProjectModal, type NewProjectPayload } from '../components/NewProjectModal';
 
 const EmptyState: React.FC<{ message: string }> = ({ message }) => (
   <div
@@ -28,6 +29,9 @@ export const WorkSection: React.FC = () => {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ eventId: string; x: number; y: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   const loadEvents = async () => {
     setLoading(true);
@@ -49,32 +53,64 @@ export const WorkSection: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleCreateEvent = async () => {
-    const today = new Date();
-    const isoDate = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString().slice(0, 10);
+  // Refresh when a new event is created elsewhere (e.g., global modal).
+  useEffect(() => {
+    const refresh = () => loadEvents();
+    window.addEventListener('wbp:new-event-created', refresh);
+    return () => window.removeEventListener('wbp:new-event-created', refresh);
+  }, []);
+
+  // Close context menu on outside click / scroll / escape
+  useEffect(() => {
+    const close = () => setContextMenu(null);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    window.addEventListener('click', close);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, []);
+
+  const handleCreateProjectFromModal = async (payload: NewProjectPayload) => {
+    // Use the modal’s data to create a new wedding event in the pipeline.
+    const { title, eventDate } = payload;
+    const dateForSave =
+      eventDate && eventDate.trim().length > 0
+        ? eventDate
+        : new Date().toISOString().slice(0, 10);
+
     const { data, error: err } = await createEvent({
-      title: `New Wedding – ${today.toLocaleDateString()}`,
-      wedding_date: isoDate,
+      title: title || `New Wedding – ${new Date().toLocaleDateString()}`,
+      wedding_date: dateForSave,
     });
+
     if (err) {
       // eslint-disable-next-line no-alert
       alert(`Failed to create event: ${err}`);
       return;
     }
+
     if (data) {
-      setEvents((prev) => [...prev, data.event]);
+      setEvents((prev) => [data.event, ...prev]);
       setSelectedEventId(data.event.id);
     }
+
+    setIsNewProjectOpen(false);
   };
 
   const selectedEvent = events.find((e) => e.id === selectedEventId) ?? null;
 
   return (
-    <SectionCard
-      title="Project Pipeline"
-      description="Each wedding gets its own workspace from first brief to post‑event wrap‑up."
-    >
-      <div style={{ display: 'grid', gridTemplateColumns: '260px minmax(0, 1fr)', gap: 16 }}>
+    <SectionCard title="Project Pipeline">
+      <div
+        ref={containerRef}
+        style={{ display: 'grid', gridTemplateColumns: '260px minmax(0, 1fr)', gap: 16, position: 'relative' }}
+      >
         {/* Events list */}
         <div
           style={{
@@ -91,8 +127,9 @@ export const WorkSection: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
             <div style={{ fontSize: 13, fontWeight: 600 }}>Events</div>
             <button
+              id="new-event-btn"
               type="button"
-              onClick={handleCreateEvent}
+              onClick={() => setIsNewProjectOpen(true)}
               style={{
                 borderRadius: 999,
                 padding: '6px 10px',
@@ -102,6 +139,8 @@ export const WorkSection: React.FC = () => {
                 fontSize: 12,
                 fontWeight: 500,
                 cursor: 'pointer',
+                position: 'relative',
+                zIndex: 10,
               }}
             >
               + New event
@@ -126,6 +165,10 @@ export const WorkSection: React.FC = () => {
                 key={ev.id}
                 type="button"
                 onClick={() => setSelectedEventId(ev.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setContextMenu({ eventId: ev.id, x: e.clientX, y: e.clientY });
+                }}
                 style={{
                   textAlign: 'left',
                   borderRadius: 10,
@@ -159,6 +202,60 @@ export const WorkSection: React.FC = () => {
           )}
         </div>
       </div>
+      {contextMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            top: contextMenu.y,
+            left: contextMenu.x,
+            background: '#ffffff',
+            border: '1px solid #e5e7eb',
+            boxShadow: '0 8px 20px rgba(15,23,42,0.15)',
+            borderRadius: 12,
+            padding: 8,
+            zIndex: 9999,
+            minWidth: 140,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ fontSize: 12, color: '#475467', padding: '6px 8px' }}>Event actions</div>
+          <button
+            type="button"
+            onClick={async () => {
+              const { error: deleteError } = await deleteEvent(contextMenu.eventId);
+              if (deleteError) {
+                // eslint-disable-next-line no-alert
+                alert(`Failed to delete event: ${deleteError}`);
+                return;
+              }
+              setEvents((prev) => prev.filter((ev) => ev.id !== contextMenu.eventId));
+              if (selectedEventId === contextMenu.eventId) {
+                setSelectedEventId(null);
+              }
+              setContextMenu(null);
+            }}
+            style={{
+              width: '100%',
+              textAlign: 'left',
+              padding: '8px 10px',
+              border: 'none',
+              background: '#fee2e2',
+              color: '#b91c1c',
+              borderRadius: 8,
+              cursor: 'pointer',
+              fontWeight: 600,
+            }}
+          >
+            Delete event
+          </button>
+        </div>
+      )}
+      <NewProjectModal
+        isOpen={isNewProjectOpen}
+        onClose={() => setIsNewProjectOpen(false)}
+        handleCreateProject={handleCreateProjectFromModal}
+        key={isNewProjectOpen ? 'open' : 'closed'}
+      />
     </SectionCard>
   );
 };
@@ -192,40 +289,7 @@ export const CalendarSection: React.FC = () => {
   );
 };
 
-export const LayoutsSection: React.FC = () => {
-  const navigate = useNavigate();
-  const layouts: Array<{ venue: string; capacity: number; status: string }> = [];
-
-  return (
-    <SectionCard title="Layout Library" description="Manage venue floor plans and seating charts.">
-      <div className="wp-section-header">
-        <div />
-        <button type="button" className="wp-pill primary" onClick={() => navigate('/layout-maker')}>
-          New Layout
-        </button>
-      </div>
-      <div className="wp-section-grid">
-        {layouts.length === 0 ? (
-          <EmptyState message="No layouts saved yet. Create a layout to see it listed here." />
-        ) : (
-          layouts.map((layout) => (
-            <div key={layout.venue} className="wp-layout-card">
-              <strong>{layout.venue}</strong>
-              <p style={{ margin: '4px 0', color: '#7b7b7b' }}>{layout.capacity} guests</p>
-              <span
-                className={`wp-badge ${
-                  layout.status === 'Approved' ? 'positive' : layout.status === 'In Review' ? 'warning' : 'neutral'
-                }`}
-              >
-                {layout.status}
-              </span>
-            </div>
-          ))
-        )}
-      </div>
-    </SectionCard>
-  );
-};
+export { default as LayoutsSection } from './layouts/LayoutsSection';
 
 export const QuotesSection: React.FC = () => {
   const quotes: Array<{ client: string; date: string; amount: string; status: string }> = [];

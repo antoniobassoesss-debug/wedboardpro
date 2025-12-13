@@ -48,16 +48,102 @@
   display: flex;
   gap: 8px;
   align-items: center;
-  margin-top: 8px;
+  margin-top: 12px;
   flex-wrap: wrap;
 }
 
-.filters-row select {
+/* Rounded Pill Filter */
+.td-filter {
+  position: relative;
+}
+
+.td-filter-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  border: 1px solid #e2e8f0;
   border-radius: 999px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  padding: 6px 14px;
-  font-size: 13px;
   background: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.td-filter-trigger:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.td-filter-trigger.open {
+  border-color: #0f172a;
+  background: #fff;
+}
+
+.td-filter-trigger.filtered {
+  background: #0f172a;
+  color: #fff;
+  border-color: #0f172a;
+}
+
+.td-filter-trigger.filtered:hover {
+  background: #1e293b;
+  border-color: #1e293b;
+}
+
+.td-filter-dot {
+  display: none;
+}
+
+/* Filter Menu */
+.td-filter-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 150px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 200;
+  overflow: hidden;
+  animation: tdMenuIn 0.12s ease;
+}
+
+@keyframes tdMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.td-filter-item {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s ease;
+}
+
+.td-filter-item:hover {
+  background: #f1f5f9;
+}
+
+.td-filter-item.selected {
+  background: #f1f5f9;
+  color: #0f172a;
+  font-weight: 600;
 }
 
 .task-list {

@@ -7,7 +7,7 @@
   --accent: #111111;
   --radius-card: 2rem;
   --sidebar-width: 240px;
-  --sidebar-collapsed: 68px;
+  --sidebar-collapsed: 80px;
   font-family: 'Geist', 'Inter', sans-serif;
 }
 
@@ -71,9 +71,20 @@ body {
   border: none;
   background: transparent;
   font-weight: 600;
-  color: #7c7c7c;
+  color: #0c0c0c; /* icons: solid black by default via currentColor */
   cursor: pointer;
   transition: background 0.15s ease;
+}
+
+.wp-nav-button svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.wp-nav-button span {
+  color: #6f6f6f; /* slightly softer label to keep focus on icon */
+  font-weight: 500;
 }
 
 .wp-nav-button:hover {
@@ -85,18 +96,42 @@ body {
   color: #ffffff;
 }
 
+.wp-nav-button.active span {
+  color: #ffffff;
+}
+
 .wp-sidebar.collapsed .wp-nav-button span {
   display: none;
 }
 
+.wp-sidebar.collapsed .wp-nav-button {
+  justify-content: center;
+  padding-inline: 12px;
+}
+
 .wp-toggle {
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 6px 10px;
-  background: #fff;
-  font-size: 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
   cursor: pointer;
   margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wp-toggle-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wp-toggle-lines span {
+  display: block;
+  width: 14px;
+  height: 2px;
+  border-radius: 999px;
+  background: #0c0c0c;
 }
 
 .wp-main {
@@ -106,21 +141,100 @@ body {
   height: 100vh;
   overflow: hidden;
   min-height: 0;
+  position: relative;
 }
 
-.wp-topbar {
-  height: 80px;
-  background: white;
-  border-bottom: 1px solid var(--border);
-  padding: 0 32px;
+/* Floating top-right controls */
+.wp-floating-controls {
+  position: fixed;
+  top: 16px;
+  right: 24px;
+  z-index: 100;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
 }
 
-.wp-topbar h1 {
-  margin: 0;
-  font-size: 24px;
+.wp-floating-controls > * {
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.wp-floating-controls > *:hover {
+  transform: translateY(-1px);
+}
+
+/* Profile button */
+.wp-floating-profile {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: all 150ms ease;
+}
+
+.wp-floating-profile:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.wp-floating-profile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wp-floating-profile-initials {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+/* Notifications button */
+.wp-floating-notifications {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 150ms ease;
+  color: #0f172a;
+}
+
+.wp-floating-notifications:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.wp-floating-notifications-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: #ef4444;
+  color: white;
+  border-radius: 999px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ffffff;
 }
 
 .wp-actions {
@@ -146,7 +260,7 @@ body {
 
 .wp-content {
   flex: 1;
-  padding: 32px;
+  padding: 72px 32px 32px 32px; /* 16px top margin + 40px icon + 16px gap = 72px */
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -378,6 +492,284 @@ body {
     gap: 16px;
     height: auto;
     padding: 16px 20px;
+  }
+}
+
+/* ===================== */
+/* Home Dashboard Styles */
+/* ===================== */
+
+.home-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #64748b;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  display: block;
+}
+
+/* Home Grid */
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+/* Home Card */
+.home-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.home-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.home-card-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  color: #0f172a;
+}
+
+.home-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Small pill button */
+.wp-pill.small {
+  padding: 6px 14px;
+  font-size: 12px;
+}
+
+/* Home List */
+.home-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.home-list.compact {
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.home-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.home-list-item:hover {
+  background: #f1f5f9;
+}
+
+.home-list-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.home-list-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-list-meta {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.home-list-meta.overdue {
+  color: #ef4444;
+  font-weight: 500;
+}
+
+/* Date block for calendar items */
+.home-list-date {
+  width: 44px;
+  height: 44px;
+  background: #0f172a;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.home-date-day {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+
+.home-date-month {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Status Badge */
+.home-status-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+.home-status-badge.status-on_track {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.home-status-badge.status-at_risk {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.home-status-badge.status-delayed {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.home-status-badge.status-completed {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+/* Priority Badge */
+.home-priority-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+.home-priority-badge.priority-high {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.home-priority-badge.priority-medium {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.home-priority-badge.priority-low {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+/* CRM Stats */
+.home-crm-stats {
+  display: flex;
+  gap: 20px;
+}
+
+.home-crm-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.home-crm-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.home-crm-label {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* Empty State */
+.home-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px 16px;
+  gap: 12px;
+  flex: 1;
+}
+
+.home-empty.small {
+  padding: 12px 8px;
+  gap: 8px;
+}
+
+.home-empty p {
+  margin: 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+/* Skeleton Loading */
+.home-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.home-skeleton-row {
+  height: 48px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 12px;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Responsive */
+@media (max-width: 700px) {
+  .home-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .home-crm-stats {
+    flex-direction: column;
+    gap: 12px;
   }
 }
 

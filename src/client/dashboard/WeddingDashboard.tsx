@@ -1,18 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
 import DashboardContent from './DashboardContent';
 import './wedding-dashboard.css';
 import { browserSupabaseClient } from '../browserSupabaseClient';
 import NotificationsBell from '../components/NotificationsBell';
-
-const SECTION_TITLES: Record<string, string> = {
-  home: 'Bloom Studio Dashboard',
-  work: 'Project Pipeline',
-  calendar: 'Event Calendar',
-  layouts: 'Layout Library',
-  quotes: 'Quotes & Proposals',
-  todo: 'Task Manager',
-};
+import { NewProjectModal, type NewProjectPayload } from '../components/NewProjectModal';
+import { createEvent } from '../api/eventsPipelineApi';
+import { AccountModal } from '../components/AccountModal';
 
 const safeParse = (raw: string | null) => {
   if (!raw) return null;
@@ -62,8 +56,9 @@ const WeddingDashboard: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [displayName, setDisplayName] = useState(() => deriveDisplayName() ?? 'Sarah Mitchell');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-
-  const title = useMemo(() => SECTION_TITLES[active] ?? 'Bloom Studio Dashboard', [active]);
+  const [isGlobalProjectModalOpen, setIsGlobalProjectModalOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
 
   const fetchProfileFromSupabase = useCallback(async () => {
     if (typeof window === 'undefined') {
@@ -145,27 +140,62 @@ const WeddingDashboard: React.FC = () => {
         avatarUrl={avatarUrl}
       />
       <div className="wp-main">
-        <header className="wp-topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <img src="/logo/iconlogo.png" alt="Logo" style={{ width: 40, height: 40, objectFit: 'contain' }} />
-            <div>
-              <h1 style={{ margin: 0 }}>{title}</h1>
-            </div>
-          </div>
-          <div className="wp-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <NotificationsBell />
-            <button type="button" className="wp-pill">
-              Search
-            </button>
-            <button type="button" className="wp-pill primary">
-              New Project
-            </button>
-          </div>
-        </header>
+        {/* Floating top-right controls */}
+        <div className="wp-floating-controls">
+          <NotificationsBell />
+          <button
+            type="button"
+            className="wp-floating-profile"
+            onClick={() => setAccountOpen(true)}
+            title="Open account settings"
+          >
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Profile" />
+            ) : (
+              <span className="wp-floating-profile-initials">
+                {(displayName || 'U')
+                  .split(' ')
+                  .map((s) => s[0])
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase()}
+              </span>
+            )}
+          </button>
+        </div>
+
         <section className="wp-content">
           <DashboardContent active={active} onNavigate={setActive} />
         </section>
       </div>
+      <NewProjectModal
+        isOpen={isGlobalProjectModalOpen}
+        onClose={() => setIsGlobalProjectModalOpen(false)}
+        handleCreateProject={async (payload: NewProjectPayload) => {
+          setIsCreating(true);
+          const dateForSave =
+            payload.eventDate && payload.eventDate.trim().length > 0
+              ? payload.eventDate
+              : new Date().toISOString().slice(0, 10);
+          const { data, error } = await createEvent({
+            title: payload.title || `New Wedding – ${new Date().toLocaleDateString()}`,
+            wedding_date: dateForSave,
+          });
+          setIsCreating(false);
+          if (error) {
+            // eslint-disable-next-line no-alert
+            alert(`Failed to create event: ${error}`);
+            return;
+          }
+          if (data?.event) {
+            // Inform WorkSection to refresh events
+            window.dispatchEvent(new CustomEvent('wbp:new-event-created', { detail: data.event }));
+          }
+          setActive('work');
+          setIsGlobalProjectModalOpen(false);
+        }}
+      />
+      <AccountModal open={accountOpen} onOpenChange={setAccountOpen} />
     </div>
   );
 };

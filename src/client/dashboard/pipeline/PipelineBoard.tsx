@@ -4,10 +4,12 @@ import { createEmptyProject, mockProjects } from './projectsData';
 import ProjectsPage from './ProjectsPage';
 import ProjectPipelinePage from './ProjectPipelinePage';
 import './pipeline.css';
+import { NewProjectModal, NewProjectPayload } from '../../components/NewProjectModal';
 
 const PipelineBoard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>(mockProjects);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(projects[0]?.id ?? null);
+  const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
@@ -18,10 +20,13 @@ const PipelineBoard: React.FC = () => {
     setSelectedProjectId(projectId);
   };
 
-  const handleCreateProject = () => {
-    const newProject = createEmptyProject();
+  const handleCreateProject = (payload: NewProjectPayload) => {
+    // For now we only use the title as the project name; the other fields
+    // can later be wired into Supabase / extended Project schema.
+    const newProject = createEmptyProject(payload.title);
     setProjects((prev) => [newProject, ...prev]);
     setSelectedProjectId(newProject.id);
+    setIsNewProjectOpen(false);
   };
 
   const updateProject = (projectId: string, updater: (project: Project) => Project) => {
@@ -72,21 +77,28 @@ const PipelineBoard: React.FC = () => {
   };
 
   return (
-    <div className="pipeline-wrapper">
-      <ProjectsPage
-        projects={projects}
-        selectedProjectId={selectedProjectId}
-        onSelectProject={handleSelectProject}
-        onCreateProject={handleCreateProject}
+    <>
+      <div className="pipeline-wrapper">
+        <ProjectsPage
+          projects={projects}
+          selectedProjectId={selectedProjectId}
+          onSelectProject={handleSelectProject}
+          onCreateProject={() => setIsNewProjectOpen(true)}
+        />
+        <ProjectPipelinePage
+          project={selectedProject}
+          onProjectNameChange={handleProjectNameChange}
+          onStageStatusChange={handleStageStatusChange}
+          onStageNotesChange={handleStageNotesChange}
+          onAssignStage={handleAssignStage}
+        />
+      </div>
+      <NewProjectModal
+        isOpen={isNewProjectOpen}
+        onClose={() => setIsNewProjectOpen(false)}
+        handleCreateProject={handleCreateProject}
       />
-      <ProjectPipelinePage
-        project={selectedProject}
-        onProjectNameChange={handleProjectNameChange}
-        onStageStatusChange={handleStageStatusChange}
-        onStageNotesChange={handleStageNotesChange}
-        onAssignStage={handleAssignStage}
-      />
-    </div>
+    </>
   );
 };
 

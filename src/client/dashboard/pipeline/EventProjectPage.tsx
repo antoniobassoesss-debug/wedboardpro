@@ -1,18 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { EventWorkspace, PipelineStage, StageTask, Vendor, EventFile } from '../../api/eventsPipelineApi';
+import type { EventWorkspace, PipelineStage, StageTask, Vendor, EventFile, Client } from '../../api/eventsPipelineApi';
 import {
   fetchEventWorkspace,
   updateEvent,
   updateStageTask,
   updateVendor,
   createEventFile,
+  createClient,
+  updateClient,
 } from '../../api/eventsPipelineApi';
+import ProjectFilesSection from './files/ProjectFilesSection';
 
 interface EventProjectPageProps {
   eventId: string;
 }
 
-type ActiveTab = 'pipeline' | 'tasks' | 'vendors' | 'files' | 'notes';
+type ActiveTab = 'pipeline' | 'tasks' | 'vendors' | 'files' | 'notes' | 'contacts';
 
 const formatDate = (iso: string | null | undefined) => {
   if (!iso) return 'No date';
@@ -38,6 +41,15 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
   const [newFileName, setNewFileName] = useState('');
   const [newFileUrl, setNewFileUrl] = useState('');
   const [newFileCategory, setNewFileCategory] = useState<EventFile['category']>('other');
+  const [isSavingClient, setIsSavingClient] = useState(false);
+  const [clientForm, setClientForm] = useState({
+    bride_name: '',
+    groom_name: '',
+    email: '',
+    phone: '',
+    address: '',
+    communication_notes: '',
+  });
 
   const loadWorkspace = async () => {
     setLoading(true);
@@ -55,6 +67,30 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
     loadWorkspace();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
+
+  // Populate client form when workspace loads
+  useEffect(() => {
+    if (workspace && workspace.client) {
+      const c = workspace.client;
+      setClientForm({
+        bride_name: c.bride_name || '',
+        groom_name: c.groom_name || '',
+        email: c.email || '',
+        phone: c.phone || '',
+        address: c.address || '',
+        communication_notes: c.communication_notes || '',
+      });
+    } else {
+      setClientForm({
+        bride_name: '',
+        groom_name: '',
+        email: '',
+        phone: '',
+        address: '',
+        communication_notes: '',
+      });
+    }
+  }, [workspace]);
 
   const event = workspace?.event ?? null;
 
@@ -376,137 +412,8 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
   };
 
   const renderFilesTab = () => {
-    if (!workspace) return null;
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div
-          style={{
-            borderRadius: 12,
-            border: '1px solid #e5e5e5',
-            padding: 10,
-            background: '#ffffff',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-          }}
-        >
-          <div style={{ fontSize: 13, fontWeight: 600 }}>Add file link</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              placeholder="File name"
-              value={newFileName}
-              onChange={(e) => setNewFileName(e.target.value)}
-              style={{
-                flex: 1,
-                minWidth: 140,
-                borderRadius: 8,
-                border: '1px solid #d1d5db',
-                padding: '6px 8px',
-                fontSize: 12,
-              }}
-            />
-            <input
-              type="text"
-              placeholder="https://file-url"
-              value={newFileUrl}
-              onChange={(e) => setNewFileUrl(e.target.value)}
-              style={{
-                flex: 2,
-                minWidth: 180,
-                borderRadius: 8,
-                border: '1px solid #d1d5db',
-                padding: '6px 8px',
-                fontSize: 12,
-              }}
-            />
-            <select
-              value={newFileCategory}
-              onChange={(e) => setNewFileCategory(e.target.value as EventFile['category'])}
-              style={{
-                borderRadius: 8,
-                border: '1px solid #d1d5db',
-                padding: '6px 8px',
-                fontSize: 12,
-              }}
-            >
-              <option value="contract">Contract</option>
-              <option value="layout">Layout</option>
-              <option value="menu">Menu</option>
-              <option value="photo">Photo</option>
-              <option value="other">Other</option>
-            </select>
-            <button
-              type="button"
-              disabled={isCreatingFile || !newFileName.trim() || !newFileUrl.trim()}
-              onClick={async () => {
-                if (!event) return;
-                setIsCreatingFile(true);
-                await createEventFile(event.id, {
-                  file_name: newFileName.trim(),
-                  file_url: newFileUrl.trim(),
-                  category: newFileCategory,
-                });
-                setNewFileName('');
-                setNewFileUrl('');
-                setNewFileCategory('other');
-                setIsCreatingFile(false);
-                await loadWorkspace();
-              }}
-              style={{
-                borderRadius: 999,
-                padding: '6px 10px',
-                border: 'none',
-                background: '#0f172a',
-                color: '#ffffff',
-                fontSize: 12,
-                fontWeight: 500,
-                cursor: 'pointer',
-                minWidth: 90,
-              }}
-            >
-              {isCreatingFile ? 'Saving…' : 'Add file'}
-            </button>
-          </div>
-        </div>
-
-        {workspace.files.length === 0 ? (
-          <div style={{ fontSize: 13, color: '#6b7280' }}>No files uploaded yet.</div>
-        ) : (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-              gap: 12,
-            }}
-          >
-            {workspace.files.map((file: EventFile) => (
-              <a
-                key={file.id}
-                href={file.file_url}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  borderRadius: 12,
-                  border: '1px solid #e5e5e5',
-                  padding: 10,
-                  background: '#ffffff',
-                  fontSize: 13,
-                  textDecoration: 'none',
-                  color: '#111827',
-                }}
-              >
-                <div style={{ fontWeight: 500 }}>{file.file_name}</div>
-                <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>Category: {file.category}</div>
-                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
-                  Uploaded {formatDate(file.uploaded_at)}
-                </div>
-              </a>
-            ))}
-          </div>
-        )}
-      </div>
-    );
+    if (!event) return null;
+    return <ProjectFilesSection projectId={event.id} />;
   };
 
   const renderNotesTab = () => {
@@ -540,6 +447,324 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
         />
         <div style={{ fontSize: 11, color: '#9ca3af' }}>
           Notes are private to your team and never visible to the client.
+        </div>
+      </div>
+    );
+  };
+
+  const renderContactsTab = () => {
+    if (!workspace || !event) return null;
+    const client = workspace.client;
+
+    const handleSaveClient = async () => {
+      if (!clientForm.bride_name.trim() || !clientForm.groom_name.trim() || !clientForm.email.trim() || !clientForm.phone.trim()) {
+        // eslint-disable-next-line no-alert
+        alert('Please fill in all required fields (Bride name, Groom name, Email, Phone)');
+        return;
+      }
+
+      setIsSavingClient(true);
+      try {
+        if (client) {
+          await updateClient(event.id, {
+            bride_name: clientForm.bride_name.trim(),
+            groom_name: clientForm.groom_name.trim(),
+            email: clientForm.email.trim(),
+            phone: clientForm.phone.trim(),
+            address: clientForm.address.trim() || null,
+            communication_notes: clientForm.communication_notes.trim() || null,
+          });
+        } else {
+          await createClient(event.id, {
+            bride_name: clientForm.bride_name.trim(),
+            groom_name: clientForm.groom_name.trim(),
+            email: clientForm.email.trim(),
+            phone: clientForm.phone.trim(),
+            address: clientForm.address.trim() || null,
+            communication_notes: clientForm.communication_notes.trim() || null,
+          });
+        }
+        await loadWorkspace();
+      } catch (err: any) {
+        // eslint-disable-next-line no-alert
+        alert(`Failed to save client: ${err.message || err}`);
+      } finally {
+        setIsSavingClient(false);
+      }
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div
+          style={{
+            borderRadius: 16,
+            border: '1px solid #e5e5e5',
+            padding: 20,
+            background: '#ffffff',
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', marginBottom: 16 }}>
+            Client Contact Information
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Bride & Groom Names */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: 6,
+                  }}
+                >
+                  Bride Name <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={clientForm.bride_name}
+                  onChange={(e) => setClientForm((prev) => ({ ...prev, bride_name: e.target.value }))}
+                  placeholder="Bride's full name"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    fontSize: 13,
+                    border: '1px solid #e5e5e5',
+                    borderRadius: 10,
+                    background: '#fafafa',
+                    color: '#111827',
+                    outline: 'none',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.border = '1px solid #0f172a';
+                    e.target.style.background = '#ffffff';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.border = '1px solid #e5e5e5';
+                    e.target.style.background = '#fafafa';
+                  }}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: 6,
+                  }}
+                >
+                  Groom Name <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={clientForm.groom_name}
+                  onChange={(e) => setClientForm((prev) => ({ ...prev, groom_name: e.target.value }))}
+                  placeholder="Groom's full name"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    fontSize: 13,
+                    border: '1px solid #e5e5e5',
+                    borderRadius: 10,
+                    background: '#fafafa',
+                    color: '#111827',
+                    outline: 'none',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.border = '1px solid #0f172a';
+                    e.target.style.background = '#ffffff';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.border = '1px solid #e5e5e5';
+                    e.target.style.background = '#fafafa';
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Email & Phone */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: 6,
+                  }}
+                >
+                  Email <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="email"
+                  value={clientForm.email}
+                  onChange={(e) => setClientForm((prev) => ({ ...prev, email: e.target.value }))}
+                  placeholder="client@example.com"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    fontSize: 13,
+                    border: '1px solid #e5e5e5',
+                    borderRadius: 10,
+                    background: '#fafafa',
+                    color: '#111827',
+                    outline: 'none',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.border = '1px solid #0f172a';
+                    e.target.style.background = '#ffffff';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.border = '1px solid #e5e5e5';
+                    e.target.style.background = '#fafafa';
+                  }}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: 6,
+                  }}
+                >
+                  Phone <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={clientForm.phone}
+                  onChange={(e) => setClientForm((prev) => ({ ...prev, phone: e.target.value }))}
+                  placeholder="+1 234 567 8900"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    fontSize: 13,
+                    border: '1px solid #e5e5e5',
+                    borderRadius: 10,
+                    background: '#fafafa',
+                    color: '#111827',
+                    outline: 'none',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.border = '1px solid #0f172a';
+                    e.target.style.background = '#ffffff';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.border = '1px solid #e5e5e5';
+                    e.target.style.background = '#fafafa';
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Address */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: 6,
+                }}
+              >
+                Address
+              </label>
+              <input
+                type="text"
+                value={clientForm.address}
+                onChange={(e) => setClientForm((prev) => ({ ...prev, address: e.target.value }))}
+                placeholder="Street address, city, state, zip"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  fontSize: 13,
+                  border: '1px solid #e5e5e5',
+                  borderRadius: 10,
+                  background: '#fafafa',
+                  color: '#111827',
+                  outline: 'none',
+                }}
+                onFocus={(e) => {
+                  e.target.style.border = '1px solid #0f172a';
+                  e.target.style.background = '#ffffff';
+                }}
+                onBlur={(e) => {
+                  e.target.style.border = '1px solid #e5e5e5';
+                  e.target.style.background = '#fafafa';
+                }}
+              />
+            </div>
+
+            {/* Communication Notes */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: 6,
+                }}
+              >
+                Communication Notes
+              </label>
+              <textarea
+                value={clientForm.communication_notes}
+                onChange={(e) => setClientForm((prev) => ({ ...prev, communication_notes: e.target.value }))}
+                placeholder="Notes about preferred communication style, best times to contact, etc."
+                rows={4}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  fontSize: 13,
+                  border: '1px solid #e5e5e5',
+                  borderRadius: 10,
+                  background: '#fafafa',
+                  color: '#111827',
+                  outline: 'none',
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
+                }}
+                onFocus={(e) => {
+                  e.target.style.border = '1px solid #0f172a';
+                  e.target.style.background = '#ffffff';
+                }}
+                onBlur={(e) => {
+                  e.target.style.border = '1px solid #e5e5e5';
+                  e.target.style.background = '#fafafa';
+                }}
+              />
+            </div>
+
+            {/* Save Button */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={handleSaveClient}
+                disabled={isSavingClient}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  border: 'none',
+                  borderRadius: 999,
+                  background: isSavingClient ? '#d1d5db' : '#0f172a',
+                  color: '#ffffff',
+                  cursor: isSavingClient ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {isSavingClient ? 'Saving…' : client ? 'Update Contact' : 'Save Contact'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -660,6 +885,7 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
             { id: 'vendors', label: 'Vendors' },
             { id: 'files', label: 'Files' },
             { id: 'notes', label: 'Notes' },
+            { id: 'contacts', label: 'Contacts' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -688,6 +914,7 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
           {activeTab === 'vendors' && renderVendorsTab()}
           {activeTab === 'files' && renderFilesTab()}
           {activeTab === 'notes' && renderNotesTab()}
+          {activeTab === 'contacts' && renderContactsTab()}
         </div>
       </div>
 

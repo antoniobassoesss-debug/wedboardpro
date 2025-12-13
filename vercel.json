@@ -1,23 +1,21 @@
 {
   "version": 2,
-  "builds": [
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/client",
+  "framework": null,
+  "rewrites": [
     {
-      "src": "api/index.ts",
-      "use": "@vercel/node"
+      "source": "/api/:path*",
+      "destination": "/api/index.ts"
     },
     {
-      "src": "dist/client/**",
-      "use": "@vercel/static"
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
     }
   ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/index.ts"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/dist/client/index.html"
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "dist/**"
     }
-  ]
+  }
 }

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import './todo.css';
 import type { Task, Priority } from './todoData';
 import { listTasks, createTask, updateTask, deleteTask, type Task as ApiTask } from '../api/tasksApi';
@@ -8,6 +8,63 @@ type StatusFilter = 'all' | 'active' | 'completed';
 type PriorityFilter = 'all' | 'low' | 'medium' | 'high';
 type DueFilter = 'all' | 'today' | 'next7' | 'overdue';
 type AssigneeFilter = 'all' | 'me' | 'unassigned';
+
+// Rounded Pill Filter - clickable pill that shows current selection
+interface FilterDropdownProps<T extends string> {
+  label: string;
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
+  defaultValue?: T;
+}
+
+function FilterDropdown<T extends string>({ label, value, options, onChange, defaultValue = 'all' as T }: FilterDropdownProps<T>) {
+  const [isOpen, setIsOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  const isFiltered = value !== defaultValue;
+  const selectedLabel = options.find((o) => o.value === value)?.label || label;
+
+  return (
+    <div className="td-filter" ref={ref}>
+      <button
+        type="button"
+        className={`td-filter-trigger ${isOpen ? 'open' : ''} ${isFiltered ? 'filtered' : ''}`}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        {isFiltered ? selectedLabel : label}
+      </button>
+      {isOpen && (
+        <div className="td-filter-menu">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`td-filter-item ${option.value === value ? 'selected' : ''}`}
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const TodoPage: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -289,51 +346,60 @@ const TodoPage: React.FC = () => {
       </div>
 
       <div className="filters-row">
-        <div className="todo-controls">
-          <label>
-            Status
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}>
-              <option value="all">All</option>
-              <option value="active">Active</option>
-              <option value="completed">Completed</option>
-            </select>
-          </label>
-          <label>
-            Priority
-            <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value as PriorityFilter)}>
-              <option value="all">All</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </label>
-          <label>
-            Due
-            <select value={dueFilter} onChange={(e) => setDueFilter(e.target.value as DueFilter)}>
-              <option value="all">All</option>
-              <option value="today">Today</option>
-              <option value="next7">Next 7 days</option>
-              <option value="overdue">Overdue</option>
-            </select>
-          </label>
-          <label>
-            Assignee
-            <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value as AssigneeFilter)}>
-              <option value="all">All tasks</option>
-              <option value="me">My tasks</option>
-              <option value="unassigned">Unassigned</option>
-            </select>
-          </label>
-          <label>
-            Sort
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
-              <option value="due">By due date</option>
-              <option value="priority">By priority</option>
-              <option value="assignee">By assignee</option>
-              <option value="created">By created</option>
-            </select>
-          </label>
-        </div>
+        <FilterDropdown
+          label="Status"
+          value={statusFilter}
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'active', label: 'Active' },
+            { value: 'completed', label: 'Completed' },
+          ]}
+          onChange={setStatusFilter}
+        />
+        <FilterDropdown
+          label="Priority"
+          value={priorityFilter}
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'low', label: 'Low' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'high', label: 'High' },
+          ]}
+          onChange={setPriorityFilter}
+        />
+        <FilterDropdown
+          label="Due"
+          value={dueFilter}
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'today', label: 'Today' },
+            { value: 'next7', label: 'Next 7 days' },
+            { value: 'overdue', label: 'Overdue' },
+          ]}
+          onChange={setDueFilter}
+        />
+        <FilterDropdown
+          label="Assignee"
+          value={assigneeFilter}
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'me', label: 'My tasks' },
+            { value: 'unassigned', label: 'Unassigned' },
+          ]}
+          onChange={setAssigneeFilter}
+        />
+        <FilterDropdown
+          label="Sort"
+          value={sortBy}
+          defaultValue="due"
+          options={[
+            { value: 'due', label: 'Due date' },
+            { value: 'priority', label: 'Priority' },
+            { value: 'assignee', label: 'Assignee' },
+            { value: 'created', label: 'Created' },
+          ]}
+          onChange={setSortBy}
+        />
       </div>
 
       {loading && tasks.length === 0 ? (

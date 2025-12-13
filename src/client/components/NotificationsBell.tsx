@@ -137,22 +137,12 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        style={{
-          position: 'relative',
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          padding: '8px',
-          borderRadius: '8px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
+        className="wp-floating-notifications"
         title="Notifications"
       >
         <svg
-          width="20"
-          height="20"
+          width="18"
+          height="18"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -164,23 +154,7 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
         {unreadCount > 0 && (
-          <span
-            style={{
-              position: 'absolute',
-              top: '4px',
-              right: '4px',
-              background: '#ef4444',
-              color: 'white',
-              borderRadius: '50%',
-              width: '18px',
-              height: '18px',
-              fontSize: '11px',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
+          <span className="wp-floating-notifications-badge">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
