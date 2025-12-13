@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { browserSupabaseClient } from '../browserSupabaseClient';
+import './chat.css';
 
 type Message = {
   id: string;
@@ -42,6 +43,30 @@ const deriveDisplayName = (user: any): string | null => {
   return null;
 };
 
+const formatTime = (dateStr: string): string => {
+  const d = new Date(dateStr);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+const SearchIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8" />
+    <path d="m21 21-4.35-4.35" />
+  </svg>
+);
+
+const PlusIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+
+const SendIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" />
+  </svg>
+);
+
 export default function ChatTab() {
   const [team, setTeam] = useState<{ id: string; name: string } | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -50,8 +75,11 @@ export default function ChatTab() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
+  const [conversationsLoading, setConversationsLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'team' | 'direct'>('all');
   const [profileCache, setProfileCache] = useState<
     Record<string, { full_name?: string | null; email?: string | null; avatar_url?: string | null }>
   >({});
@@ -87,6 +115,7 @@ export default function ChatTab() {
       setTeam(null);
       setError('Please log in to use chat.');
       setLoading(false);
+      setConversationsLoading(false);
       return null;
     }
 
@@ -104,6 +133,7 @@ export default function ChatTab() {
         setTeam(null);
         setError('No team found. Create one to start chatting.');
         setLoading(false);
+        setConversationsLoading(false);
         return null;
       }
       const body = await res.json();
@@ -115,6 +145,7 @@ export default function ChatTab() {
     } catch (err: any) {
       setError(err?.message || 'Failed to load team');
       setLoading(false);
+      setConversationsLoading(false);
       return null;
     }
   }, [accessToken]);
@@ -129,7 +160,6 @@ export default function ChatTab() {
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || 'Failed to load conversations');
       setConversations(Array.isArray(body.conversations) ? body.conversations : []);
-      // Auto-select team conversation if none selected
       if (!activeConversation && body.conversations?.length > 0) {
         const teamConv = body.conversations.find((c: Conversation) => c.type === 'team');
         if (teamConv) {
@@ -139,6 +169,8 @@ export default function ChatTab() {
       }
     } catch (err: any) {
       console.error('Failed to fetch conversations:', err);
+    } finally {
+      setConversationsLoading(false);
     }
   }, [accessToken, activeConversation]);
 
@@ -146,9 +178,6 @@ export default function ChatTab() {
     async (opts?: { before?: string }) => {
       if (!accessToken || !team || !activeConversation) {
         setLoading(false);
-        if (!accessToken) setError('Please log in to use chat.');
-        if (!team) setError('Join or create a team to chat.');
-        if (!activeConversation) setError('Select a conversation to view messages.');
         return;
       }
       try {
@@ -165,7 +194,6 @@ export default function ChatTab() {
           throw new Error(body?.error || 'Failed to load messages');
         }
         const incoming: Message[] = Array.isArray(body.messages) ? body.messages : [];
-        console.log('[ChatTab] Fetched messages:', incoming.length, 'for conversation:', activeConversation);
         const incomingProfiles: Record<
           string,
           { full_name?: string | null; email?: string | null; avatar_url?: string | null }
@@ -183,7 +211,6 @@ export default function ChatTab() {
           setProfileCache((prev) => ({ ...prev, ...incomingProfiles }));
         }
         const sorted = incoming.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        console.log('[ChatTab] Setting messages:', sorted.length);
         setMessages(sorted);
         setError(null);
       } catch (err: any) {
@@ -223,7 +250,6 @@ export default function ChatTab() {
         const data = (payload.new as any) ?? null;
         if (!data?.id) return;
 
-        // Filter by conversation type
         const isTeamMessage = !data.recipient_id;
         const isDirectMessage = data.recipient_id && (data.user_id === authedUserId || data.recipient_id === authedUserId);
         const matchesActive =
@@ -249,7 +275,6 @@ export default function ChatTab() {
           return next.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         });
 
-        // Best-effort profile hydration
         if (data.user_id && !profileCache[data.user_id]) {
           (async () => {
             try {
@@ -340,7 +365,6 @@ export default function ChatTab() {
             return [...prev, saved];
           });
         }
-        // Refresh conversations to update last message
         await fetchConversations();
       } catch (err: any) {
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
@@ -370,14 +394,12 @@ export default function ChatTab() {
     [],
   );
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (messageListRef.current) {
       messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
     }
   }, [messages]);
 
-  // Keep focus on input when conversation changes or component mounts
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.focus();
@@ -403,7 +425,6 @@ export default function ChatTab() {
     }
     let cancelled = false;
     (async () => {
-      console.log('[ChatTab] Loading messages for conversation:', activeConversation, 'recipient:', activeRecipientId, 'team:', team?.id);
       setLoading(true);
       setError(null);
       try {
@@ -424,7 +445,6 @@ export default function ChatTab() {
     };
   }, [activeConversation, activeRecipientId, team, fetchMessages, subscribeToRealtime]);
 
-  // Poll conversations every 10 seconds
   useEffect(() => {
     if (!accessToken) return;
     const interval = setInterval(() => {
@@ -433,361 +453,222 @@ export default function ChatTab() {
     return () => clearInterval(interval);
   }, [accessToken, fetchConversations]);
 
+  const filteredConversations = useMemo(() => {
+    let filtered = conversations;
+    if (filterType !== 'all') {
+      filtered = filtered.filter((c) => c.type === filterType);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.lastMessage?.content.toLowerCase().includes(q)
+      );
+    }
+    return filtered;
+  }, [conversations, filterType, searchQuery]);
+
   const activeConv = conversations.find((c) => c.id === activeConversation);
   const activeConvName = activeConv?.name || 'Chat';
 
+  const getInitials = (name: string) => {
+    return (name || 'U')
+      .split(' ')
+      .map((s) => s[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
+  };
+
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 200px)', gap: 0, background: '#f5f5f5' }}>
-      {/* Conversations Sidebar */}
-      <div
-        style={{
-          width: 380,
-          background: '#fff',
-          borderRight: '1px solid #e3e3e3',
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          borderRadius: '32px 0 0 32px',
-          overflow: 'hidden',
-        }}
-      >
-        <div
-          style={{
-            padding: '24px 20px',
-            background: '#fff',
-            borderBottom: '1px solid #e3e3e3',
-          }}
-        >
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#0c0c0c' }}>Chats</h2>
+    <div className="chat-shell">
+      {/* Sidebar - Conversations List */}
+      <div className="chat-sidebar">
+        <div className="chat-sidebar-header">
+          <div className="chat-sidebar-title-row">
+            <h2 className="chat-sidebar-title">Messages</h2>
+            <button type="button" className="chat-new-btn">
+              <PlusIcon /> New
+            </button>
+          </div>
+          <div className="chat-search">
+            <span className="chat-search-icon">
+              <SearchIcon />
+            </span>
+            <input
+              type="text"
+              className="chat-search-input"
+              placeholder="Search conversations..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="chat-filter-tabs">
+            <button
+              type="button"
+              className={`chat-filter-tab ${filterType === 'all' ? 'active' : ''}`}
+              onClick={() => setFilterType('all')}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              className={`chat-filter-tab ${filterType === 'team' ? 'active' : ''}`}
+              onClick={() => setFilterType('team')}
+            >
+              Team
+            </button>
+            <button
+              type="button"
+              className={`chat-filter-tab ${filterType === 'direct' ? 'active' : ''}`}
+              onClick={() => setFilterType('direct')}
+            >
+              Direct
+            </button>
+          </div>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {conversations.map((conv) => {
-            const isActive = conv.id === activeConversation;
-            const lastMsgTime = conv.lastMessage
-              ? new Date(conv.lastMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-              : null;
-            return (
-              <div
-                key={conv.id}
-                onClick={() => handleSelectConversation(conv.id)}
-                style={{
-                  padding: '14px 20px',
-                  cursor: 'pointer',
-                  background: isActive ? '#ebebeb' : '#fff',
-                  borderBottom: '1px solid #e3e3e3',
-                  display: 'flex',
-                  gap: 12,
-                  alignItems: 'center',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) e.currentTarget.style.background = '#f5f5f5';
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) e.currentTarget.style.background = '#fff';
-                }}
-              >
-                <div
-                  style={{
-                    width: 50,
-                    height: 50,
-                    borderRadius: '50%',
-                    background: conv.type === 'team' ? '#0c0c0c' : '#e5e5e5',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 600,
-                    fontSize: 18,
-                    color: conv.type === 'team' ? '#fff' : '#0c0c0c',
-                    flexShrink: 0,
-                  }}
-                >
-                  {conv.type === 'team' ? '👥' : (conv.name || 'U').charAt(0).toUpperCase()}
+
+        <div className="chat-conversation-list">
+          {conversationsLoading ? (
+            <>
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="chat-skeleton-item">
+                  <div className="chat-skeleton-avatar" />
+                  <div className="chat-skeleton-lines">
+                    <div className="chat-skeleton-line" />
+                    <div className="chat-skeleton-line short" />
+                  </div>
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <div style={{ fontWeight: 600, fontSize: 15, color: '#0c0c0c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {conv.name}
+              ))}
+            </>
+          ) : filteredConversations.length === 0 ? (
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
+              {searchQuery ? 'No conversations found.' : 'No conversations yet.'}
+            </div>
+          ) : (
+            filteredConversations.map((conv) => {
+              const isActive = conv.id === activeConversation;
+              const lastMsgTime = conv.lastMessage ? formatTime(conv.lastMessage.created_at) : null;
+              return (
+                <div
+                  key={conv.id}
+                  className={`chat-conversation-item ${isActive ? 'active' : ''}`}
+                  onClick={() => handleSelectConversation(conv.id)}
+                >
+                  <div className={`chat-conversation-avatar ${conv.type === 'team' ? 'team' : ''}`}>
+                    {conv.type === 'team' ? '👥' : getInitials(conv.name)}
+                  </div>
+                  <div className="chat-conversation-content">
+                    <div className="chat-conversation-header">
+                      <span className="chat-conversation-name">{conv.name}</span>
+                      {lastMsgTime && <span className="chat-conversation-time">{lastMsgTime}</span>}
                     </div>
-                    {lastMsgTime && (
-                      <div style={{ fontSize: 12, color: '#7c7c7c', flexShrink: 0, marginLeft: 8 }}>
-                        {lastMsgTime}
-                      </div>
+                    {conv.lastMessage && (
+                      <div className="chat-conversation-preview">{conv.lastMessage.content}</div>
                     )}
                   </div>
-                  {conv.lastMessage && (
-                    <div
-                      style={{
-                        fontSize: 13,
-                        color: '#7c7c7c',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {conv.lastMessage.content}
-                    </div>
+                  {conv.unread && conv.unread > 0 && (
+                    <div className="chat-unread-badge">{conv.unread}</div>
                   )}
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
 
       {/* Main Chat Area */}
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          background: '#fff',
-          height: '100%',
-          borderRadius: '0 32px 32px 0',
-          overflow: 'hidden',
-        }}
-      >
+      <div className="chat-main">
+        {error && !activeConversation && (
+          <div className="chat-error">{error}</div>
+        )}
+
         {activeConversation ? (
           <>
             {/* Chat Header */}
-            <div
-              style={{
-                padding: '16px 24px',
-                background: '#fff',
-                borderBottom: '1px solid #e3e3e3',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-              }}
-            >
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '50%',
-                  background: activeConv?.type === 'team' ? '#0c0c0c' : '#e5e5e5',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 600,
-                  fontSize: 16,
-                  color: activeConv?.type === 'team' ? '#fff' : '#0c0c0c',
-                }}
-              >
-                {activeConv?.type === 'team' ? '👥' : (activeConvName || 'U').charAt(0).toUpperCase()}
+            <div className="chat-header">
+              <div className={`chat-header-avatar ${activeConv?.type === 'team' ? 'team' : ''}`}>
+                {activeConv?.type === 'team' ? '👥' : getInitials(activeConvName)}
               </div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 15, color: '#0c0c0c' }}>{activeConvName}</div>
-                <div style={{ fontSize: 12, color: '#7c7c7c' }}>
-                  {activeConv?.type === 'team' ? 'Team chat' : 'Direct message'}
-                </div>
+              <div className="chat-header-info">
+                <h3 className="chat-header-title">{activeConvName}</h3>
+                <p className="chat-header-subtitle">
+                  {activeConv?.type === 'team' ? 'Team conversation' : 'Direct message'}
+                </p>
               </div>
             </div>
 
             {/* Messages */}
-            <div
-              ref={messageListRef}
-              style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: '24px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 16,
-                background: '#f5f5f5',
-              }}
-            >
+            <div className="chat-messages" ref={messageListRef}>
               {loading && messages.length === 0 ? (
-                <div style={{ color: '#6b6b6b', textAlign: 'center', padding: 40, fontSize: 14 }}>
-                  Loading messages…
-                </div>
+                <div className="chat-loading">Loading messages...</div>
               ) : messages.length === 0 ? (
-                <div
-                  style={{
-                    color: '#6b6b6b',
-                    textAlign: 'center',
-                    padding: 40,
-                    fontSize: 14,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: '100%',
-                  }}
-                >
-                  <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.3 }}>💬</div>
-                  <div>No messages yet. Start the conversation!</div>
+                <div className="chat-empty">
+                  <div className="chat-empty-icon">💬</div>
+                  <h3 className="chat-empty-title">No messages yet</h3>
+                  <p className="chat-empty-text">Start the conversation by sending a message below.</p>
                 </div>
               ) : (
                 messages.map((msg) => {
                   const isOwnMessage = msg.user_id === authedUserId;
                   const cachedProfile = msg.profile ?? profileCache[msg.user_id];
                   const name = cachedProfile?.full_name || cachedProfile?.email || 'Unknown';
-                  const initials = (name || 'U')
-                    .split(' ')
-                    .map((s) => s[0])
-                    .slice(0, 2)
-                    .join('')
-                    .toUpperCase();
-                  const timestamp = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  const initials = getInitials(name);
+                  const timestamp = formatTime(msg.created_at);
 
-                  if (isOwnMessage) {
-                    return (
-                      <div
-                        key={msg.id}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'flex-end',
-                          alignItems: 'flex-end',
-                          gap: 8,
-                          marginLeft: '20%',
-                        }}
-                      >
-                        <div
-                          style={{
-                            background: '#0c0c0c',
-                            color: '#fff',
-                            borderRadius: '20px 20px 4px 20px',
-                            padding: '12px 16px',
-                            maxWidth: '75%',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
-                          }}
-                        >
-                          <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.5 }}>
-                            {msg.content}
-                          </div>
-                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 6, textAlign: 'right' }}>
-                            {timestamp}
-                          </div>
-                        </div>
+                  return (
+                    <div key={msg.id} className={`chat-message-row ${isOwnMessage ? 'me' : 'them'}`}>
+                      {!isOwnMessage && <div className="chat-message-avatar">{initials}</div>}
+                      <div className={`chat-bubble ${isOwnMessage ? 'me' : 'them'}`}>
+                        {!isOwnMessage && <div className="chat-bubble-sender">{name}</div>}
+                        <div className="chat-bubble-content">{msg.content}</div>
+                        <div className="chat-bubble-time">{timestamp}</div>
                       </div>
-                    );
-                  } else {
-                    return (
-                      <div
-                        key={msg.id}
-                        style={{
-                          display: 'flex',
-                          gap: 10,
-                          alignItems: 'flex-end',
-                          marginRight: '20%',
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: '50%',
-                            background: '#ebebeb',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 600,
-                            fontSize: 13,
-                            color: '#0c0c0c',
-                            flexShrink: 0,
-                          }}
-                        >
-                          {initials}
-                        </div>
-                        <div
-                          style={{
-                            background: '#fff',
-                            borderRadius: '20px 20px 20px 4px',
-                            padding: '12px 16px',
-                            maxWidth: '100%',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
-                            border: '1px solid #e3e3e3',
-                          }}
-                        >
-                          <div style={{ fontWeight: 600, fontSize: 12, color: '#0c0c0c', marginBottom: 6 }}>
-                            {name}
-                          </div>
-                          <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.5, color: '#0c0c0c' }}>
-                            {msg.content}
-                          </div>
-                          <div style={{ fontSize: 11, color: '#7c7c7c', marginTop: 6 }}>{timestamp}</div>
-                        </div>
-                      </div>
-                    );
-                  }
+                    </div>
+                  );
                 })
               )}
             </div>
 
-            {/* Input Area */}
-            <div
-              style={{
-                padding: '16px 24px',
-                background: '#fff',
-                borderTop: '1px solid #e3e3e3',
-              }}
-            >
-              <form onSubmit={sendMessage} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                <input
-                  ref={inputRef}
-                  autoFocus
-                  disabled={!team}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      sendMessage(e);
-                    }
-                  }}
-                  placeholder={team ? 'Type a message…' : 'Join a team to chat'}
-                  style={{
-                    flex: 1,
-                    padding: '12px 18px',
-                    borderRadius: 999,
-                    border: '1px solid #e3e3e3',
-                    fontSize: 14,
-                    background: '#f5f5f5',
-                    outline: 'none',
-                    transition: 'all 0.2s',
-                    fontFamily: "'Geist', 'Inter', sans-serif",
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#0c0c0c';
-                    e.target.style.background = '#fff';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#e3e3e3';
-                    e.target.style.background = '#f5f5f5';
-                  }}
-                />
+            {/* Composer */}
+            <div className="chat-composer">
+              <form className="chat-composer-form" onSubmit={sendMessage}>
+                <div className="chat-input-wrapper">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    className="chat-input"
+                    placeholder={team ? 'Type a message...' : 'Join a team to chat'}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    disabled={!team}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        sendMessage(e);
+                      }
+                    }}
+                  />
+                </div>
                 <button
                   type="submit"
+                  className="chat-send-btn"
                   disabled={!team || sending || !input.trim()}
-                  style={{
-                    border: 'none',
-                    background: !team || sending || !input.trim() ? '#d7d7d7' : '#0c0c0c',
-                    color: '#fff',
-                    padding: '10px 20px',
-                    borderRadius: 24,
-                    cursor: !team || sending || !input.trim() ? 'not-allowed' : 'pointer',
-                    fontWeight: 600,
-                    fontSize: 14,
-                    transition: 'all 0.2s',
-                  }}
                 >
-                  {sending ? 'Sending…' : 'Send'}
+                  <SendIcon />
+                  {sending ? 'Sending...' : 'Send'}
                 </button>
               </form>
             </div>
           </>
         ) : (
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#6b6b6b',
-              fontSize: 16,
-            }}
-          >
-            Select a conversation to start chatting
+          <div className="chat-empty">
+            <div className="chat-empty-icon">💬</div>
+            <h3 className="chat-empty-title">Select a conversation</h3>
+            <p className="chat-empty-text">Choose a conversation from the list to start messaging, or create a new one.</p>
+            <button type="button" className="chat-empty-btn">
+              <PlusIcon /> Start New Chat
+            </button>
           </div>
         )}
       </div>

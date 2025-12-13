@@ -165,7 +165,7 @@ const WeddingDashboard: React.FC = () => {
         </div>
 
         <section className="wp-content">
-          <DashboardContent active={active} onNavigate={setActive} />
+          <DashboardContent active={active} onNavigate={setActive} userName={displayName} />
         </section>
       </div>
       <NewProjectModal

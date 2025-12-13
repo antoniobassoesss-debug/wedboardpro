@@ -5,6 +5,7 @@ import { getOrCreateDefaultPipeline, listDeals, getCrmMetrics, type CrmDealCard,
 
 interface HomeSectionProps {
   onNavigate: (section: string) => void;
+  userName?: string;
 }
 
 // Types for dashboard data
@@ -60,7 +61,7 @@ const isToday = (dateStr: string | null): boolean => {
   return d.toDateString() === now.toDateString();
 };
 
-const HomeSection: React.FC<HomeSectionProps> = ({ onNavigate }) => {
+const HomeSection: React.FC<HomeSectionProps> = ({ onNavigate, userName }) => {
   const [data, setData] = useState<DashboardData>({
     activeProjects: 0,
     eventsThisWeek: 0,
@@ -174,23 +175,13 @@ const HomeSection: React.FC<HomeSectionProps> = ({ onNavigate }) => {
     <div className="home-dashboard">
       {/* Hero / Welcome Section */}
       <div className="wp-card">
-        <div className="wp-section-header">
-          <div>
-            <p className="eyebrow">Dashboard</p>
-            <h2>Welcome back to WedBoardPro</h2>
-          </div>
-          <div className="home-actions">
-            <button type="button" className="wp-pill primary" onClick={() => onNavigate('work')}>
-              New Project
-            </button>
-            <button type="button" className="wp-pill" onClick={() => onNavigate('layouts')}>
-              Create Layout
-            </button>
-          </div>
+        <div>
+          <p className="eyebrow">Dashboard</p>
+          <h2>Welcome, {userName || 'there'}</h2>
         </div>
 
         {/* KPI Stats Row */}
-        <div className="stats-grid">
+        <div className="stats-grid" style={{ marginTop: '20px' }}>
           {stats.map((stat) => (
             <div key={stat.label} className="stat-card">
               <span className="stat-label">{stat.label}</span>

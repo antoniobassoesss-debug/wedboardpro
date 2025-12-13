@@ -277,7 +277,7 @@ export const CalendarSection: React.FC = () => {
   }, []);
 
   return (
-    <SectionCard title="Calendar" description="Keep track of events, fittings, and deadlines.">
+    <SectionCard title="Calendar">
       {accountId ? (
         <Calendar accountId={accountId} />
       ) : (
@@ -326,7 +326,7 @@ export const QuotesSection: React.FC = () => {
 
 export const TodoSection: React.FC = () => {
   return (
-    <SectionCard title="To-Do List" description="Quick tasks and reminders.">
+    <SectionCard title="To-Do List">
       <TodoPage />
     </SectionCard>
   );
@@ -334,10 +334,7 @@ export const TodoSection: React.FC = () => {
 
 export const SuppliersSection: React.FC = () => {
   return (
-    <SectionCard
-      title="Suppliers"
-      description="Keep all your trusted vendors in one directory, and see how often you use them."
-    >
+    <SectionCard title="Suppliers">
       <SuppliersPage embedded />
     </SectionCard>
   );

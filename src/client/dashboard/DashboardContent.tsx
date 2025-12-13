@@ -14,12 +14,13 @@ import ChatSection from './ChatTab';
 interface DashboardContentProps {
   active: string;
   onNavigate: (id: string) => void;
+  userName?: string;
 }
 
-const DashboardContent: React.FC<DashboardContentProps> = ({ active, onNavigate }) => {
+const DashboardContent: React.FC<DashboardContentProps> = ({ active, onNavigate, userName }) => {
   switch (active) {
     case 'home':
-      return <HomeSection onNavigate={onNavigate} />;
+      return <HomeSection onNavigate={onNavigate} userName={userName} />;
     case 'work':
       return <WorkSection />;
     case 'calendar':
@@ -37,7 +38,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ active, onNavigate 
     case 'teams':
       return <TeamsSection />;
     default:
-      return <HomeSection onNavigate={onNavigate} />;
+      return <HomeSection onNavigate={onNavigate} userName={userName} />;
   }
 };
 
