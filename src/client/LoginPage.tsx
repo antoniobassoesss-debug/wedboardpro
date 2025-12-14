@@ -136,6 +136,31 @@ const LoginPage: React.FC = () => {
           </Link>
         </p>
       </div>
+
+      {/* Full-screen loading splash when logging in */}
+      {loading && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#ffffff',
+            zIndex: 20000,
+            pointerEvents: 'auto',
+          }}
+        >
+          <img
+            src="/loadinglogo.png"
+            alt="Loading"
+            style={{ width: '160px', height: 'auto', objectFit: 'contain' }}
+          />
+        </div>
+      )}
     </div>
   );
 };
