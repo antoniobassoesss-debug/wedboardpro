@@ -3,7 +3,7 @@
  */
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AuthLayout, EmailPasswordForm, GoogleAuthButton } from './auth/index.js';
+import { AuthLayout, EmailPasswordForm, GoogleAuthButton } from './auth/index.ts';
 import './auth/auth.css';
 
 const LoginPage: React.FC = () => {

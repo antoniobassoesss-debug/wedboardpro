@@ -4,7 +4,7 @@ import MarketingHome from './MarketingHome';
 import { DebugClickProbe } from './components/DebugClickProbe';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
-import { AuthCallbackPage } from './auth/index.js';
+import { AuthCallbackPage } from './auth/index.ts';
 import LayoutMakerPage from './LayoutMakerPage';
 import { WeddingDashboard } from './dashboard/index';
 import SuppliersPage from './suppliers/SuppliersPage';
