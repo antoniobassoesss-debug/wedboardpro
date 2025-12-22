@@ -7,28 +7,22 @@ import { Link } from 'react-router-dom';
 import { AuthLayout, EmailPasswordForm, GoogleAuthButton } from './auth/index.js';
 import './auth/auth.css';
 
-const SignupPage: React.FC = () => {
+const SignupPage = () => {
   const [showLoading, setShowLoading] = useState(false);
 
   return (
     <>
-      <AuthLayout
-        title="Create your WedBoardPro account"
-        subtitle="Set up access for your planning studio."
-      >
+      <AuthLayout title="Create your WedBoardPro account" subtitle="Set up access for your planning studio.">
         <EmailPasswordForm mode="signup" />
 
-        {/* Divider */}
         <div className="auth-divider">
           <span className="auth-divider-line" />
           <span className="auth-divider-text">or</span>
           <span className="auth-divider-line" />
         </div>
 
-        {/* Google OAuth */}
         <GoogleAuthButton />
 
-        {/* Footer link */}
         <p className="auth-footer">
           Already have an account?{' '}
           <Link to="/login" className="auth-footer-link">
@@ -37,14 +31,9 @@ const SignupPage: React.FC = () => {
         </p>
       </AuthLayout>
 
-      {/* Loading overlay shown during form submission */}
       {showLoading && (
         <div className="auth-loading-overlay">
-          <img
-            src="/loadinglogo.png"
-            alt="Loading"
-            className="auth-loading-logo"
-          />
+          <img src="/loadinglogo.png" alt="Loading" className="auth-loading-logo" />
         </div>
       )}
     </>
@@ -52,3 +41,5 @@ const SignupPage: React.FC = () => {
 };
 
 export default SignupPage;
+
+

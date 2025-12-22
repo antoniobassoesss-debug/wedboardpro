@@ -18,8 +18,10 @@ export const browserSupabaseClient =
   supabaseUrl && supabaseAnonKey
     ? createClient(supabaseUrl, supabaseAnonKey, {
         auth: {
-          persistSession: false,
-          detectSessionInUrl: false,
+          // We persist our app session separately under `wedboarpro_session`,
+          // but Supabase needs storage for PKCE/state + OAuth callback parsing.
+          persistSession: true,
+          detectSessionInUrl: true,
         },
       })
     : null;

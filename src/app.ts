@@ -225,6 +225,16 @@ app.post('/api/auth/signup', express.json(), async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
 
+    // Best-effort: ensure the new user has a default team so the app works immediately.
+    try {
+      const newUserId = data?.user?.id;
+      if (typeof newUserId === 'string' && newUserId) {
+        await createTeamForUser(supabase, newUserId);
+      }
+    } catch (teamErr: any) {
+      console.warn('[auth/signup] default team creation failed (non-fatal):', teamErr?.message ?? teamErr);
+    }
+
     return res.status(201).json({ user: data?.user ?? null });
   } catch (err: any) {
     console.error('Supabase signup error (unexpected):', err);
@@ -366,7 +376,16 @@ async function getUserTeam(
     return { team: ownerTeam, membershipRole: 'owner' as const };
   }
 
-  return null;
+  // If the user has no team yet, auto-provision a default one.
+  // This avoids hard failures when auth DB triggers are disabled or misconfigured
+  // (e.g. "Database error saving new user" during OAuth signup).
+  try {
+    const created = await createTeamForUser(supabase, userId);
+    return { team: created, membershipRole: 'owner' as const };
+  } catch (e: any) {
+    console.warn('[teams] auto-provision team failed (non-fatal):', e?.message ?? e);
+    return null;
+  }
 }
 
 async function ensureUserTeamMembership(

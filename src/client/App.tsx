@@ -4,6 +4,7 @@ import MarketingHome from './MarketingHome';
 import { DebugClickProbe } from './components/DebugClickProbe';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
+import { AuthCallbackPage } from './auth/index.js';
 import LayoutMakerPage from './LayoutMakerPage';
 import { WeddingDashboard } from './dashboard/index';
 import SuppliersPage from './suppliers/SuppliersPage';
@@ -60,6 +61,7 @@ const App: React.FC = () => {
         <Route path="/" element={<MarketingHome />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/dashboard" element={<WeddingDashboard />} />
         <Route path="/layout-maker" element={<LayoutMakerPage />} />
         <Route path="/suppliers" element={<SuppliersPage />} />

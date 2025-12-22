@@ -1,6 +1,10 @@
 -- Team Management Schema for WedBoarPro
 -- Run this in your Supabase SQL Editor
 
+-- Ensure required crypto functions are available for gen_random_uuid()/gen_random_bytes()
+-- (Supabase typically has this enabled, but this keeps migrations portable.)
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
 -- 1. Create teams table
 CREATE TABLE IF NOT EXISTS teams (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -312,30 +316,30 @@ CREATE POLICY "Owners and admins can update invitations"
   );
 
 -- 9. Function to auto-create a team for new users
-CREATE OR REPLACE FUNCTION create_default_team_for_user()
+CREATE OR REPLACE FUNCTION public.create_default_team_for_user()
 RETURNS TRIGGER AS $$
 DECLARE
   new_team_id UUID;
 BEGIN
   -- Create a default team for the new user
-  INSERT INTO teams (owner_id, name)
+  INSERT INTO public.teams (owner_id, name)
   VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'business_name', 'My Team'))
   RETURNING id INTO new_team_id;
   
   -- Add the user as owner member
-  INSERT INTO team_members (team_id, user_id, role)
+  INSERT INTO public.team_members (team_id, user_id, role)
   VALUES (new_team_id, NEW.id, 'owner');
   
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions;
 
 -- 10. Trigger to create team on user signup
 DROP TRIGGER IF EXISTS on_auth_user_created_create_team ON auth.users;
 CREATE TRIGGER on_auth_user_created_create_team
   AFTER INSERT ON auth.users
   FOR EACH ROW
-  EXECUTE FUNCTION create_default_team_for_user();
+  EXECUTE FUNCTION public.create_default_team_for_user();
 
 -- 11. Function to generate invitation token
 CREATE OR REPLACE FUNCTION generate_invitation_token()
