@@ -27,7 +27,8 @@ const GoogleAuthButton: React.FC = () => {
     setError(null);
 
     try {
-      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(sanitizedNext)}`;
+      const siteOrigin = import.meta.env.VITE_SITE_URL || window.location.origin;
+      const redirectTo = `${siteOrigin}/auth/callback?next=${encodeURIComponent(sanitizedNext)}`;
 
       const { error: oauthError } = await browserSupabaseClient.auth.signInWithOAuth({
         provider: 'google',

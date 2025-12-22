@@ -26,7 +26,9 @@ const GoogleAuthButton = () => {
     setError(null);
 
     try {
-      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(sanitizedNext)}`;
+      // Use configurable site origin for production (fallback to runtime origin)
+      const siteOrigin = import.meta.env.VITE_SITE_URL || window.location.origin;
+      const redirectTo = `${siteOrigin}/auth/callback?next=${encodeURIComponent(sanitizedNext)}`;
 
       const { error: oauthError } = await browserSupabaseClient.auth.signInWithOAuth({
         provider: 'google',
