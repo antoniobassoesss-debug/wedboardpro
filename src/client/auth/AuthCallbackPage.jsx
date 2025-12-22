@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { browserSupabaseClient } from '../browserSupabaseClient.js';
+import { browserSupabaseClient } from '../browserSupabaseClient';
 import './auth.css';
 
 const AuthCallbackPage = () => {

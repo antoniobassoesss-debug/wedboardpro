@@ -5,7 +5,7 @@
  */
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { browserSupabaseClient } from '../browserSupabaseClient.js';
+import { browserSupabaseClient } from '../browserSupabaseClient';
 import './auth.css';
 
 const GoogleAuthButton = () => {
