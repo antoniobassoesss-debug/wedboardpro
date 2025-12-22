@@ -26,8 +26,14 @@ const GoogleAuthButton = () => {
     setError(null);
 
     try {
-      // Use configurable site origin for production (fallback to runtime origin)
-      const siteOrigin = import.meta.env.VITE_SITE_URL || window.location.origin;
+      // Prefer VITE_SITE_URL, but if it points to localhost while we're on a prod host, fallback to runtime origin
+      const envOrigin = (import.meta.env.VITE_SITE_URL || '').trim();
+      const runtimeOrigin = window.location.origin;
+      const envLooksLocal = envOrigin.includes('localhost');
+      const runtimeIsLocal = runtimeOrigin.includes('localhost');
+      const siteOrigin =
+        envOrigin && !(envLooksLocal && !runtimeIsLocal) ? envOrigin : runtimeOrigin;
+
       const redirectTo = `${siteOrigin}/auth/callback?next=${encodeURIComponent(sanitizedNext)}`;
 
       const { error: oauthError } = await browserSupabaseClient.auth.signInWithOAuth({
