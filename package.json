@@ -16,6 +16,9 @@
   "author": "",
   "license": "ISC",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.17",
     "@types/express": "^5.0.5",
