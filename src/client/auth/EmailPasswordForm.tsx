@@ -15,10 +15,11 @@ const EmailPasswordForm: React.FC<EmailPasswordFormProps> = ({ mode }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const nextUrl = searchParams.get('next') || '/dashboard';
+  const oauthErrorFromRedirect = searchParams.get('oauth_error');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(oauthErrorFromRedirect || null);
   const [loading, setLoading] = useState(false);
 
   // Sanitize next param to only allow internal paths

@@ -72,8 +72,14 @@ const AuthUrlHandler: React.FC = () => {
         }
 
         navigate(next, { replace: true });
-      } catch {
-        navigate(`/login?next=${encodeURIComponent(next)}`, { replace: true });
+      } catch (e: any) {
+        const msg =
+          (typeof e?.message === 'string' && e.message.trim()) ||
+          (typeof e === 'string' && e.trim()) ||
+          'Google sign-in failed. Please try again.';
+        navigate(`/login?next=${encodeURIComponent(next)}&oauth_error=${encodeURIComponent(msg)}`, {
+          replace: true,
+        });
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
