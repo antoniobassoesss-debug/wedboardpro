@@ -6,13 +6,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { PowerPoint } from '../types/powerPoint';
 import type { ElectricalStandard } from '../types/electrical';
-import {
-  EU_PT_BREAKER_AMPS,
-  US_NEC_BREAKER_AMPS,
-  EU_PT_VOLTAGE,
-  US_NEC_VOLTAGE,
-} from '../types/electrical';
 import { useElectricalAssistantChat } from '../hooks/useElectricalAssistantChat';
+import ElectricalBreakerCalculator from './ElectricalBreakerCalculator.js';
 
 interface ElectricalDrawerProps {
   isOpen: boolean;
@@ -43,24 +38,13 @@ const ElectricalDrawer: React.FC<ElectricalDrawerProps> = ({
 
   if (!powerPoint) return null;
 
-  const handleStandardChange = (newStandard: ElectricalStandard) => {
-    const voltage = newStandard === 'EU_PT' ? EU_PT_VOLTAGE : US_NEC_VOLTAGE;
-    const breakerOptions = newStandard === 'EU_PT' ? EU_PT_BREAKER_AMPS : US_NEC_BREAKER_AMPS;
-    // Pick closest breaker or first if current doesn't exist
-    let newBreaker = breakerOptions[0];
-    if (breakerOptions.includes(powerPoint.breaker_amps as any)) {
-      newBreaker = powerPoint.breaker_amps;
-    }
+  const handleCalculatorChange = (data: { standard: ElectricalStandard; breakerAmps: number; voltage: number }) => {
     onUpdate({
       ...powerPoint,
-      standard: newStandard,
-      voltage,
-      breaker_amps: newBreaker,
+      standard: data.standard,
+      breaker_amps: data.breakerAmps,
+      voltage: data.voltage,
     });
-  };
-
-  const handleBreakerChange = (amps: number) => {
-    onUpdate({ ...powerPoint, breaker_amps: amps });
   };
 
   const handleLabelChange = (label: string) => {
@@ -72,8 +56,6 @@ const ElectricalDrawer: React.FC<ElectricalDrawerProps> = ({
     await sendMessage(chatInput);
     setChatInput('');
   };
-
-  const breakerOptions = powerPoint.standard === 'EU_PT' ? EU_PT_BREAKER_AMPS : US_NEC_BREAKER_AMPS;
 
   return (
     <AnimatePresence>
@@ -214,148 +196,14 @@ const ElectricalDrawer: React.FC<ElectricalDrawerProps> = ({
                 />
               </div>
 
-              {/* Country Toggle */}
+              {/* Electrical Breaker Calculator - Toggle, Breaker, Capacity, Progress */}
               <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '8px' }}>
-                  Electrical Standard
-                </label>
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '8px',
-                    padding: '4px',
-                    background: 'rgba(0,0,0,0.04)',
-                    borderRadius: '12px',
-                  }}
-                >
-                  {[
-                    { id: 'EU_PT' as ElectricalStandard, flag: '🇪🇺', label: 'EU/PT', sublabel: 'RTE BT' },
-                    { id: 'US_NEC' as ElectricalStandard, flag: '🇺🇸', label: 'US', sublabel: 'NEC' },
-                  ].map((option) => (
-                    <motion.button
-                      key={option.id}
-                      onClick={() => handleStandardChange(option.id)}
-                      whileTap={{ scale: 0.98 }}
-                      style={{
-                        flex: 1,
-                        padding: '12px 16px',
-                        borderRadius: '10px',
-                        border: 'none',
-                        background: powerPoint.standard === option.id
-                          ? 'white'
-                          : 'transparent',
-                        boxShadow: powerPoint.standard === option.id
-                          ? '0 2px 8px rgba(0,0,0,0.08)'
-                          : 'none',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        transition: 'all 0.2s',
-                      }}
-                    >
-                      <span style={{ fontSize: '20px' }}>{option.flag}</span>
-                      <div style={{ textAlign: 'left' }}>
-                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>
-                          {option.label}
-                        </div>
-                        <div style={{ fontSize: '11px', color: '#9ca3af' }}>
-                          {option.sublabel}
-                        </div>
-                      </div>
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Breaker Selector */}
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '8px' }}>
-                  Circuit Breaker
-                </label>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(4, 1fr)',
-                    gap: '8px',
-                  }}
-                >
-                  {breakerOptions.map((amps) => (
-                    <motion.button
-                      key={amps}
-                      onClick={() => handleBreakerChange(amps)}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      style={{
-                        padding: '12px 8px',
-                        borderRadius: '10px',
-                        border: powerPoint.breaker_amps === amps
-                          ? '2px solid #f59e0b'
-                          : '1px solid rgba(0,0,0,0.1)',
-                        background: powerPoint.breaker_amps === amps
-                          ? 'linear-gradient(135deg, rgba(245,158,11,0.1) 0%, rgba(245,158,11,0.05) 100%)'
-                          : 'white',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        transition: 'all 0.2s',
-                      }}
-                    >
-                      <div style={{ fontSize: '16px', fontWeight: 600, color: '#1f2937' }}>
-                        {amps}A
-                      </div>
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Voltage Display */}
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '8px' }}>
-                  Voltage
-                </label>
-                <div
-                  style={{
-                    padding: '16px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(59,130,246,0.04) 100%)',
-                    border: '1px solid rgba(59,130,246,0.2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                  }}
-                >
-                  <span style={{ fontSize: '24px', fontWeight: 700, color: '#3b82f6' }}>
-                    {powerPoint.voltage}V
-                  </span>
-                  <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                    ({powerPoint.standard === 'EU_PT' ? 'Single Phase' : 'Standard'})
-                  </span>
-                </div>
-              </div>
-
-              {/* Capacity Info */}
-              <div
-                style={{
-                  padding: '16px',
-                  borderRadius: '12px',
-                  background: 'rgba(0,0,0,0.02)',
-                  marginBottom: '24px',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Max Capacity</span>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>
-                    {powerPoint.breaker_amps * powerPoint.voltage}W
-                  </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Safe Load (80%)</span>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#10b981' }}>
-                    {Math.floor(powerPoint.breaker_amps * powerPoint.voltage * 0.8)}W
-                  </span>
-                </div>
+                <ElectricalBreakerCalculator
+                  circuitId={powerPoint.circuitId || null}
+                  initialStandard={powerPoint.standard}
+                  initialBreakerAmps={powerPoint.breaker_amps}
+                  onChange={handleCalculatorChange}
+                />
               </div>
 
               {/* AI Assistant Button */}
