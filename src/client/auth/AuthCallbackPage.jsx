@@ -36,36 +36,19 @@ const AuthCallbackPage = () => {
         const nextUrl = searchParams.get('next') || '/dashboard';
         const sanitizedNext = nextUrl.startsWith('/') ? nextUrl : '/dashboard';
 
-        // Prefer explicit code exchange when present
-        const code = searchParams.get('code');
-        if (code) {
-          const { data: exchangeData, error: exchangeError } = await browserSupabaseClient.auth.exchangeCodeForSession(
-            code,
-          );
-          if (exchangeError) throw exchangeError;
-
-          const session = exchangeData.session;
-          if (!session) throw new Error('No session returned from OAuth exchange');
-
-          const user = session.user;
-          const displayName =
-            (typeof user?.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim()) ||
-            (typeof user?.user_metadata?.name === 'string' && user.user_metadata.name.trim()) ||
-            (typeof user?.email === 'string' && user.email.trim()) ||
-            'User';
-
-          localStorage.setItem('wedboarpro_session', JSON.stringify(session));
-          localStorage.setItem('wedboarpro_user', JSON.stringify(user));
-          localStorage.setItem('wedboarpro_display_name', displayName);
-
-          navigate(sanitizedNext, { replace: true });
-          return;
-        }
-
-        // Fallback: if Supabase already processed the URL, try getSession
+        // With detectSessionInUrl: true, Supabase automatically exchanges the code
+        // when the client initializes. We just need to wait a moment and retrieve the session.
+        // Do NOT call exchangeCodeForSession manually - it will fail because the code
+        // verifier was already consumed by Supabase's automatic handling.
+        
+        // Give Supabase a moment to finish processing the URL
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         const { data, error: sessionError } = await browserSupabaseClient.auth.getSession();
         if (sessionError) throw sessionError;
-        if (!data.session) throw new Error('No authentication data received. Please try again.');
+        if (!data.session) {
+          throw new Error('No authentication data received. Please try again.');
+        }
 
         const session = data.session;
         const user = session.user;
@@ -82,15 +65,8 @@ const AuthCallbackPage = () => {
         navigate(sanitizedNext, { replace: true });
       } catch (err) {
         console.error('Auth callback error:', err);
-        // Provide a slightly more actionable message for common OAuth misconfig
         const msg = err?.message || 'Authentication failed';
-        if (typeof msg === 'string' && msg.toLowerCase().includes('redirect')) {
-          setError(
-            `${msg}\n\nMake sure your Supabase Redirect URLs include:\n- ${window.location.origin}/auth/callback`
-          );
-        } else {
-          setError(msg);
-        }
+        setError(msg);
       }
     };
 

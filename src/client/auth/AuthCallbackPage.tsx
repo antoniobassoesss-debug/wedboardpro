@@ -21,80 +21,52 @@ const AuthCallbackPage: React.FC = () => {
       }
 
       try {
-        // Supabase appends the code as a hash fragment or query param
-        // For PKCE flow, it's usually in the URL hash as #access_token=...
-        // or as query params ?code=...
+        // Surface provider / Supabase errors directly if present
+        const oauthError = searchParams.get('error');
+        const oauthErrorDescription = searchParams.get('error_description');
+        if (oauthError || oauthErrorDescription) {
+          setError(
+            oauthErrorDescription ||
+              oauthError ||
+              'Google sign-in failed. Please try again.'
+          );
+          return;
+        }
+
+        const nextUrl = searchParams.get('next') || '/dashboard';
+        const sanitizedNext = nextUrl.startsWith('/') ? nextUrl : '/dashboard';
+
+        // With detectSessionInUrl: true, Supabase automatically exchanges the code
+        // when the client initializes. We just need to wait a moment and retrieve the session.
+        // Do NOT call exchangeCodeForSession manually - it will fail because the code
+        // verifier was already consumed by Supabase's automatic handling.
         
-        // First, try to get session from URL (Supabase handles this automatically)
+        // Give Supabase a moment to finish processing the URL
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         const { data, error: sessionError } = await browserSupabaseClient.auth.getSession();
-
-        if (sessionError) {
-          setError(sessionError.message);
-          return;
+        if (sessionError) throw sessionError;
+        if (!data.session) {
+          throw new Error('No authentication data received. Please try again.');
         }
 
-        if (data.session) {
-          // Session obtained successfully
-          const session = data.session;
-          const user = session.user;
+        const session = data.session;
+        const user = session.user;
+        const displayName =
+          (typeof user?.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim()) ||
+          (typeof user?.user_metadata?.name === 'string' && user.user_metadata.name.trim()) ||
+          (typeof user?.email === 'string' && user.email.trim()) ||
+          'User';
 
-          const displayName =
-            (typeof user?.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim()) ||
-            (typeof user?.user_metadata?.name === 'string' && user.user_metadata.name.trim()) ||
-            (typeof user?.email === 'string' && user.email.trim()) ||
-            'User';
+        localStorage.setItem('wedboarpro_session', JSON.stringify(session));
+        localStorage.setItem('wedboarpro_user', JSON.stringify(user));
+        localStorage.setItem('wedboarpro_display_name', displayName);
 
-          localStorage.setItem('wedboarpro_session', JSON.stringify(session));
-          localStorage.setItem('wedboarpro_user', JSON.stringify(user));
-          localStorage.setItem('wedboarpro_display_name', displayName);
-
-          // Get next param and sanitize
-          const nextUrl = searchParams.get('next') || '/dashboard';
-          const sanitizedNext = nextUrl.startsWith('/') ? nextUrl : '/dashboard';
-
-          navigate(sanitizedNext, { replace: true });
-          return;
-        }
-
-        // If no session yet, try to exchange code for session
-        // This handles the case where Supabase returns a code in the URL
-        const code = searchParams.get('code');
-        if (code) {
-          const { data: exchangeData, error: exchangeError } = 
-            await browserSupabaseClient.auth.exchangeCodeForSession(code);
-
-          if (exchangeError) {
-            setError(exchangeError.message);
-            return;
-          }
-
-          if (exchangeData.session) {
-            const session = exchangeData.session;
-            const user = session.user;
-
-            const displayName =
-              (typeof user?.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim()) ||
-              (typeof user?.user_metadata?.name === 'string' && user.user_metadata.name.trim()) ||
-              (typeof user?.email === 'string' && user.email.trim()) ||
-              'User';
-
-            localStorage.setItem('wedboarpro_session', JSON.stringify(session));
-            localStorage.setItem('wedboarpro_user', JSON.stringify(user));
-            localStorage.setItem('wedboarpro_display_name', displayName);
-
-            const nextUrl = searchParams.get('next') || '/dashboard';
-            const sanitizedNext = nextUrl.startsWith('/') ? nextUrl : '/dashboard';
-
-            navigate(sanitizedNext, { replace: true });
-            return;
-          }
-        }
-
-        // No session and no code - something went wrong
-        setError('No authentication data received. Please try again.');
+        navigate(sanitizedNext, { replace: true });
       } catch (err: any) {
         console.error('Auth callback error:', err);
-        setError(err?.message || 'Authentication failed');
+        const msg = err?.message || 'Authentication failed';
+        setError(msg);
       }
     };
 
