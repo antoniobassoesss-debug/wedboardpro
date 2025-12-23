@@ -25,16 +25,20 @@ const AuthUrlHandler: React.FC = () => {
     const sp = url.searchParams;
 
     const next = sanitizeNext(sp.get('next'));
+    const oauthError = sp.get('error') || sp.get('error_description');
     const code = sp.get('code');
     const hasAccessToken = (url.hash || '').includes('access_token=');
 
-    const shouldHandle = !!code || hasAccessToken;
+    const shouldHandle = !!oauthError || !!code || hasAccessToken;
     if (!shouldHandle) return;
 
     setHandled(true);
 
     (async () => {
       try {
+        if (oauthError) {
+          throw new Error(oauthError);
+        }
         if (code) {
           const { data, error } = await browserSupabaseClient.auth.exchangeCodeForSession(code);
           if (error) throw error;
