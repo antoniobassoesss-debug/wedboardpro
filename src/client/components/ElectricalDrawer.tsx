@@ -1,13 +1,15 @@
 /**
  * ElectricalDrawer - Right-side sliding drawer for electrical point configuration.
- * Glassmorphism backdrop, country toggle, breaker selector, and embedded AI chat.
+ * Glassmorphism backdrop, breaker calculator, and embedded AI chat for load validation.
  */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { PowerPoint } from '../types/powerPoint';
 import type { ElectricalStandard } from '../types/electrical';
-import { useElectricalAssistantChat } from '../hooks/useElectricalAssistantChat';
+import { MAX_OUTLETS } from '../types/electrical';
 import ElectricalBreakerCalculator from './ElectricalBreakerCalculator.js';
+import ElectricalAIChat from './ElectricalAIChat.js';
+import { useCircuitCalculations } from '../hooks/useCircuitCalculations.js';
 
 interface ElectricalDrawerProps {
   isOpen: boolean;
@@ -24,17 +26,15 @@ const ElectricalDrawer: React.FC<ElectricalDrawerProps> = ({
   onUpdate,
   onDelete,
 }) => {
-  const [showChat, setShowChat] = useState(false);
-  const { messages, isLoading, sendMessage, clearChat } = useElectricalAssistantChat();
-  const [chatInput, setChatInput] = useState('');
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // Scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (showChat && chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages, showChat]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  
+  // Use circuit calculations hook to get current totals (for circuits linked to Supabase)
+  const circuitCalcs = useCircuitCalculations({
+    circuitId: powerPoint?.circuitId || null,
+    localMode: !powerPoint?.circuitId,
+    initialStandard: powerPoint?.standard || 'EU_PT',
+    initialBreakerAmps: powerPoint?.breaker_amps,
+  });
 
   if (!powerPoint) return null;
 
@@ -51,11 +51,16 @@ const ElectricalDrawer: React.FC<ElectricalDrawerProps> = ({
     onUpdate({ ...powerPoint, label });
   };
 
-  const handleSendChat = async () => {
-    if (!chatInput.trim()) return;
-    await sendMessage(chatInput);
-    setChatInput('');
-  };
+  // Refresh circuit calculations after a load is confirmed
+  const handleLoadConfirmed = useCallback(() => {
+    circuitCalcs.refresh();
+    setRefreshKey((k) => k + 1);
+  }, [circuitCalcs]);
+
+  // Get current values from hook or fallback to power point values
+  const currentWatts = circuitCalcs.totalWatts;
+  const currentOutlets = circuitCalcs.totalOutlets;
+  const maxOutlets = MAX_OUTLETS[powerPoint.standard];
 
   return (
     <AnimatePresence>
@@ -206,179 +211,20 @@ const ElectricalDrawer: React.FC<ElectricalDrawerProps> = ({
                 />
               </div>
 
-              {/* AI Assistant Button */}
-              <motion.button
-                onClick={() => setShowChat(!showChat)}
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  borderRadius: '12px',
-                  border: 'none',
-                  background: showChat
-                    ? 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)'
-                    : 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                  color: 'white',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '10px',
-                  boxShadow: '0 4px 16px rgba(124,58,237,0.3)',
-                  marginBottom: showChat ? '16px' : '24px',
-                }}
-              >
-                <span style={{ fontSize: '18px' }}>🤖</span>
-                {showChat ? 'Hide AI Electrical Assistant' : 'Open AI Electrical Assistant'}
-              </motion.button>
-
-              {/* Chat Panel */}
-              <AnimatePresence>
-                {showChat && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                    style={{ overflow: 'hidden' }}
-                  >
-                    <div
-                      style={{
-                        borderRadius: '12px',
-                        border: '1px solid rgba(124,58,237,0.2)',
-                        background: 'white',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {/* Chat Messages */}
-                      <div
-                        style={{
-                          height: '240px',
-                          overflow: 'auto',
-                          padding: '16px',
-                          background: 'linear-gradient(180deg, rgba(124,58,237,0.02) 0%, white 100%)',
-                        }}
-                      >
-                        {messages.map((msg) => (
-                          <div
-                            key={msg.id}
-                            style={{
-                              marginBottom: '12px',
-                              display: 'flex',
-                              justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                            }}
-                          >
-                            <div
-                              style={{
-                                maxWidth: '85%',
-                                padding: '10px 14px',
-                                borderRadius: msg.role === 'user' ? '12px 12px 4px 12px' : '12px 12px 12px 4px',
-                                background: msg.role === 'user'
-                                  ? 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)'
-                                  : msg.role === 'system'
-                                  ? 'rgba(0,0,0,0.04)'
-                                  : 'white',
-                                color: msg.role === 'user' ? 'white' : '#374151',
-                                fontSize: '13px',
-                                lineHeight: '1.5',
-                                boxShadow: msg.role === 'assistant' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                                border: msg.role === 'assistant' ? '1px solid rgba(0,0,0,0.06)' : 'none',
-                              }}
-                            >
-                              {msg.content}
-                            </div>
-                          </div>
-                        ))}
-                        {isLoading && (
-                          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                            <div
-                              style={{
-                                padding: '10px 14px',
-                                borderRadius: '12px 12px 12px 4px',
-                                background: 'white',
-                                border: '1px solid rgba(0,0,0,0.06)',
-                                fontSize: '13px',
-                                color: '#9ca3af',
-                              }}
-                            >
-                              Thinking...
-                            </div>
-                          </div>
-                        )}
-                        <div ref={chatEndRef} />
-                      </div>
-
-                      {/* Chat Input */}
-                      <div
-                        style={{
-                          padding: '12px',
-                          borderTop: '1px solid rgba(0,0,0,0.06)',
-                          display: 'flex',
-                          gap: '8px',
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={chatInput}
-                          onChange={(e) => setChatInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              handleSendChat();
-                            }
-                          }}
-                          placeholder="Ask about electrical planning..."
-                          style={{
-                            flex: 1,
-                            padding: '10px 14px',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(0,0,0,0.1)',
-                            fontSize: '13px',
-                            outline: 'none',
-                          }}
-                        />
-                        <button
-                          onClick={handleSendChat}
-                          disabled={isLoading || !chatInput.trim()}
-                          style={{
-                            padding: '10px 16px',
-                            borderRadius: '8px',
-                            border: 'none',
-                            background: '#7c3aed',
-                            color: 'white',
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            cursor: isLoading || !chatInput.trim() ? 'not-allowed' : 'pointer',
-                            opacity: isLoading || !chatInput.trim() ? 0.5 : 1,
-                          }}
-                        >
-                          Send
-                        </button>
-                      </div>
-
-                      {/* Clear Chat */}
-                      <div style={{ padding: '8px 12px 12px', textAlign: 'center' }}>
-                        <button
-                          onClick={clearChat}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#9ca3af',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            textDecoration: 'underline',
-                          }}
-                        >
-                          Clear conversation
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {/* AI Electrical Chat - Load validation and addition */}
+              <div style={{ height: '400px', marginBottom: '16px' }}>
+                <ElectricalAIChat
+                  key={refreshKey}
+                  circuitId={powerPoint.circuitId || null}
+                  standard={powerPoint.standard}
+                  breakerAmps={powerPoint.breaker_amps}
+                  voltage={powerPoint.voltage}
+                  maxOutlets={maxOutlets}
+                  currentWatts={currentWatts}
+                  currentOutlets={currentOutlets}
+                  onConfirmed={handleLoadConfirmed}
+                />
+              </div>
             </div>
 
             {/* Footer Actions */}
