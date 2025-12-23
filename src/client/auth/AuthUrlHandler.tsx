@@ -24,6 +24,9 @@ const AuthUrlHandler: React.FC = () => {
     const url = new URL(window.location.href);
     const sp = url.searchParams;
 
+    // If we're on the dedicated callback page, let AuthCallbackPage handle it exclusively
+    if (url.pathname === '/auth/callback') return;
+
     const next = sanitizeNext(sp.get('next'));
     const oauthError = sp.get('error') || sp.get('error_description');
     const code = sp.get('code');
