@@ -49,7 +49,9 @@ const GoogleAuthButton: React.FC = () => {
       // Prefer env origin if valid, but never force localhost when we're on a non-local host.
       const siteOrigin = envOrigin && !(envLooksLocal && !runtimeIsLocal) ? envOrigin : runtimeOrigin;
 
-      const redirectTo = `${siteOrigin}/auth/callback?next=${encodeURIComponent(sanitizedNext)}`;
+      // Redirect to "/" so OAuth return always hits a known-good route on mobile Safari.
+      // AuthUrlHandler will detect ?code= or #access_token on ANY route and finish login.
+      const redirectTo = `${siteOrigin}/?next=${encodeURIComponent(sanitizedNext)}`;
 
       const { error: oauthError } = await browserSupabaseClient.auth.signInWithOAuth({
         provider: 'google',

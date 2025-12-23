@@ -46,7 +46,7 @@ const GoogleAuthButton = () => {
       const runtimeIsLocal = runtimeOrigin.includes('localhost');
       const siteOrigin = envOrigin && !(envLooksLocal && !runtimeIsLocal) ? envOrigin : runtimeOrigin;
 
-      const redirectTo = `${siteOrigin}/auth/callback?next=${encodeURIComponent(sanitizedNext)}`;
+      const redirectTo = `${siteOrigin}/?next=${encodeURIComponent(sanitizedNext)}`;
 
       const { error: oauthError } = await browserSupabaseClient.auth.signInWithOAuth({
         provider: 'google',

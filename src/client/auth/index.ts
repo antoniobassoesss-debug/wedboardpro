@@ -5,4 +5,5 @@ export { default as AuthLayout } from './AuthLayout';
 export { default as EmailPasswordForm } from './EmailPasswordForm';
 export { default as GoogleAuthButton } from './GoogleAuthButton';
 export { default as AuthCallbackPage } from './AuthCallbackPage';
+export { default as AuthUrlHandler } from './AuthUrlHandler';
 
