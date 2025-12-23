@@ -109,6 +109,11 @@ const AuthUrlHandler: React.FC = () => {
           (typeof e?.message === 'string' && e.message.trim()) ||
           (typeof e === 'string' && e.trim()) ||
           'Google sign-in failed. Please try again.';
+        try {
+          window.localStorage.setItem('wedboardpro_oauth_last_error', msg);
+        } catch {
+          // ignore
+        }
         navigate(`/login?next=${encodeURIComponent(next)}&oauth_error=${encodeURIComponent(msg)}`, {
           replace: true,
         });

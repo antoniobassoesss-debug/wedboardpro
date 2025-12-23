@@ -3,7 +3,7 @@
  * mode='login': calls /api/auth/login, stores session, redirects.
  * mode='signup': calls /api/auth/signup, then auto-logs in, stores session, redirects.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import './auth.css';
 
@@ -22,6 +22,19 @@ const EmailPasswordForm: React.FC<EmailPasswordFormProps> = ({ mode }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(oauthErrorFromRedirect || oauthErrorDirect || null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (error) return;
+    try {
+      const last = window.localStorage.getItem('wedboardpro_oauth_last_error');
+      if (last && last.trim()) {
+        setError(last.trim());
+        window.localStorage.removeItem('wedboardpro_oauth_last_error');
+      }
+    } catch {
+      // ignore
+    }
+  }, [error]);
 
   // Sanitize next param to only allow internal paths
   const sanitizedNext = nextUrl.startsWith('/') ? nextUrl : '/dashboard';
