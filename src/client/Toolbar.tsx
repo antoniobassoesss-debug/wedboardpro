@@ -493,6 +493,34 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange, onAddSpace,
           WebkitBackfaceVisibility: 'hidden',
         }}
       >
+        {/* Always-visible Power Point button (ensures the ⚡ tool is accessible) */}
+        <button
+          key="power-point-fixed"
+          data-tool-id="power-point"
+          onClick={() => onToolChange('power-point')}
+          onMouseEnter={() => { if (!disableHover && !suppressHover) setHoveredTool('power-point'); }}
+          onMouseLeave={() => { if (!disableHover && !suppressHover) setHoveredTool(null); }}
+          style={{
+            width: `${buttonSize}px`,
+            height: `${buttonSize}px`,
+            borderRadius: '12px',
+            border: '2px solid transparent',
+            background: getButtonBackground('power-point'),
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '18px',
+            transition: 'all 0.18s ease',
+            color: getButtonColor('power-point'),
+            padding: '6px',
+            marginBottom: '8px',
+          }}
+          title="Power Point"
+        >
+          ⚡
+        </button>
+
         {tools.map((tool) => (
           <button
             key={tool.id}
