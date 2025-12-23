@@ -5,6 +5,7 @@
   "framework": null,
   "routes": [
     { "src": "^/api/(.*)$", "dest": "/api/index.ts" },
+    { "handle": "filesystem" },
     { "src": "^/(.*)$", "dest": "/index.html" }
   ],
   "functions": {
