@@ -29,7 +29,16 @@ const AuthUrlHandler: React.FC = () => {
     const code = sp.get('code');
     const hasAccessToken = (url.hash || '').includes('access_token=');
 
-    const shouldHandle = !!oauthError || !!code || hasAccessToken;
+    const alreadyHasAppSession = !!window.localStorage.getItem('wedboarpro_session');
+    const mightHaveSupabaseSession =
+      // common return points
+      url.pathname === '/' ||
+      url.pathname === '/login' ||
+      url.pathname === '/signup' ||
+      // if a next param is present, we want to continue the flow
+      !!sp.get('next');
+
+    const shouldHandle = !!oauthError || !!code || hasAccessToken || (!alreadyHasAppSession && mightHaveSupabaseSession);
     if (!shouldHandle) return;
 
     setHandled(true);
@@ -73,6 +82,25 @@ const AuthUrlHandler: React.FC = () => {
             localStorage.setItem('wedboarpro_user', JSON.stringify(user));
             localStorage.setItem('wedboarpro_display_name', displayName);
           }
+        } else if (!alreadyHasAppSession) {
+          // If Supabase already processed the URL (detectSessionInUrl), the code may be gone.
+          // In that case, just read the current Supabase session and persist it for the app.
+          const { data, error } = await browserSupabaseClient.auth.getSession();
+          if (error) throw error;
+          const session = data.session;
+          if (!session) {
+            throw new Error('Google sign-in did not complete. Please try again.');
+          }
+          const user = session.user;
+          const displayName =
+            (typeof user?.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim()) ||
+            (typeof user?.user_metadata?.name === 'string' && user.user_metadata.name.trim()) ||
+            (typeof user?.email === 'string' && user.email.trim()) ||
+            'User';
+
+          localStorage.setItem('wedboarpro_session', JSON.stringify(session));
+          localStorage.setItem('wedboarpro_user', JSON.stringify(user));
+          localStorage.setItem('wedboarpro_display_name', displayName);
         }
 
         navigate(next, { replace: true });
