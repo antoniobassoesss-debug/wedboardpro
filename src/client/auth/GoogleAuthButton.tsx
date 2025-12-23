@@ -53,7 +53,7 @@ const GoogleAuthButton: React.FC = () => {
       // AuthUrlHandler will detect ?code= or #access_token on ANY route and finish login.
       const redirectTo = `${siteOrigin}/?next=${encodeURIComponent(sanitizedNext)}`;
 
-      const { error: oauthError } = await browserSupabaseClient.auth.signInWithOAuth({
+      const { data: oauthData, error: oauthError } = await browserSupabaseClient.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo,
@@ -63,8 +63,12 @@ const GoogleAuthButton: React.FC = () => {
       if (oauthError) {
         setError(oauthError.message);
         setLoading(false);
+        return;
       }
-      // If successful, the page will redirect to Google
+      // Some browsers/environments may not auto-navigate; force navigation if we got a URL back.
+      if (oauthData?.url) {
+        window.location.assign(oauthData.url);
+      }
     } catch (err: any) {
       setError(err?.message || 'Failed to initiate Google sign-in');
       setLoading(false);

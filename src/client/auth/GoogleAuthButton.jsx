@@ -48,7 +48,7 @@ const GoogleAuthButton = () => {
 
       const redirectTo = `${siteOrigin}/?next=${encodeURIComponent(sanitizedNext)}`;
 
-      const { error: oauthError } = await browserSupabaseClient.auth.signInWithOAuth({
+      const { data: oauthData, error: oauthError } = await browserSupabaseClient.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo },
       });
@@ -56,8 +56,11 @@ const GoogleAuthButton = () => {
       if (oauthError) {
         setError(oauthError.message);
         setLoading(false);
+        return;
       }
-      // success => browser redirects away
+      if (oauthData?.url) {
+        window.location.assign(oauthData.url);
+      }
     } catch (err) {
       setError(err?.message || 'Failed to initiate Google sign-in');
       setLoading(false);
