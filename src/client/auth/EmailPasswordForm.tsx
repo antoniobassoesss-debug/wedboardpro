@@ -5,6 +5,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { browserSupabaseClient } from '../browserSupabaseClient';
 import './auth.css';
 
 interface EmailPasswordFormProps {
@@ -22,6 +23,7 @@ const EmailPasswordForm: React.FC<EmailPasswordFormProps> = ({ mode }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(oauthErrorFromRedirect || oauthErrorDirect || null);
   const [loading, setLoading] = useState(false);
+  const [checkingOAuth, setCheckingOAuth] = useState(false);
 
   useEffect(() => {
     if (error) return;
@@ -53,6 +55,46 @@ const EmailPasswordForm: React.FC<EmailPasswordFormProps> = ({ mode }) => {
       fallbackEmail.trim()
     );
   };
+
+  // If we land back on /login after Google OAuth, auto-complete by reading the current Supabase session.
+  useEffect(() => {
+    if (mode !== 'login') return;
+    if (!browserSupabaseClient) return;
+
+    const alreadyHasAppSession = !!window.localStorage.getItem('wedboarpro_session');
+    if (alreadyHasAppSession) return;
+
+    let cancelled = false;
+    setCheckingOAuth(true);
+    (async () => {
+      try {
+        const { data, error: sessErr } = await browserSupabaseClient.auth.getSession();
+        if (cancelled) return;
+        if (sessErr) {
+          setError(sessErr.message);
+          return;
+        }
+        const session = data.session;
+        if (!session) {
+          return; // nothing to do
+        }
+        const user = session.user;
+        const displayName = resolveDisplayName(user, user?.email || email || 'User');
+        storeSession(session, user, displayName);
+        navigate(sanitizedNext);
+      } catch (e: any) {
+        if (cancelled) return;
+        setError(e?.message || 'Google sign-in did not complete. Please try again.');
+      } finally {
+        if (!cancelled) setCheckingOAuth(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, navigate, sanitizedNext]);
 
   const handleLogin = async () => {
     const res = await fetch('/api/auth/login', {
@@ -150,6 +192,11 @@ const EmailPasswordForm: React.FC<EmailPasswordFormProps> = ({ mode }) => {
 
   return (
     <form className="auth-form" onSubmit={handleSubmit}>
+      {checkingOAuth && !error && (
+        <div className="auth-error" style={{ color: '#6b6b6b' }}>
+          Completing Google sign in…
+        </div>
+      )}
       <label className="auth-label">
         Email
         <input
