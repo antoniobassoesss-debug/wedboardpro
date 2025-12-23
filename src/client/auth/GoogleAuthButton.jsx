@@ -27,12 +27,24 @@ const GoogleAuthButton = () => {
 
     try {
       // Prefer VITE_SITE_URL, but if it points to localhost while we're on a prod host, fallback to runtime origin
-      const envOrigin = (import.meta.env.VITE_SITE_URL || '').trim();
+      const envOriginRaw = (import.meta.env.VITE_SITE_URL || '').trim();
       const runtimeOrigin = window.location.origin;
-      const envLooksLocal = envOrigin.includes('localhost');
+
+      const normalizeOrigin = (origin) => {
+        if (!origin) return null;
+        try {
+          const url = new URL(origin);
+          if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+          return url.origin;
+        } catch {
+          return null;
+        }
+      };
+
+      const envOrigin = normalizeOrigin(envOriginRaw);
+      const envLooksLocal = !!envOrigin && envOrigin.includes('localhost');
       const runtimeIsLocal = runtimeOrigin.includes('localhost');
-      const siteOrigin =
-        envOrigin && !(envLooksLocal && !runtimeIsLocal) ? envOrigin : runtimeOrigin;
+      const siteOrigin = envOrigin && !(envLooksLocal && !runtimeIsLocal) ? envOrigin : runtimeOrigin;
 
       const redirectTo = `${siteOrigin}/auth/callback?next=${encodeURIComponent(sanitizedNext)}`;
 

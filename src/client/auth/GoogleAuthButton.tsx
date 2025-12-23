@@ -27,12 +27,27 @@ const GoogleAuthButton: React.FC = () => {
     setError(null);
 
     try {
-      const envOrigin = (import.meta.env.VITE_SITE_URL || '').trim();
+      const envOriginRaw = (import.meta.env.VITE_SITE_URL || '').trim();
       const runtimeOrigin = window.location.origin;
-      const envLooksLocal = envOrigin.includes('localhost');
+
+      const normalizeOrigin = (origin: string): string | null => {
+        if (!origin) return null;
+        try {
+          const url = new URL(origin);
+          if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+          // normalize to origin only (no path) and remove trailing slash
+          return url.origin;
+        } catch {
+          return null;
+        }
+      };
+
+      const envOrigin = normalizeOrigin(envOriginRaw);
+      const envLooksLocal = !!envOrigin && envOrigin.includes('localhost');
       const runtimeIsLocal = runtimeOrigin.includes('localhost');
-      const siteOrigin =
-        envOrigin && !(envLooksLocal && !runtimeIsLocal) ? envOrigin : runtimeOrigin;
+
+      // Prefer env origin if valid, but never force localhost when we're on a non-local host.
+      const siteOrigin = envOrigin && !(envLooksLocal && !runtimeIsLocal) ? envOrigin : runtimeOrigin;
 
       const redirectTo = `${siteOrigin}/auth/callback?next=${encodeURIComponent(sanitizedNext)}`;
 
