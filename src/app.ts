@@ -4600,6 +4600,183 @@ app.post('/api/crm/deals/:id/won', express.json(), async (req, res) => {
   }
 });
 
+// ============================================================================
+// ELECTRICAL MODULE - PDF Export
+// ============================================================================
+
+// Dynamic import for pdfkit (only when needed)
+app.get('/api/electrical/projects/:projectId/export.pdf', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase service client unavailable' });
+    }
+
+    const { projectId } = req.params;
+
+    // Fetch electrical project
+    const { data: project, error: projectError } = await supabase
+      .from('electrical_projects')
+      .select('*')
+      .eq('id', projectId)
+      .eq('owner_id', user.id)
+      .single();
+
+    if (projectError || !project) {
+      return res.status(404).json({ error: 'Electrical project not found' });
+    }
+
+    // Fetch all circuits for this project
+    const { data: circuits, error: circuitsError } = await supabase
+      .from('electrical_circuits')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: true });
+
+    if (circuitsError) {
+      throw circuitsError;
+    }
+
+    // Import pdfkit dynamically
+    const PDFDocument = (await import('pdfkit')).default;
+
+    // Create PDF document
+    const doc = new PDFDocument({
+      size: 'A4',
+      margin: 50,
+      info: {
+        Title: `Electrical Summary - ${project.name}`,
+        Author: 'WedBoardPro',
+        Subject: 'Electrical Installation Summary',
+      },
+    });
+
+    // Set response headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="electrical-summary-${projectId}.pdf"`);
+
+    // Pipe PDF to response
+    doc.pipe(res);
+
+    // Colors
+    const primaryColor = '#f59e0b';
+    const okColor = '#10b981';
+    const warningColor = '#f59e0b';
+    const criticalColor = '#ef4444';
+    const textColor = '#1f2937';
+    const lightText = '#6b7280';
+
+    // Header
+    doc.fontSize(24).fillColor(primaryColor).text('⚡ Electrical Summary', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(14).fillColor(textColor).text(project.name, { align: 'center' });
+    doc.fontSize(10).fillColor(lightText).text(`Standard: ${project.standard === 'EU_PT' ? 'EU/PT (RTE BT)' : 'US (NEC)'}`, { align: 'center' });
+    doc.text(`Generated: ${new Date().toLocaleString()}`, { align: 'center' });
+    doc.moveDown(2);
+
+    // Summary Stats
+    const totalCircuits = circuits?.length || 0;
+    const totalWatts = circuits?.reduce((sum: number, c: any) => sum + (c.total_watts || 0), 0) || 0;
+    const totalCapacity = circuits?.reduce((sum: number, c: any) => sum + (c.capacity_watts || 0), 0) || 0;
+    const okCount = circuits?.filter((c: any) => c.status === 'ok').length || 0;
+    const warningCount = circuits?.filter((c: any) => c.status === 'warning').length || 0;
+    const criticalCount = circuits?.filter((c: any) => c.status === 'overload').length || 0;
+
+    doc.fontSize(12).fillColor(textColor).text('Summary', { underline: true });
+    doc.moveDown(0.5);
+    doc.fontSize(10).fillColor(lightText);
+    doc.text(`Total Circuits: ${totalCircuits}`);
+    doc.text(`Total Load: ${(totalWatts / 1000).toFixed(2)} kW`);
+    doc.text(`Total Capacity: ${(totalCapacity / 1000).toFixed(2)} kW`);
+    doc.text(`Overall Utilization: ${totalCapacity > 0 ? ((totalWatts / totalCapacity) * 100).toFixed(1) : 0}%`);
+    doc.moveDown(0.5);
+    doc.fillColor(okColor).text(`OK: ${okCount}`, { continued: true });
+    doc.fillColor(warningColor).text(`  |  Warning: ${warningCount}`, { continued: true });
+    doc.fillColor(criticalColor).text(`  |  Critical: ${criticalCount}`);
+    doc.moveDown(2);
+
+    // Circuits Table
+    if (circuits && circuits.length > 0) {
+      doc.fontSize(12).fillColor(textColor).text('Circuit Details', { underline: true });
+      doc.moveDown(1);
+
+      // Table header
+      const tableTop = doc.y;
+      const col0 = 140, col1 = 60, col2 = 80, col3 = 80, col4 = 60, col5 = 60;
+
+      doc.fontSize(9).fillColor(lightText);
+      doc.text('Circuit Name', 50, tableTop, { width: col0, align: 'left' });
+      doc.text('Breaker', 50 + col0, tableTop, { width: col1, align: 'left' });
+      doc.text('Load', 50 + col0 + col1, tableTop, { width: col2, align: 'left' });
+      doc.text('Capacity', 50 + col0 + col1 + col2, tableTop, { width: col3, align: 'left' });
+      doc.text('Util %', 50 + col0 + col1 + col2 + col3, tableTop, { width: col4, align: 'left' });
+      doc.text('Status', 50 + col0 + col1 + col2 + col3 + col4, tableTop, { width: col5, align: 'left' });
+
+      doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke('#e5e7eb');
+      doc.moveDown(1);
+
+      // Table rows
+      circuits.forEach((circuit: any, index: number) => {
+        const rowY = doc.y;
+        const loadPercent = circuit.capacity_watts > 0 ? (circuit.total_watts / circuit.capacity_watts) * 100 : 0;
+        const statusColor = circuit.status === 'ok' ? okColor : circuit.status === 'warning' ? warningColor : criticalColor;
+
+        // Alternate row background
+        if (index % 2 === 0) {
+          doc.rect(50, rowY - 2, 500, 16).fill('#f9fafb');
+        }
+
+        doc.fontSize(9).fillColor(textColor);
+
+        // Name
+        doc.text(circuit.name || 'Unnamed', 50, rowY, { width: col0, align: 'left' });
+
+        // Breaker
+        doc.text(`${circuit.breaker_amps}A`, 50 + col0, rowY, { width: col1, align: 'left' });
+
+        // Load
+        doc.text(`${circuit.total_watts}W`, 50 + col0 + col1, rowY, { width: col2, align: 'left' });
+
+        // Capacity
+        doc.text(`${circuit.capacity_watts}W`, 50 + col0 + col1 + col2, rowY, { width: col3, align: 'left' });
+
+        // Utilization %
+        doc.text(`${loadPercent.toFixed(1)}%`, 50 + col0 + col1 + col2 + col3, rowY, { width: col4, align: 'left' });
+
+        // Status
+        doc.fillColor(statusColor).text(circuit.status?.toUpperCase() || 'OK', 50 + col0 + col1 + col2 + col3 + col4, rowY, { width: col5, align: 'left' });
+
+        doc.moveDown(0.8);
+
+        // Page break if needed
+        if (doc.y > 750) {
+          doc.addPage();
+        }
+      });
+    } else {
+      doc.fontSize(10).fillColor(lightText).text('No circuits found in this project.');
+    }
+
+    // Footer
+    doc.moveDown(2);
+    doc.fontSize(8).fillColor(lightText).text('Generated by WedBoardPro Electrical Module', { align: 'center' });
+
+    // Finalize PDF
+    doc.end();
+  } catch (error: any) {
+    console.error('[GET /api/electrical/projects/:projectId/export.pdf] Error:', error);
+    // Only send error if headers haven't been sent
+    if (!res.headersSent) {
+      res.status(500).json({ error: error?.message || 'Failed to generate PDF' });
+    }
+  }
+});
+
 // Export app for Vercel serverless functions
 export default app;
 

@@ -6,6 +6,7 @@ import ProjectTabs from './ProjectTabs';
 import InfiniteGridBackground from './InfiniteGridBackground';
 import AssistantChat from './AssistantChat';
 import AssociateProjectModal from './AssociateProjectModal';
+import ElectricalDashboard from './components/ElectricalDashboard';
 import { saveLayout, saveMultipleLayouts, type SaveLayoutInput, type LayoutRecord } from './api/layoutsApi';
 import type { Wall, Door } from './types/wall.js';
 import type { PowerPoint } from './types/powerPoint';
@@ -111,8 +112,15 @@ const LayoutMakerPage: React.FC = () => {
     addSpace: (width: number, height: number) => void;
     addTable: (type: string, size: string, seats: number, imageUrl: string, targetSpaceId?: string) => void;
     addWalls: (walls: Wall[], doors?: Door[]) => void;
+    zoomToPoints: (points: { x: number; y: number }[]) => void;
+    getPowerPoints: () => PowerPoint[];
   } | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  
+  // Electrical Dashboard state
+  const [showElectricalDashboard, setShowElectricalDashboard] = useState<boolean>(false);
+  // Placeholder for electrical project ID - in production, this would come from props or context
+  const electricalProjectId = activeProject?.supabaseLayoutId || 'demo-electrical-project';
   
   // Save to Supabase state
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -558,6 +566,19 @@ const LayoutMakerPage: React.FC = () => {
     };
   }, [projects, activeProjectId, handleProjectSelect, handleNewProject]);
 
+  // Handle zoom to points from electrical dashboard
+  const handleZoomToPoints = useCallback((points: { x: number; y: number }[]) => {
+    if (gridCanvasRef.current?.zoomToPoints) {
+      gridCanvasRef.current.zoomToPoints(points);
+      setShowElectricalDashboard(false);
+    }
+  }, []);
+
+  // Get current power points for dashboard
+  const currentPowerPoints = useMemo(() => {
+    return activeProject?.canvasData?.powerPoints || [];
+  }, [activeProject?.canvasData?.powerPoints]);
+
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
       {/* Layer 0: Infinite Grid Background (always visible, behind everything) */}
@@ -625,6 +646,44 @@ const LayoutMakerPage: React.FC = () => {
         layoutIds={recentlySavedLayoutIds}
         onAssociated={handleLayoutsAssociated}
       />
+      
+      {/* Electrical Dashboard */}
+      {showElectricalDashboard && (
+        <ElectricalDashboard
+          electricalProjectId={electricalProjectId}
+          powerPoints={currentPowerPoints}
+          onZoomToPoints={handleZoomToPoints}
+          onClose={() => setShowElectricalDashboard(false)}
+        />
+      )}
+      
+      {/* Electrical Dashboard Button (floating) */}
+      {!showElectricalDashboard && currentPowerPoints.length > 0 && (
+        <button
+          onClick={() => setShowElectricalDashboard(true)}
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            padding: '12px 20px',
+            borderRadius: '12px',
+            border: 'none',
+            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+            color: 'white',
+            fontSize: '13px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+            zIndex: 15000,
+          }}
+        >
+          <span style={{ fontSize: '16px' }}>⚡</span>
+          Electrical Panel
+        </button>
+      )}
       
       {/* Loading overlay */}
       {isLoading && (

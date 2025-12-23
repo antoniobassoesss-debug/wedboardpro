@@ -162,6 +162,8 @@ const GridCanvas = forwardRef<{
   addSpace: (width: number, height: number) => void;
   addTable: (type: string, size: string, seats: number, imageUrl: string, targetSpaceId?: string) => void;
   addWalls: (walls: Wall[], doors?: Door[]) => void;
+  zoomToPoints: (points: { x: number; y: number }[]) => void;
+  getPowerPoints: () => PowerPoint[];
 }, GridCanvasProps>(({ 
   activeTool, 
   onToolChange,
@@ -1187,11 +1189,45 @@ const GridCanvas = forwardRef<{
   }, [a4Dimensions, saveState]);
 
   // Expose addSpace, addTable, and addWalls methods via ref
+  // Zoom to a set of points (for electrical dashboard)
+  const zoomToPoints = useCallback((points: { x: number; y: number }[]) => {
+    if (points.length === 0) return;
+    
+    // Calculate bounding box
+    const minX = Math.min(...points.map(p => p.x));
+    const maxX = Math.max(...points.map(p => p.x));
+    const minY = Math.min(...points.map(p => p.y));
+    const maxY = Math.max(...points.map(p => p.y));
+    
+    // Add padding
+    const padding = 200;
+    const boxWidth = Math.max(maxX - minX + padding * 2, 400);
+    const boxHeight = Math.max(maxY - minY + padding * 2, 300);
+    
+    // Center the view on the bounding box
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    
+    setViewBox({
+      x: centerX - boxWidth / 2,
+      y: centerY - boxHeight / 2,
+      width: boxWidth,
+      height: boxHeight,
+    });
+  }, []);
+
+  // Get current power points
+  const getPowerPoints = useCallback(() => {
+    return [...powerPoints];
+  }, [powerPoints]);
+
   useImperativeHandle(ref, () => ({
     addSpace,
     addTable,
     addWalls,
-  }), [addSpace, addTable, addWalls]);
+    zoomToPoints,
+    getPowerPoints,
+  }), [addSpace, addTable, addWalls, zoomToPoints, getPowerPoints]);
 
   // Undo function
   const undo = useCallback(() => {
