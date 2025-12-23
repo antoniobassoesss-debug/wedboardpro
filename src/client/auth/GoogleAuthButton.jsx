@@ -26,27 +26,10 @@ const GoogleAuthButton = () => {
     setError(null);
 
     try {
-      // Prefer VITE_SITE_URL, but if it points to localhost while we're on a prod host, fallback to runtime origin
-      const envOriginRaw = (import.meta.env.VITE_SITE_URL || '').trim();
-      const runtimeOrigin = window.location.origin;
-
-      const normalizeOrigin = (origin) => {
-        if (!origin) return null;
-        try {
-          const url = new URL(origin);
-          if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-          return url.origin;
-        } catch {
-          return null;
-        }
-      };
-
-      const envOrigin = normalizeOrigin(envOriginRaw);
-      const envLooksLocal = !!envOrigin && envOrigin.includes('localhost');
-      const runtimeIsLocal = runtimeOrigin.includes('localhost');
-      const siteOrigin = envOrigin && !(envLooksLocal && !runtimeIsLocal) ? envOrigin : runtimeOrigin;
-
-      const redirectTo = `${siteOrigin}/auth/callback?next=${encodeURIComponent(sanitizedNext)}`;
+      // CRITICAL: Always use window.location.origin so the callback returns to the SAME origin.
+      // This ensures the PKCE code verifier (stored in localStorage) is accessible.
+      // Using a different origin (e.g., www vs non-www) would cause "code verifier not found" errors.
+      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(sanitizedNext)}`;
 
       const { data: oauthData, error: oauthError } = await browserSupabaseClient.auth.signInWithOAuth({
         provider: 'google',

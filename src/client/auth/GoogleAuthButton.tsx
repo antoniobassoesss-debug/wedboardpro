@@ -27,30 +27,10 @@ const GoogleAuthButton: React.FC = () => {
     setError(null);
 
     try {
-      const envOriginRaw = (import.meta.env.VITE_SITE_URL || '').trim();
-      const runtimeOrigin = window.location.origin;
-
-      const normalizeOrigin = (origin: string): string | null => {
-        if (!origin) return null;
-        try {
-          const url = new URL(origin);
-          if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-          // normalize to origin only (no path) and remove trailing slash
-          return url.origin;
-        } catch {
-          return null;
-        }
-      };
-
-      const envOrigin = normalizeOrigin(envOriginRaw);
-      const envLooksLocal = !!envOrigin && envOrigin.includes('localhost');
-      const runtimeIsLocal = runtimeOrigin.includes('localhost');
-
-      // Prefer env origin if valid, but never force localhost when we're on a non-local host.
-      const siteOrigin = envOrigin && !(envLooksLocal && !runtimeIsLocal) ? envOrigin : runtimeOrigin;
-
-      // Redirect to a dedicated callback route so we can reliably exchange the code and show errors if needed.
-      const redirectTo = `${siteOrigin}/auth/callback?next=${encodeURIComponent(sanitizedNext)}`;
+      // CRITICAL: Always use window.location.origin so the callback returns to the SAME origin.
+      // This ensures the PKCE code verifier (stored in localStorage) is accessible.
+      // Using a different origin (e.g., www vs non-www) would cause "code verifier not found" errors.
+      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(sanitizedNext)}`;
 
       const { data: oauthData, error: oauthError } = await browserSupabaseClient.auth.signInWithOAuth({
         provider: 'google',
