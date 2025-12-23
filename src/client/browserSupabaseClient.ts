@@ -20,6 +20,8 @@ export const browserSupabaseClient =
         auth: {
           // We persist our app session separately under `wedboarpro_session`,
           // but Supabase needs storage for PKCE/state + OAuth callback parsing.
+          // Use PKCE so OAuth returns with ?code=... (more reliable than #access_token on Safari/iOS).
+          flowType: 'pkce',
           persistSession: true,
           detectSessionInUrl: true,
         },
