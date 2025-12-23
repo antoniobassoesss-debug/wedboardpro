@@ -338,6 +338,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange, onAddSpace,
     // 'shapes' (aka Forms) uses the provided PNG but keeps the same id so functionality remains unchanged
     { id: 'shapes', label: 'Forms', icon: '/icons/forms.png', isImage: true },
     { id: 'text', label: 'Text', icon: '/icons/text.png', isImage: true },
+    { id: 'power-point', label: 'Power Point', icon: '⚡', isImage: false },
   ];
 
   const structureOptions = [

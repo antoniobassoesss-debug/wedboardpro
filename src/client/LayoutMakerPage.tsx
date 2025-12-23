@@ -8,6 +8,7 @@ import AssistantChat from './AssistantChat';
 import AssociateProjectModal from './AssociateProjectModal';
 import { saveLayout, saveMultipleLayouts, type SaveLayoutInput, type LayoutRecord } from './api/layoutsApi';
 import type { Wall, Door } from './types/wall.js';
+import type { PowerPoint } from './types/powerPoint';
 
 export interface Project {
   id: string;
@@ -18,6 +19,7 @@ export interface Project {
     textElements: any[];
     walls?: Wall[];
     doors?: Door[];
+    powerPoints?: PowerPoint[];
     viewBox: { x: number; y: number; width: number; height: number };
   };
   // Supabase linkage
@@ -56,6 +58,7 @@ const loadProjectsFromStorage = (): Project[] => {
         textElements: [],
         walls: [],
         doors: [],
+        powerPoints: [],
         viewBox: { x: 0, y: 0, width: 0, height: 0 },
       },
     },
@@ -138,6 +141,7 @@ const LayoutMakerPage: React.FC = () => {
       textElements: [],
       walls: [],
       doors: [],
+      powerPoints: [],
       viewBox: { x: 0, y: 0, width: 1000, height: 1000 }
     }
   };
@@ -150,6 +154,7 @@ const LayoutMakerPage: React.FC = () => {
       textElements: JSON.parse(JSON.stringify(data.textElements || [])),
       walls: JSON.parse(JSON.stringify(data.walls || [])),
       doors: JSON.parse(JSON.stringify(data.doors || [])),
+      powerPoints: JSON.parse(JSON.stringify(data.powerPoints || [])),
       viewBox: { ...data.viewBox },
     };
   }, []);
@@ -365,6 +370,8 @@ const LayoutMakerPage: React.FC = () => {
         shapes: [],
         textElements: [],
         walls: [],
+        doors: [],
+        powerPoints: [],
         viewBox: { x: 0, y: 0, width: 0, height: 0 },
       },
     };

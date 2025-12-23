@@ -1,8 +1,12 @@
 import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
-import Toolbar from './Toolbar.tsx';
-import Header from './Header.tsx';
-import ProjectTabs from './ProjectTabs.tsx';
+import Toolbar from './Toolbar.js';
+import Header from './Header.js';
+import ProjectTabs from './ProjectTabs.js';
 import type { Wall, Door } from './types/wall.js';
+import type { PowerPoint } from './types/powerPoint.js';
+import { createPowerPoint } from './types/powerPoint.js';
+import ElectricalIcon from './components/ElectricalIcon.js';
+import ElectricalDrawer from './components/ElectricalDrawer.js';
 
 const WALLMAKER_PIXELS_PER_METER = 100;
 
@@ -138,6 +142,7 @@ interface GridCanvasProps {
     textElements: TextElement[];
     walls?: Wall[];
     doors?: Door[];
+    powerPoints?: PowerPoint[];
     viewBox?: ViewBox;
   };
   onDataChange?: (data: {
@@ -146,6 +151,7 @@ interface GridCanvasProps {
     textElements: TextElement[];
     walls: Wall[];
     doors: Door[];
+    powerPoints: PowerPoint[];
     viewBox: ViewBox;
   }, projectId: string) => void; // Pass projectId to ensure correct project
   brushSize?: number;
@@ -218,6 +224,12 @@ const GridCanvas = forwardRef<{
   const [textElements, setTextElements] = useState<TextElement[]>(projectData?.textElements || []);
   const [walls, setWalls] = useState<Wall[]>(projectData?.walls || []);
   const [doors, setDoors] = useState<Door[]>(projectData?.doors || []);
+  const [powerPoints, setPowerPoints] = useState<PowerPoint[]>(projectData?.powerPoints || []);
+  
+  // Electrical drawer state
+  const [selectedPowerPointId, setSelectedPowerPointId] = useState<string | null>(null);
+  const [isElectricalDrawerOpen, setIsElectricalDrawerOpen] = useState(false);
+  const selectedPowerPoint = powerPoints.find(p => p.id === selectedPowerPointId) || null;
   
   // Calculate initial viewBox to show A4 canvas at 70% of screen
   const getInitialViewBox = useCallback(() => {
@@ -294,6 +306,7 @@ const GridCanvas = forwardRef<{
   const clipboardRef = useRef<Shape | null>(null);
   const wallsRef = useRef(walls);
   const doorsRef = useRef(doors);
+  const powerPointsRef = useRef(powerPoints);
   const viewBoxRef = useRef(viewBox);
   
   // Keep refs in sync with state
@@ -319,6 +332,7 @@ const GridCanvas = forwardRef<{
             textElements: JSON.parse(JSON.stringify(textElementsRef.current)),
             walls: JSON.parse(JSON.stringify(wallsRef.current)),
             doors: JSON.parse(JSON.stringify(doorsRef.current)),
+            powerPoints: JSON.parse(JSON.stringify(powerPointsRef.current)),
             viewBox: { ...viewBoxRef.current },
           }, currentProjectIdRef.current);
           console.log('GridCanvas unmounting - emergency save completed');
@@ -428,6 +442,9 @@ const GridCanvas = forwardRef<{
     doorsRef.current = doors;
   }, [doors]);
   useEffect(() => {
+    powerPointsRef.current = powerPoints;
+  }, [powerPoints]);
+  useEffect(() => {
     viewBoxRef.current = viewBox;
   }, [viewBox]);
 
@@ -441,6 +458,7 @@ const GridCanvas = forwardRef<{
         textElements: JSON.parse(JSON.stringify(textElementsRef.current)),
         walls: JSON.parse(JSON.stringify(wallsRef.current)),
         doors: JSON.parse(JSON.stringify(doorsRef.current)),
+        powerPoints: JSON.parse(JSON.stringify(powerPointsRef.current)),
         viewBox: { ...viewBoxRef.current },
       }, currentProjectIdRef.current);
     }
@@ -464,6 +482,7 @@ const GridCanvas = forwardRef<{
           textElements: JSON.parse(JSON.stringify(textElementsRef.current)),
           walls: JSON.parse(JSON.stringify(wallsRef.current)),
           doors: JSON.parse(JSON.stringify(doorsRef.current)),
+          powerPoints: JSON.parse(JSON.stringify(powerPointsRef.current)),
           viewBox: { ...viewBoxRef.current },
         }, previousProjectIdRef.current); // CRITICAL: Save to the PREVIOUS project, not the new one
       }
@@ -486,6 +505,7 @@ const GridCanvas = forwardRef<{
         setTextElements(JSON.parse(JSON.stringify(projectData.textElements || [])));
         setWalls(JSON.parse(JSON.stringify(projectData.walls || [])));
         setDoors(JSON.parse(JSON.stringify(projectData.doors || [])));
+        setPowerPoints(JSON.parse(JSON.stringify(projectData.powerPoints || [])));
         
         // On initial mount (page refresh), always center the canvas
         // Otherwise, use saved viewBox when switching projects
@@ -552,6 +572,7 @@ const GridCanvas = forwardRef<{
         textElements: JSON.parse(JSON.stringify(textElementsRef.current)),
         walls: JSON.parse(JSON.stringify(wallsRef.current)),
         doors: JSON.parse(JSON.stringify(doorsRef.current)),
+        powerPoints: JSON.parse(JSON.stringify(powerPointsRef.current)),
         viewBox: { ...viewBoxRef.current },
       };
       
@@ -570,6 +591,7 @@ const GridCanvas = forwardRef<{
             textElements: JSON.parse(JSON.stringify(textElementsRef.current)),
             walls: JSON.parse(JSON.stringify(wallsRef.current)),
             doors: JSON.parse(JSON.stringify(doorsRef.current)),
+            powerPoints: JSON.parse(JSON.stringify(powerPointsRef.current)),
             viewBox: { ...viewBoxRef.current },
           }, currentProjectIdRef.current);
         }
@@ -1719,6 +1741,7 @@ const GridCanvas = forwardRef<{
       case 'eraser': return 'cell';
       case 'shapes': return 'crosshair';
       case 'text': return 'text';
+      case 'power-point': return 'crosshair';
       default: return 'default';
     }
   };
@@ -1728,7 +1751,7 @@ const GridCanvas = forwardRef<{
     
     const svgCoords = screenToSvg(e.clientX, e.clientY);
     if (!svgCoords || !isPointOnCanvas(svgCoords.x, svgCoords.y)) {
-      if (activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'shapes' || activeTool === 'text') {
+      if (activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'shapes' || activeTool === 'text' || activeTool === 'power-point') {
         isPanningRef.current = true;
         panStartRef.current = { x: e.clientX, y: e.clientY };
         e.preventDefault();
@@ -1792,6 +1815,20 @@ const GridCanvas = forwardRef<{
             fill: '#000000'
           }]);
         }
+        setTimeout(() => {
+          isUserInteractingRef.current = false;
+        }, 100);
+        e.preventDefault();
+      }
+    } else if (activeTool === 'power-point') {
+      if (svgCoords && isPointOnCanvas(svgCoords.x, svgCoords.y)) {
+        isUserInteractingRef.current = true;
+        saveState(); // Save state before adding power point
+        const newPoint = createPowerPoint(svgCoords.x, svgCoords.y, 'EU_PT');
+        setPowerPoints(prev => [...prev, newPoint]);
+        // Open the drawer for the new point
+        setSelectedPowerPointId(newPoint.id);
+        setIsElectricalDrawerOpen(true);
         setTimeout(() => {
           isUserInteractingRef.current = false;
         }, 100);
@@ -2339,6 +2376,41 @@ const GridCanvas = forwardRef<{
           border: 0,
           background: 'transparent',
           zIndex: 1,
+        }}
+      >
+        {/* Power Points */}
+        {powerPoints.map((point) => (
+          <ElectricalIcon
+            key={point.id}
+            x={point.x}
+            y={point.y}
+            isSelected={selectedPowerPointId === point.id}
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              setSelectedPowerPointId(point.id);
+              setIsElectricalDrawerOpen(true);
+            }}
+          />
+        ))}
+      </svg>
+      
+      {/* Electrical Drawer */}
+      <ElectricalDrawer
+        isOpen={isElectricalDrawerOpen}
+        onClose={() => {
+          setIsElectricalDrawerOpen(false);
+          setTimeout(() => setSelectedPowerPointId(null), 300);
+        }}
+        powerPoint={selectedPowerPoint}
+        onUpdate={(updated: PowerPoint) => {
+          setPowerPoints(prev => prev.map(p => p.id === updated.id ? updated : p));
+          saveState();
+        }}
+        onDelete={(id: string) => {
+          setPowerPoints(prev => prev.filter(p => p.id !== id));
+          setIsElectricalDrawerOpen(false);
+          setTimeout(() => setSelectedPowerPointId(null), 300);
+          saveState();
         }}
       />
     </div>
