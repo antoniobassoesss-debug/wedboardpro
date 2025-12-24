@@ -596,6 +596,29 @@ const LayoutMakerPage: React.FC = () => {
         brushColor={brushColor}
       />
       
+      {/* Quick floating button to select Power Point tool (guaranteed visible) */}
+      <button
+        onClick={() => setActiveTool('power-point')}
+        id="floating-add-power-point"
+        style={{
+          position: 'fixed',
+          top: 96,
+          left: 24,
+          zIndex: 20000,
+          padding: '10px 12px',
+          borderRadius: '12px',
+          border: 'none',
+          background: 'linear-gradient(135deg,#f59e0b 0%,#d97706 100%)',
+          color: 'white',
+          fontSize: '14px',
+          fontWeight: 700,
+          cursor: 'pointer',
+          boxShadow: '0 6px 20px rgba(0,0,0,0.25)',
+        }}
+      >
+        ⚡ Place power point
+      </button>
+      
       {/* Layer 2: UI Elements (front layer - fixed screen position) */}
       <div style={{ 
         position: 'fixed', 
