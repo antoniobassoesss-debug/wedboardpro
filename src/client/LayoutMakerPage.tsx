@@ -598,7 +598,20 @@ const LayoutMakerPage: React.FC = () => {
       
       {/* Quick floating button to select Power Point tool (guaranteed visible) */}
       <button
-        onClick={() => setActiveTool('power-point')}
+        onClick={() => {
+          // Try programmatic addition first (center of current view), fallback to selecting tool
+          const ref = gridCanvasRef.current as any;
+          const vb = activeProject?.canvasData?.viewBox;
+          const cx = vb ? (vb.x + vb.width / 2) : 0;
+          const cy = vb ? (vb.y + vb.height / 2) : 0;
+          if (ref && typeof ref.addPowerPoint === 'function') {
+            ref.addPowerPoint(cx, cy);
+            // Also open electrical drawer by selecting the tool state briefly
+            setActiveTool('power-point');
+            return;
+          }
+          setActiveTool('power-point');
+        }}
         id="floating-add-power-point"
         style={{
           position: 'fixed',
