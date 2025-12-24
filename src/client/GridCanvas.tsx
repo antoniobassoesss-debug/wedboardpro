@@ -4,6 +4,7 @@ import Header from './Header.js';
 import ProjectTabs from './ProjectTabs.js';
 import type { Wall, Door } from './types/wall.js';
 import type { PowerPoint } from './types/powerPoint.js';
+import type { ElectricalStandard } from './types/electrical.js';
 import { createPowerPoint } from './types/powerPoint.js';
 import ElectricalIcon from './components/ElectricalIcon.js';
 import ElectricalDrawer from './components/ElectricalDrawer.js';
@@ -1228,6 +1229,24 @@ const GridCanvas = forwardRef<{
     zoomToPoints,
     getPowerPoints,
   }), [addSpace, addTable, addWalls, zoomToPoints, getPowerPoints]);
+  
+  // Expose programmatic addPowerPoint
+  const addPowerPointImperative = useCallback((x: number, y: number, standard: ElectricalStandard = 'EU_PT') => {
+    if (!isPointOnCanvas(x, y)) return null;
+    const newPoint = createPowerPoint(x, y, standard);
+    setPowerPoints(prev => [...prev, newPoint]);
+    return newPoint;
+  }, [setPowerPoints]);
+  
+  // extend existing handle to include addPowerPointImperative
+  useImperativeHandle(ref, () => ({
+    addSpace,
+    addTable,
+    addWalls,
+    zoomToPoints,
+    getPowerPoints,
+    addPowerPoint: addPowerPointImperative,
+  }), [addSpace, addTable, addWalls, zoomToPoints, getPowerPoints, addPowerPointImperative]);
 
   // Undo function
   const undo = useCallback(() => {
