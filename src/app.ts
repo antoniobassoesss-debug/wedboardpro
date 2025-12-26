@@ -469,6 +469,8 @@ app.get('/api/teams/members', express.json(), async (req, res) => {
     }
     const { team } = teamResult;
 
+    console.log('[GET /api/teams/members] User:', user.id, 'Team:', team.id);
+
     // Fetch team members (no profile join to avoid profile RLS issues)
     const { data: members, error } = await supabase
       .from('team_members')
@@ -477,19 +479,30 @@ app.get('/api/teams/members', express.json(), async (req, res) => {
       .order('joined_at', { ascending: true });
 
     if (error) {
+      console.error('[GET /api/teams/members] Error fetching members:', error);
       return res.status(500).json({ error: error.message });
     }
 
     const membersSafe = members ?? [];
+    console.log('[GET /api/teams/members] Found', membersSafe.length, 'members:', membersSafe.map(m => m.user_id));
 
     // Optionally hydrate with profile info (best-effort; ignore failures)
     const userIds = membersSafe.map((m) => m.user_id).filter(Boolean);
+    console.log('[GET /api/teams/members] Fetching profiles for user IDs:', userIds);
+
     let profilesById: Record<string, { id: string; full_name?: string; email?: string; avatar_url?: string }> = {};
     if (userIds.length > 0) {
-      const { data: profileRows } = await supabase
+      const { data: profileRows, error: profileError } = await supabase
         .from('profiles')
         .select('id, full_name, email, avatar_url')
         .in('id', userIds);
+
+      if (profileError) {
+        console.warn('[GET /api/teams/members] Error fetching profiles:', profileError);
+      }
+
+      console.log('[GET /api/teams/members] Fetched', profileRows?.length || 0, 'profiles');
+
       if (profileRows) {
         profilesById = profileRows.reduce((acc, row) => {
           acc[row.id] = row;
@@ -533,10 +546,84 @@ app.get('/api/teams/members', express.json(), async (req, res) => {
         null,
     }));
 
+    console.log('[GET /api/teams/members] Returning', enriched.length, 'enriched members');
+    console.log('[GET /api/teams/members] Members:', enriched.map(m => ({
+      user_id: m.user_id,
+      displayName: m.displayName,
+      hasProfile: !!m.profile
+    })));
+
     return res.json({ members: enriched });
   } catch (err: any) {
     console.error('Get members error:', err);
     return res.status(500).json({ error: 'Failed to get members' });
+  }
+});
+
+// DEBUG endpoint to diagnose team membership issues
+app.get('/api/teams/debug', async (req, res) => {
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase service client unavailable' });
+  }
+
+  try {
+    // Get user's team membership
+    const { data: myMembership, error: membershipError } = await supabase
+      .from('team_members')
+      .select('*, teams(*)')
+      .eq('user_id', user.id);
+
+    // Get all members in user's team (if they have one)
+    let allTeamMembers = null;
+    let teamMembersError = null;
+    if (myMembership && myMembership.length > 0) {
+      const teamId = myMembership[0].team_id;
+      const result = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('team_id', teamId);
+      allTeamMembers = result.data;
+      teamMembersError = result.error;
+    }
+
+    // Try to fetch profiles
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('*')
+      .limit(5);
+
+    return res.json({
+      debug: {
+        currentUser: {
+          id: user.id,
+          email: user.email,
+        },
+        myMembership: {
+          data: myMembership,
+          error: membershipError?.message || null,
+          count: myMembership?.length || 0,
+        },
+        allTeamMembers: {
+          data: allTeamMembers,
+          error: teamMembersError?.message || null,
+          count: allTeamMembers?.length || 0,
+        },
+        profiles: {
+          data: profiles,
+          error: profilesError?.message || null,
+          count: profiles?.length || 0,
+        },
+      },
+    });
+  } catch (err: any) {
+    console.error('Debug endpoint error:', err);
+    return res.status(500).json({ error: err.message });
   }
 });
 
