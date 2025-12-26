@@ -88,23 +88,13 @@ export interface WorkloadByMember {
   assignments: WorkloadAssignment[];
 }
 
-export type Result<T> = { data: T | null; error: string | null };
+import { getValidAccessToken } from '../utils/sessionManager';
 
-const getAccessToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  const raw = window.localStorage.getItem('wedboarpro_session');
-  if (!raw) return null;
-  try {
-    const session = JSON.parse(raw);
-    return session?.access_token ?? null;
-  } catch {
-    return null;
-  }
-};
+export type Result<T> = { data: T | null; error: string | null };
 
 export async function listTeamMembers(): Promise<Result<TeamMemberSummary[]>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch('/api/team', {
@@ -128,7 +118,7 @@ export async function listTeamMembers(): Promise<Result<TeamMemberSummary[]>> {
 
 export async function fetchTeamMember(memberId: string): Promise<Result<TeamMemberDetail>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/team/${memberId}`, {
@@ -152,7 +142,7 @@ export async function fetchTeamMember(memberId: string): Promise<Result<TeamMemb
 
 export async function listMemberTasks(memberId: string): Promise<Result<MemberTaskSummary[]>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/team/${memberId}/tasks`, {
@@ -176,7 +166,7 @@ export async function listMemberTasks(memberId: string): Promise<Result<MemberTa
 
 export async function fetchTeamWorkload(): Promise<Result<WorkloadByMember[]>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch('/api/team/calendar', {

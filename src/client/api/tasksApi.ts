@@ -45,17 +45,7 @@ export interface UpdateTaskInput {
   event_id?: string | null;
 }
 
-const getAccessToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  const raw = window.localStorage.getItem('wedboarpro_session');
-  if (!raw) return null;
-  try {
-    const session = JSON.parse(raw);
-    return session?.access_token ?? null;
-  } catch {
-    return null;
-  }
-};
+import { getValidAccessToken } from '../utils/sessionManager';
 
 export async function listTasks(options?: {
   assignee_id?: string;
@@ -63,7 +53,7 @@ export async function listTasks(options?: {
   completed?: boolean;
 }): Promise<{ data: Task[] | null; error: string | null }> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) {
       return { data: null, error: 'Not authenticated' };
     }
@@ -92,7 +82,7 @@ export async function listTasks(options?: {
 
 export async function createTask(input: CreateTaskInput): Promise<{ data: Task | null; error: string | null }> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) {
       return { data: null, error: 'Not authenticated' };
     }
@@ -123,7 +113,7 @@ export async function updateTask(
   input: UpdateTaskInput
 ): Promise<{ data: Task | null; error: string | null }> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) {
       return { data: null, error: 'Not authenticated' };
     }
@@ -151,7 +141,7 @@ export async function updateTask(
 
 export async function deleteTask(id: string): Promise<{ error: string | null }> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) {
       return { error: 'Not authenticated' };
     }

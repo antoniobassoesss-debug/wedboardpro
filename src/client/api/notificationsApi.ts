@@ -1,3 +1,5 @@
+import { getValidAccessToken } from '../utils/sessionManager';
+
 export interface Notification {
   id: string;
   user_id: string;
@@ -10,24 +12,12 @@ export interface Notification {
   created_at: string;
 }
 
-const getAccessToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  const raw = window.localStorage.getItem('wedboarpro_session');
-  if (!raw) return null;
-  try {
-    const session = JSON.parse(raw);
-    return session?.access_token ?? null;
-  } catch {
-    return null;
-  }
-};
-
 export async function listNotifications(options?: {
   unread?: boolean;
   limit?: number;
 }): Promise<{ data: Notification[] | null; error: string | null }> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) {
       return { data: null, error: 'Not authenticated' };
     }
@@ -55,7 +45,7 @@ export async function listNotifications(options?: {
 
 export async function markNotificationRead(id: string): Promise<{ data: Notification | null; error: string | null }> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) {
       return { data: null, error: 'Not authenticated' };
     }
@@ -79,7 +69,7 @@ export async function markNotificationRead(id: string): Promise<{ data: Notifica
 
 export async function markAllNotificationsRead(): Promise<{ error: string | null }> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) {
       return { error: 'Not authenticated' };
     }
@@ -102,7 +92,7 @@ export async function markAllNotificationsRead(): Promise<{ error: string | null
 
 export async function getUnreadCount(): Promise<{ count: number; error: string | null }> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) {
       return { count: 0, error: 'Not authenticated' };
     }

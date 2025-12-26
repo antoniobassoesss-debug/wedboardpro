@@ -1,5 +1,7 @@
 // Suppliers / Vendors API client and types for WedBoardPro
 
+import { getValidAccessToken } from '../utils/sessionManager';
+
 export type SupplierCategory =
   | 'flowers'
   | 'decor'
@@ -75,18 +77,6 @@ export interface EventSupplierQuote {
 
 export type Result<T> = { data: T | null; error: string | null };
 
-const getAccessToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  const raw = window.localStorage.getItem('wedboarpro_session');
-  if (!raw) return null;
-  try {
-    const session = JSON.parse(raw);
-    return session?.access_token ?? null;
-  } catch {
-    return null;
-  }
-};
-
 export interface ListSuppliersFilters {
   search?: string;
   category?: SupplierCategory | 'all';
@@ -95,7 +85,7 @@ export interface ListSuppliersFilters {
 
 export async function listSuppliers(filters: ListSuppliersFilters = {}): Promise<Result<Supplier[]>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const params = new URLSearchParams();
@@ -133,7 +123,7 @@ export interface CreateSupplierInput {
 
 export async function createSupplier(input: CreateSupplierInput): Promise<Result<Supplier>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch('/api/suppliers', {
@@ -166,7 +156,7 @@ export type UpdateSupplierInput = Partial<
 
 export async function updateSupplier(id: string, patch: UpdateSupplierInput): Promise<Result<Supplier>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/suppliers/${id}`, {
@@ -192,7 +182,7 @@ export async function updateSupplier(id: string, patch: UpdateSupplierInput): Pr
 
 export async function deleteSupplier(id: string): Promise<Result<null>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/suppliers/${id}`, {
@@ -217,7 +207,7 @@ export async function deleteSupplier(id: string): Promise<Result<null>> {
 
 export async function listEventSuppliers(eventId: string): Promise<Result<EventSupplier[]>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/events/${eventId}/suppliers`, {
@@ -253,7 +243,7 @@ export async function addEventSupplier(
   input: AddEventSupplierInput,
 ): Promise<Result<EventSupplier>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/events/${eventId}/suppliers`, {
@@ -286,7 +276,7 @@ export async function updateEventSupplier(
   patch: UpdateEventSupplierInput,
 ): Promise<Result<EventSupplier>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/event-suppliers/${id}`, {

@@ -1,6 +1,8 @@
 // CRM module API client for WedBoarPro
 // Provides typed access to pipelines, stages, deals, contacts, and activities.
 
+import { getValidAccessToken } from '../utils/sessionManager';
+
 export type DealPriority = 'low' | 'medium' | 'high';
 export type ActivityType = 'call' | 'email' | 'meeting' | 'note';
 
@@ -116,18 +118,6 @@ export interface CrmStageWithStats extends CrmStage {
 
 export type Result<T> = { data: T | null; error: string | null };
 
-const getAccessToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  const raw = window.localStorage.getItem('wedboarpro_session');
-  if (!raw) return null;
-  try {
-    const session = JSON.parse(raw);
-    return session?.access_token ?? null;
-  } catch {
-    return null;
-  }
-};
-
 const getCurrentUserId = (): string | null => {
   if (typeof window === 'undefined') return null;
   const raw = window.localStorage.getItem('wedboarpro_session');
@@ -146,7 +136,7 @@ const getCurrentUserId = (): string | null => {
 
 export async function listPipelines(): Promise<Result<CrmPipeline[]>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch('/api/crm/pipelines', {
@@ -168,7 +158,7 @@ export async function listPipelines(): Promise<Result<CrmPipeline[]>> {
 
 export async function getOrCreateDefaultPipeline(): Promise<Result<CrmPipeline>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch('/api/crm/pipelines/default', {
@@ -194,7 +184,7 @@ export async function getOrCreateDefaultPipeline(): Promise<Result<CrmPipeline>>
 
 export async function listStages(pipelineId: string): Promise<Result<CrmStage[]>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/crm/pipelines/${pipelineId}/stages`, {
@@ -260,7 +250,7 @@ export async function listDeals(
   filters?: ListDealsFilters
 ): Promise<Result<CrmDealCard[]>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const params = new URLSearchParams();
@@ -297,7 +287,7 @@ export async function getCrmMetrics(
   filters?: ListDealsFilters
 ): Promise<Result<CrmMetrics>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const params = new URLSearchParams();
@@ -365,7 +355,7 @@ export interface CreateDealInput {
 
 export async function createDeal(input: CreateDealInput): Promise<Result<CrmDealCard>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch('/api/crm/deals', {
@@ -388,7 +378,7 @@ export async function createDeal(input: CreateDealInput): Promise<Result<CrmDeal
 
 export async function updateDealStage(dealId: string, stageId: string): Promise<Result<CrmDeal>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/crm/deals/${dealId}/stage`, {
@@ -423,7 +413,7 @@ export interface UpdateDealInput {
 
 export async function updateDeal(dealId: string, input: UpdateDealInput): Promise<Result<CrmDeal>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/crm/deals/${dealId}`, {
@@ -446,7 +436,7 @@ export async function updateDeal(dealId: string, input: UpdateDealInput): Promis
 
 export async function deleteDeal(dealId: string): Promise<Result<boolean>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/crm/deals/${dealId}`, {
@@ -471,7 +461,7 @@ export async function deleteDeal(dealId: string): Promise<Result<boolean>> {
 
 export async function listActivities(dealId: string): Promise<Result<CrmActivity[]>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/crm/deals/${dealId}/activities`, {
@@ -500,7 +490,7 @@ export interface CreateActivityInput {
 
 export async function createActivity(input: CreateActivityInput): Promise<Result<CrmActivity>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/crm/deals/${input.dealId}/activities`, {
@@ -531,7 +521,7 @@ export async function createActivity(input: CreateActivityInput): Promise<Result
 
 export async function getDealDetails(dealId: string): Promise<Result<CrmDealDetails>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/crm/deals/${dealId}/details`, {
@@ -557,7 +547,7 @@ export async function updateNextAction(
   nextActionDueAt: string | null
 ): Promise<Result<CrmDeal>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/crm/deals/${dealId}/next-action`, {
@@ -580,7 +570,7 @@ export async function updateNextAction(
 
 export async function markDealAsLost(dealId: string, reason?: string): Promise<Result<CrmDeal>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/crm/deals/${dealId}/lost`, {
@@ -603,7 +593,7 @@ export async function markDealAsLost(dealId: string, reason?: string): Promise<R
 
 export async function markDealAsWon(dealId: string): Promise<Result<CrmDeal>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/crm/deals/${dealId}/won`, {

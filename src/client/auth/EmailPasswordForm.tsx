@@ -6,6 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { browserSupabaseClient } from '../browserSupabaseClient';
+import { storeSession } from '../utils/sessionManager';
 import './auth.css';
 
 interface EmailPasswordFormProps {
@@ -41,21 +42,6 @@ const EmailPasswordForm: React.FC<EmailPasswordFormProps> = ({ mode }) => {
   // Sanitize next param to only allow internal paths
   const sanitizedNext = nextUrl.startsWith('/') ? nextUrl : '/dashboard';
 
-  const storeSession = (session: any, user: any, displayName: string) => {
-    localStorage.setItem('wedboarpro_session', JSON.stringify(session));
-    localStorage.setItem('wedboarpro_user', JSON.stringify(user));
-    localStorage.setItem('wedboarpro_display_name', displayName);
-  };
-
-  const resolveDisplayName = (user: any, fallbackEmail: string): string => {
-    return (
-      (typeof user?.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim()) ||
-      (typeof user?.user_metadata?.name === 'string' && user.user_metadata.name.trim()) ||
-      (typeof user?.email === 'string' && user.email.trim()) ||
-      fallbackEmail.trim()
-    );
-  };
-
   // If we land back on /login after Google OAuth, auto-complete by reading the current Supabase session.
   useEffect(() => {
     if (mode !== 'login') return;
@@ -79,8 +65,7 @@ const EmailPasswordForm: React.FC<EmailPasswordFormProps> = ({ mode }) => {
           return; // nothing to do
         }
         const user = session.user;
-        const displayName = resolveDisplayName(user, user?.email || email || 'User');
-        storeSession(session, user, displayName);
+        storeSession(session, user);
         navigate(sanitizedNext);
       } catch (e: any) {
         if (cancelled) return;
@@ -117,8 +102,7 @@ const EmailPasswordForm: React.FC<EmailPasswordFormProps> = ({ mode }) => {
 
     const session = data.session ?? null;
     const user = data.user ?? session?.user ?? null;
-    const displayName = resolveDisplayName(user, email);
-    storeSession(session, user, displayName);
+    storeSession(session, user);
     navigate(sanitizedNext);
   };
 

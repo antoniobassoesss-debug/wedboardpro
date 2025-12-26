@@ -1,5 +1,7 @@
 // Project Pipeline / Event Management API types & client wrappers
 
+import { getValidAccessToken } from '../utils/sessionManager';
+
 export type EventStatus = 'on_track' | 'at_risk' | 'delayed' | 'completed';
 
 export type StageKey =
@@ -148,18 +150,6 @@ export interface EventWorkspace {
 
 export type Result<T> = { data: T | null; error: string | null };
 
-const getAccessToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  const raw = window.localStorage.getItem('wedboarpro_session');
-  if (!raw) return null;
-  try {
-    const session = JSON.parse(raw);
-    return session?.access_token ?? null;
-  } catch {
-    return null;
-  }
-};
-
 // ===== Events list & creation =====
 
 export interface CreateEventInput {
@@ -174,7 +164,7 @@ export interface CreateEventInput {
 
 export async function listEvents(): Promise<Result<Event[]>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch('/api/events', {
@@ -196,7 +186,7 @@ export async function listEvents(): Promise<Result<Event[]>> {
 
 export async function createEvent(input: CreateEventInput): Promise<Result<{ event: Event; stages: PipelineStage[] }>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch('/api/events', {
@@ -224,7 +214,7 @@ export async function createEvent(input: CreateEventInput): Promise<Result<{ eve
 
 export async function fetchEventWorkspace(eventId: string): Promise<Result<EventWorkspace>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/events/${eventId}`, {
@@ -249,7 +239,7 @@ export async function updateEvent(
   patch: Partial<Pick<Event, 'title' | 'wedding_date' | 'status' | 'current_stage' | 'guest_count_expected' | 'guest_count_confirmed' | 'budget_planned' | 'budget_actual' | 'notes_internal'>>,
 ): Promise<Result<Event>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/events/${eventId}`, {
@@ -275,7 +265,7 @@ export async function updateEvent(
 
 export async function deleteEvent(eventId: string): Promise<Result<null>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/events/${eventId}`, {
@@ -298,7 +288,7 @@ export async function deleteEvent(eventId: string): Promise<Result<null>> {
 
 export async function fetchStages(eventId: string): Promise<Result<PipelineStage[]>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/events/${eventId}/stages`, {
@@ -323,7 +313,7 @@ export async function updateStage(
   patch: Partial<Pick<PipelineStage, 'title' | 'description' | 'progress_percent' | 'due_date' | 'is_blocking' | 'order_index'>>,
 ): Promise<Result<PipelineStage>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/stages/${stageId}`, {
@@ -369,7 +359,7 @@ export interface UpdateStageTaskInput {
 
 export async function createStageTask(stageId: string, input: CreateStageTaskInput): Promise<Result<StageTask>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/stages/${stageId}/tasks`, {
@@ -395,7 +385,7 @@ export async function createStageTask(stageId: string, input: CreateStageTaskInp
 
 export async function updateStageTask(taskId: string, input: UpdateStageTaskInput): Promise<Result<StageTask>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/tasks/${taskId}`, {
@@ -423,7 +413,7 @@ export async function updateStageTask(taskId: string, input: UpdateStageTaskInpu
 
 export async function fetchVendors(eventId: string): Promise<Result<Vendor[]>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/events/${eventId}/vendors`, {
@@ -448,7 +438,7 @@ export async function updateVendor(
   patch: Partial<Pick<Vendor, 'category' | 'name' | 'contact_phone' | 'contact_email' | 'website' | 'contract_status' | 'quote_amount' | 'final_amount' | 'notes'>>,
 ): Promise<Result<Vendor>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/vendors/${vendorId}`, {
@@ -482,7 +472,7 @@ export interface CreateEventFileInput {
 
 export async function createEventFile(eventId: string, input: CreateEventFileInput): Promise<Result<EventFile>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/events/${eventId}/files`, {
@@ -522,7 +512,7 @@ export interface UpdateClientInput extends Partial<CreateClientInput> {}
 
 export async function createClient(eventId: string, input: CreateClientInput): Promise<Result<Client>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/events/${eventId}/client`, {
@@ -548,7 +538,7 @@ export async function createClient(eventId: string, input: CreateClientInput): P
 
 export async function updateClient(eventId: string, input: UpdateClientInput): Promise<Result<Client>> {
   try {
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
 
     const res = await fetch(`/api/events/${eventId}/client`, {
