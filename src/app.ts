@@ -492,22 +492,27 @@ app.get('/api/teams/members', express.json(), async (req, res) => {
 
     let profilesById: Record<string, { id: string; full_name?: string; email?: string; avatar_url?: string }> = {};
     if (userIds.length > 0) {
-      const { data: profileRows, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, avatar_url')
-        .in('id', userIds);
+      try {
+        const { data: profileRows, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, avatar_url')
+          .in('id', userIds);
 
-      if (profileError) {
-        console.warn('[GET /api/teams/members] Error fetching profiles:', profileError);
-      }
+        if (profileError) {
+          console.warn('[GET /api/teams/members] Profiles table error (might not exist):', profileError.message);
+          console.warn('[GET /api/teams/members] Will use auth.users as fallback for all members');
+        } else {
+          console.log('[GET /api/teams/members] Fetched', profileRows?.length || 0, 'profiles from profiles table');
 
-      console.log('[GET /api/teams/members] Fetched', profileRows?.length || 0, 'profiles');
-
-      if (profileRows) {
-        profilesById = profileRows.reduce((acc, row) => {
-          acc[row.id] = row;
-          return acc;
-        }, {} as Record<string, { id: string; full_name?: string; email?: string; avatar_url?: string }>);
+          if (profileRows) {
+            profilesById = profileRows.reduce((acc, row) => {
+              acc[row.id] = row;
+              return acc;
+            }, {} as Record<string, { id: string; full_name?: string; email?: string; avatar_url?: string }>);
+          }
+        }
+      } catch (err) {
+        console.warn('[GET /api/teams/members] Profiles table does not exist, using auth.users fallback');
       }
     }
 
@@ -517,33 +522,51 @@ app.get('/api/teams/members', express.json(), async (req, res) => {
       .map((m) => m.user_id)
       .filter((id) => id && !profilesById[id]);
 
+    console.log('[GET /api/teams/members] Missing profiles:', missingProfileIds.length, 'users need auth.users fallback');
+
     // Fetch all missing profiles in parallel instead of sequentially
     const emailPromises = missingProfileIds.map(async (uid) => {
       try {
         const { data: adminUser } = await supabase.auth.admin.getUserById(uid);
         const email = adminUser?.user?.email;
-        return { uid, email };
-      } catch {
-        return { uid, email: null };
+        const fullName = adminUser?.user?.user_metadata?.full_name;
+        return { uid, email, fullName };
+      } catch (err) {
+        console.warn('[GET /api/teams/members] Failed to fetch auth user:', uid, err);
+        return { uid, email: null, fullName: null };
       }
     });
 
     const emailResults = await Promise.all(emailPromises);
-    emailResults.forEach(({ uid, email }) => {
+
+    // Store both email and full_name from auth.users
+    let adminNamesById: Record<string, string> = {};
+    emailResults.forEach(({ uid, email, fullName }) => {
       if (email) {
         adminEmailsById[uid] = email;
       }
+      if (fullName) {
+        adminNamesById[uid] = fullName;
+      }
     });
+
+    console.log('[GET /api/teams/members] Fetched', emailResults.filter(r => r.email).length, 'emails from auth.users');
 
     const enriched = membersSafe.map((m) => ({
       ...m,
-      profile: profilesById[m.user_id] ?? null,
+      profile: profilesById[m.user_id] ?? {
+        id: m.user_id,
+        email: adminEmailsById[m.user_id] ?? null,
+        full_name: adminNamesById[m.user_id] ?? null,
+        avatar_url: null,
+      },
       displayEmail: profilesById[m.user_id]?.email ?? adminEmailsById[m.user_id] ?? null,
       displayName:
         profilesById[m.user_id]?.full_name ??
+        adminNamesById[m.user_id] ??
         profilesById[m.user_id]?.email ??
         adminEmailsById[m.user_id] ??
-        null,
+        'Unknown User',
     }));
 
     console.log('[GET /api/teams/members] Returning', enriched.length, 'enriched members');
