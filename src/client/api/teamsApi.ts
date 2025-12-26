@@ -2,6 +2,7 @@
 // Provides typed access to team members, assignments, tasks and workload views.
 
 import type { StageTaskStatus, StageTaskPriority } from './eventsPipelineApi';
+import { getValidAccessToken } from '../utils/sessionManager';
 
 export type CoreTeamRole = 'owner' | 'admin' | 'member';
 
@@ -87,8 +88,6 @@ export interface WorkloadByMember {
   member_name: string;
   assignments: WorkloadAssignment[];
 }
-
-import { getValidAccessToken } from '../utils/sessionManager';
 
 export type Result<T> = { data: T | null; error: string | null };
 

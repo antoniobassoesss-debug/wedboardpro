@@ -1,3 +1,5 @@
+import { getValidAccessToken } from '../utils/sessionManager';
+
 export interface TaskAssignee {
   id: string;
   full_name?: string | null;
@@ -44,8 +46,6 @@ export interface UpdateTaskInput {
   assignee_id?: string | null;
   event_id?: string | null;
 }
-
-import { getValidAccessToken } from '../utils/sessionManager';
 
 export async function listTasks(options?: {
   assignee_id?: string;
