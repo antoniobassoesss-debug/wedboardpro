@@ -498,22 +498,29 @@ app.get('/api/teams/members', express.json(), async (req, res) => {
       }
     }
 
-    // Fallback: fetch auth emails for any members missing profile info
+    // Fallback: fetch auth emails for any members missing profile info (in parallel for performance)
     let adminEmailsById: Record<string, string> = {};
     const missingProfileIds = membersSafe
       .map((m) => m.user_id)
       .filter((id) => id && !profilesById[id]);
-    for (const uid of missingProfileIds) {
+
+    // Fetch all missing profiles in parallel instead of sequentially
+    const emailPromises = missingProfileIds.map(async (uid) => {
       try {
         const { data: adminUser } = await supabase.auth.admin.getUserById(uid);
         const email = adminUser?.user?.email;
-        if (email) {
-          adminEmailsById[uid] = email;
-        }
+        return { uid, email };
       } catch {
-        // ignore
+        return { uid, email: null };
       }
-    }
+    });
+
+    const emailResults = await Promise.all(emailPromises);
+    emailResults.forEach(({ uid, email }) => {
+      if (email) {
+        adminEmailsById[uid] = email;
+      }
+    });
 
     const enriched = membersSafe.map((m) => ({
       ...m,
@@ -3228,12 +3235,35 @@ app.get('/api/tasks', async (req, res) => {
           }
         }
 
+        // Enrich with event details
+        let event = null;
+        if (task.event_id) {
+          try {
+            const { data: eventRow } = await supabase
+              .from('events')
+              .select('id, title')
+              .eq('id', task.event_id)
+              .maybeSingle();
+
+            if (eventRow) {
+              event = {
+                id: eventRow.id,
+                title: eventRow.title,
+              };
+            }
+          } catch (err) {
+            console.warn('[GET /api/tasks] Failed to fetch event:', err);
+          }
+        }
+
         return {
           id: task.id,
           team_id: task.team_id,
           created_by: task.created_by,
           assignee_id: task.assignee_id,
           assignee: assignee,
+          event_id: task.event_id,
+          event: event,
           title: task.title,
           description: task.description || '',
           is_completed: task.is_completed,
@@ -3261,7 +3291,7 @@ app.post('/api/tasks', express.json(), async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { title, description, priority, is_flagged, due_date, assignee_id } = req.body;
+    const { title, description, priority, is_flagged, due_date, assignee_id, event_id } = req.body;
 
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return res.status(400).json({ error: 'Title is required' });
@@ -3295,18 +3325,28 @@ app.post('/api/tasks', express.json(), async (req, res) => {
       }
     }
 
+    const taskData = {
+      team_id: team.team_id,
+      created_by: user.id,
+      assignee_id: assignee_id || null,
+      event_id: event_id || null,
+      title: title.trim(),
+      description: description || '',
+      priority: priority || 'low',
+      is_flagged: is_flagged || false,
+      due_date: due_date || null,
+    };
+
+    console.log('[POST /api/tasks] Creating task:', {
+      team_id: taskData.team_id,
+      created_by: taskData.created_by,
+      assignee_id: taskData.assignee_id,
+      title: taskData.title,
+    });
+
     const { data: task, error } = await supabase
       .from('tasks')
-      .insert({
-        team_id: team.team_id,
-        created_by: user.id,
-        assignee_id: assignee_id || null,
-        title: title.trim(),
-        description: description || '',
-        priority: priority || 'low',
-        is_flagged: is_flagged || false,
-        due_date: due_date || null,
-      })
+      .insert(taskData)
       .select('*')
       .single();
 
@@ -3314,6 +3354,8 @@ app.post('/api/tasks', express.json(), async (req, res) => {
       console.error('[POST /api/tasks] Error:', error);
       return res.status(500).json({ error: error.message });
     }
+
+    console.log('[POST /api/tasks] Task created successfully:', task.id);
 
     // Enrich with assignee profile
     let assignee = null;
@@ -3351,6 +3393,27 @@ app.post('/api/tasks', express.json(), async (req, res) => {
       }
     }
 
+    // Enrich with event details
+    let event = null;
+    if (task.event_id) {
+      try {
+        const { data: eventRow } = await supabase
+          .from('events')
+          .select('id, title')
+          .eq('id', task.event_id)
+          .maybeSingle();
+
+        if (eventRow) {
+          event = {
+            id: eventRow.id,
+            title: eventRow.title,
+          };
+        }
+      } catch (err) {
+        console.warn('[POST /api/tasks] Failed to fetch event:', err);
+      }
+    }
+
     res.status(201).json({
       task: {
         id: task.id,
@@ -3358,6 +3421,8 @@ app.post('/api/tasks', express.json(), async (req, res) => {
         created_by: task.created_by,
         assignee_id: task.assignee_id,
         assignee: assignee,
+        event_id: task.event_id,
+        event: event,
         title: task.title,
         description: task.description || '',
         is_completed: task.is_completed,
@@ -3393,6 +3458,7 @@ app.patch('/api/tasks/:id', express.json(), async (req, res) => {
     if (req.body.is_flagged !== undefined) updates.is_flagged = req.body.is_flagged;
     if (req.body.due_date !== undefined) updates.due_date = req.body.due_date || null;
     if (req.body.assignee_id !== undefined) updates.assignee_id = req.body.assignee_id || null;
+    if (req.body.event_id !== undefined) updates.event_id = req.body.event_id || null;
 
     const supabase = getSupabaseServiceClient();
     if (!supabase) {
@@ -3485,6 +3551,27 @@ app.patch('/api/tasks/:id', express.json(), async (req, res) => {
       }
     }
 
+    // Enrich with event details
+    let event = null;
+    if (task.event_id) {
+      try {
+        const { data: eventRow } = await supabase
+          .from('events')
+          .select('id, title')
+          .eq('id', task.event_id)
+          .maybeSingle();
+
+        if (eventRow) {
+          event = {
+            id: eventRow.id,
+            title: eventRow.title,
+          };
+        }
+      } catch (err) {
+        console.warn('[PATCH /api/tasks/:id] Failed to fetch event:', err);
+      }
+    }
+
     res.json({
       task: {
         id: task.id,
@@ -3492,6 +3579,8 @@ app.patch('/api/tasks/:id', express.json(), async (req, res) => {
         created_by: task.created_by,
         assignee_id: task.assignee_id,
         assignee: assignee,
+        event_id: task.event_id,
+        event: event,
         title: task.title,
         description: task.description || '',
         is_completed: task.is_completed,

@@ -11,6 +11,8 @@ export interface Task {
   created_by: string;
   assignee_id: string | null;
   assignee: TaskAssignee | null;
+  event_id: string | null;
+  event?: { id: string; title: string } | null;
   title: string;
   description: string;
   is_completed: boolean;
@@ -28,6 +30,7 @@ export interface CreateTaskInput {
   is_flagged?: boolean;
   due_date?: string | null;
   assignee_id?: string | null;
+  event_id?: string | null;
 }
 
 export interface UpdateTaskInput {
@@ -38,6 +41,7 @@ export interface UpdateTaskInput {
   is_flagged?: boolean;
   due_date?: string | null;
   assignee_id?: string | null;
+  event_id?: string | null;
 }
 
 const getAccessToken = (): string | null => {

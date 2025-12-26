@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   created_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   assignee_id UUID REFERENCES auth.users(id) ON DELETE SET NULL, -- nullable for unassigned tasks
+  event_id UUID REFERENCES events(id) ON DELETE SET NULL, -- nullable for tasks not linked to a project
   title TEXT NOT NULL,
   description TEXT DEFAULT '',
   is_completed BOOLEAN NOT NULL DEFAULT false,
@@ -20,6 +21,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE INDEX IF NOT EXISTS idx_tasks_team_id ON tasks(team_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_assignee_id ON tasks(assignee_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_created_by ON tasks(created_by);
+CREATE INDEX IF NOT EXISTS idx_tasks_event_id ON tasks(event_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
 CREATE INDEX IF NOT EXISTS idx_tasks_is_completed ON tasks(is_completed);
 CREATE INDEX IF NOT EXISTS idx_tasks_team_assignee ON tasks(team_id, assignee_id);

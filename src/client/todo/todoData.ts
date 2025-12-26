@@ -18,6 +18,12 @@ export interface Task {
     email?: string | null;
     avatar_url?: string | null;
   } | null;
+  // New fields for event/project
+  event_id?: string | null;
+  event?: {
+    id: string;
+    title: string;
+  } | null;
 }
 
 const makeId = () => {

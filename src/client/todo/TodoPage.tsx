@@ -85,6 +85,7 @@ const TodoPage: React.FC = () => {
     notes: string;
     isFlagged: boolean;
     assignee_id: string | null;
+    event_id: string | null;
   }>({
     title: '',
     priority: 'low',
@@ -92,6 +93,7 @@ const TodoPage: React.FC = () => {
     notes: '',
     isFlagged: false,
     assignee_id: null,
+    event_id: null,
   });
 
   // Get current user ID
@@ -129,6 +131,8 @@ const TodoPage: React.FC = () => {
         return;
       }
 
+      console.log('[TodoPage] Fetched tasks:', data?.length || 0, 'tasks with filter:', assigneeFilter);
+
       // Convert API tasks to local Task format
       const convertedTasks: Task[] = (data || []).map((t: ApiTask) => ({
         id: t.id,
@@ -142,6 +146,8 @@ const TodoPage: React.FC = () => {
         updatedAt: t.updated_at,
         assignee_id: t.assignee_id,
         assignee: t.assignee,
+        event_id: t.event_id,
+        event: t.event,
       }));
 
       setTasks(convertedTasks);
@@ -164,6 +170,7 @@ const TodoPage: React.FC = () => {
       notes: '',
       isFlagged: false,
       assignee_id: null,
+      event_id: null,
     });
     setShowModal(true);
   };
@@ -178,6 +185,7 @@ const TodoPage: React.FC = () => {
       is_flagged: newTaskData.isFlagged,
       due_date: newTaskData.dueDate || null,
       assignee_id: newTaskData.assignee_id,
+      event_id: newTaskData.event_id,
     });
 
     if (error) {
@@ -200,8 +208,18 @@ const TodoPage: React.FC = () => {
         updatedAt: data.updated_at,
         assignee_id: data.assignee_id,
         assignee: data.assignee,
+        event_id: data.event_id,
+        event: data.event,
       };
       setTasks((prev) => [converted, ...prev]);
+
+      // Log success for debugging
+      console.log('[TodoPage] Task created successfully:', {
+        id: data.id,
+        assignee: data.assignee?.full_name || data.assignee?.email || 'Unassigned',
+        assignee_id: data.assignee_id,
+        team_id: data.team_id,
+      });
     }
 
     setShowModal(false);
@@ -220,6 +238,7 @@ const TodoPage: React.FC = () => {
     if (patch.isFlagged !== undefined) apiPatch.is_flagged = patch.isFlagged;
     if (patch.dueDate !== undefined) apiPatch.due_date = patch.dueDate;
     if (patch.assignee_id !== undefined) apiPatch.assignee_id = patch.assignee_id;
+    if (patch.event_id !== undefined) apiPatch.event_id = patch.event_id;
 
     const { data, error } = await updateTask(id, apiPatch);
     if (error) {
@@ -240,6 +259,8 @@ const TodoPage: React.FC = () => {
         updatedAt: data.updated_at,
         assignee_id: data.assignee_id,
         assignee: data.assignee,
+        event_id: data.event_id,
+        event: data.event,
       };
       setTasks((prev) => prev.map((t) => (t.id === id ? converted : t)));
     }
@@ -442,6 +463,8 @@ const TaskCreateModal: React.FC<{
 }> = ({ newTaskData, setNewTaskData, onSave, onClose, currentUserId }) => {
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -465,6 +488,30 @@ const TaskCreateModal: React.FC<{
       }
     };
     fetchMembers();
+  }, []);
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      setLoadingProjects(true);
+      try {
+        const session = JSON.parse(localStorage.getItem('wedboarpro_session') || '{}');
+        const token = session?.access_token;
+        if (!token) return;
+
+        const res = await fetch('/api/events', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setProjects(data.events || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch projects:', err);
+      } finally {
+        setLoadingProjects(false);
+      }
+    };
+    fetchProjects();
   }, []);
 
   return (
@@ -496,6 +543,21 @@ const TaskCreateModal: React.FC<{
                 </option>
               );
             })}
+          </select>
+        </label>
+        <label>
+          Project/Event
+          <select
+            value={newTaskData.event_id || ''}
+            onChange={(e) => setNewTaskData((prev) => ({ ...prev, event_id: e.target.value || null }))}
+            disabled={loadingProjects}
+          >
+            <option value="">No Project</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.title}
+              </option>
+            ))}
           </select>
         </label>
         <label>
