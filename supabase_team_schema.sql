@@ -175,18 +175,15 @@ CREATE POLICY "Owners can delete their teams"
 
 -- 7. RLS Policies for team_members
 -- Users can view members of teams they belong to
+-- FIXED: Removed circular reference that prevented users from seeing team members
 DROP POLICY IF EXISTS "Users can view team members" ON team_members;
 CREATE POLICY "Users can view team members"
   ON team_members FOR SELECT
   USING (
-    EXISTS (
-      SELECT 1 FROM teams
-      WHERE teams.id = team_members.team_id
-      AND (teams.owner_id = auth.uid() OR EXISTS (
-        SELECT 1 FROM team_members tm
-        WHERE tm.team_id = teams.id
-        AND tm.user_id = auth.uid()
-      ))
+    team_id IN (
+      SELECT tm.team_id
+      FROM team_members tm
+      WHERE tm.user_id = auth.uid()
     )
   );
 
