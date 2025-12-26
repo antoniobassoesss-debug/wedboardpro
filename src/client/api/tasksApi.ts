@@ -9,6 +9,7 @@ export interface Task {
   id: string;
   team_id: string;
   created_by: string;
+  creator?: TaskAssignee | null;
   assignee_id: string | null;
   assignee: TaskAssignee | null;
   event_id: string | null;

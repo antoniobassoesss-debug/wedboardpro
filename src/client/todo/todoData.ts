@@ -10,7 +10,15 @@ export interface Task {
   notes: string;
   createdAt: string;
   updatedAt: string;
-  // New fields for assignee
+  // Creator fields
+  created_by?: string;
+  creator?: {
+    id: string;
+    full_name?: string | null;
+    email?: string | null;
+    avatar_url?: string | null;
+  } | null;
+  // Assignee fields
   assignee_id?: string | null;
   assignee?: {
     id: string;
@@ -18,7 +26,7 @@ export interface Task {
     email?: string | null;
     avatar_url?: string | null;
   } | null;
-  // New fields for event/project
+  // Event/project fields
   event_id?: string | null;
   event?: {
     id: string;

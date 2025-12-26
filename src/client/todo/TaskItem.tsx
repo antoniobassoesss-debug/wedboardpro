@@ -88,6 +88,30 @@ const TaskItem: React.FC<TaskItemProps> = ({
           onChange={(e) => onUpdateTitle(task.id, e.target.value)}
         />
         <div className="meta-row">
+          {/* Show if task is assigned to current user */}
+          {task.assignee_id && currentUserId && task.assignee_id === currentUserId && task.created_by !== currentUserId && (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '2px 8px',
+                borderRadius: 10,
+                background: '#dbeafe',
+                border: '1px solid #3b82f6',
+                fontSize: 11,
+                color: '#1e40af',
+                fontWeight: 500,
+              }}
+            >
+              <span>📌</span>
+              <span>
+                Assigned to you
+                {task.creator && ` by ${task.creator.full_name || task.creator.email || 'someone'}`}
+              </span>
+            </div>
+          )}
+
           {/* Assignee display/selector */}
           {onUpdateAssignee && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -99,7 +123,8 @@ const TaskItem: React.FC<TaskItemProps> = ({
                     gap: 4,
                     padding: '4px 8px',
                     borderRadius: 12,
-                    background: '#f0f0f0',
+                    background: task.assignee_id === currentUserId ? '#dbeafe' : '#f0f0f0',
+                    border: task.assignee_id === currentUserId ? '1px solid #3b82f6' : 'none',
                     fontSize: 12,
                   }}
                   title={getAssigneeDisplay()}
@@ -116,7 +141,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
                         width: 16,
                         height: 16,
                         borderRadius: '50%',
-                        background: '#2563eb',
+                        background: task.assignee_id === currentUserId ? '#3b82f6' : '#2563eb',
                         color: 'white',
                         display: 'flex',
                         alignItems: 'center',
@@ -129,7 +154,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
                     </div>
                   )}
                   <span style={{ maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {getAssigneeDisplay()}
+                    {task.assignee_id === currentUserId ? 'You' : getAssigneeDisplay()}
                   </span>
                 </div>
               ) : (

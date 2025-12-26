@@ -3204,6 +3204,7 @@ app.get('/api/tasks', async (req, res) => {
     // Enrich with profile data (fallback to auth.users if profiles table missing)
     const enrichedTasks = await Promise.all(
       (tasks || []).map(async (task: any) => {
+        // Fetch assignee profile
         let assignee = null;
         if (task.assignee_id) {
           try {
@@ -3235,6 +3236,38 @@ app.get('/api/tasks', async (req, res) => {
           }
         }
 
+        // Fetch creator profile
+        let creator = null;
+        if (task.created_by) {
+          try {
+            const { data: creatorProfileRow } = await supabase
+              .from('profiles')
+              .select('id, full_name, email, avatar_url')
+              .eq('id', task.created_by)
+              .maybeSingle();
+
+            if (creatorProfileRow) {
+              creator = {
+                id: creatorProfileRow.id,
+                full_name: creatorProfileRow.full_name,
+                email: creatorProfileRow.email,
+                avatar_url: creatorProfileRow.avatar_url,
+              };
+            } else {
+              // Fallback to auth.users
+              const { data: creatorUserData } = await supabase.auth.admin.getUserById(task.created_by);
+              creator = {
+                id: task.created_by,
+                full_name: creatorUserData?.user?.user_metadata?.full_name || null,
+                email: creatorUserData?.user?.email || null,
+                avatar_url: null,
+              };
+            }
+          } catch (err) {
+            console.warn('[GET /api/tasks] Failed to fetch creator user:', err);
+          }
+        }
+
         // Enrich with event details
         let event = null;
         if (task.event_id) {
@@ -3260,6 +3293,7 @@ app.get('/api/tasks', async (req, res) => {
           id: task.id,
           team_id: task.team_id,
           created_by: task.created_by,
+          creator: creator,
           assignee_id: task.assignee_id,
           assignee: assignee,
           event_id: task.event_id,
@@ -3414,11 +3448,43 @@ app.post('/api/tasks', express.json(), async (req, res) => {
       }
     }
 
+    // Enrich with creator profile (it's always the current user for new tasks)
+    let creator = null;
+    if (task.created_by) {
+      try {
+        const { data: creatorProfileRow } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, avatar_url')
+          .eq('id', task.created_by)
+          .maybeSingle();
+
+        if (creatorProfileRow) {
+          creator = {
+            id: creatorProfileRow.id,
+            full_name: creatorProfileRow.full_name,
+            email: creatorProfileRow.email,
+            avatar_url: creatorProfileRow.avatar_url,
+          };
+        } else {
+          const { data: creatorUserData } = await supabase.auth.admin.getUserById(task.created_by);
+          creator = {
+            id: task.created_by,
+            full_name: creatorUserData?.user?.user_metadata?.full_name || null,
+            email: creatorUserData?.user?.email || null,
+            avatar_url: null,
+          };
+        }
+      } catch (err) {
+        console.warn('[POST /api/tasks] Failed to fetch creator user:', err);
+      }
+    }
+
     res.status(201).json({
       task: {
         id: task.id,
         team_id: task.team_id,
         created_by: task.created_by,
+        creator: creator,
         assignee_id: task.assignee_id,
         assignee: assignee,
         event_id: task.event_id,
@@ -3555,7 +3621,7 @@ app.patch('/api/tasks/:id', express.json(), async (req, res) => {
     let event = null;
     if (task.event_id) {
       try {
-        const { data: eventRow } = await supabase
+        const { data: eventRow} = await supabase
           .from('events')
           .select('id, title')
           .eq('id', task.event_id)
@@ -3572,11 +3638,43 @@ app.patch('/api/tasks/:id', express.json(), async (req, res) => {
       }
     }
 
+    // Enrich with creator profile
+    let creator = null;
+    if (task.created_by) {
+      try {
+        const { data: creatorProfileRow } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, avatar_url')
+          .eq('id', task.created_by)
+          .maybeSingle();
+
+        if (creatorProfileRow) {
+          creator = {
+            id: creatorProfileRow.id,
+            full_name: creatorProfileRow.full_name,
+            email: creatorProfileRow.email,
+            avatar_url: creatorProfileRow.avatar_url,
+          };
+        } else {
+          const { data: creatorUserData } = await supabase.auth.admin.getUserById(task.created_by);
+          creator = {
+            id: task.created_by,
+            full_name: creatorUserData?.user?.user_metadata?.full_name || null,
+            email: creatorUserData?.user?.email || null,
+            avatar_url: null,
+          };
+        }
+      } catch (err) {
+        console.warn('[PATCH /api/tasks/:id] Failed to fetch creator user:', err);
+      }
+    }
+
     res.json({
       task: {
         id: task.id,
         team_id: task.team_id,
         created_by: task.created_by,
+        creator: creator,
         assignee_id: task.assignee_id,
         assignee: assignee,
         event_id: task.event_id,
