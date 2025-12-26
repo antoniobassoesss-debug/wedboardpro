@@ -463,13 +463,20 @@ app.get('/api/teams/members', express.json(), async (req, res) => {
   }
 
   try {
+    console.log('[GET /api/teams/members] Request from user:', {
+      id: user.id,
+      email: user.email,
+      provider: user.app_metadata?.provider || 'email'
+    });
+
     const teamResult = await getUserTeam(supabase, user.id);
     if (!teamResult) {
+      console.error('[GET /api/teams/members] User has no team membership:', user.id);
       return res.status(404).json({ error: 'You have not created or joined a team yet' });
     }
     const { team } = teamResult;
 
-    console.log('[GET /api/teams/members] User:', user.id, 'Team:', team.id);
+    console.log('[GET /api/teams/members] User:', user.id, 'Team:', team.id, 'Provider:', user.app_metadata?.provider || 'email');
 
     // Fetch team members (no profile join to avoid profile RLS issues)
     const { data: members, error } = await supabase
@@ -596,6 +603,13 @@ app.get('/api/teams/debug', async (req, res) => {
   }
 
   try {
+    console.log('[GET /api/teams/debug] Debug request from:', {
+      id: user.id,
+      email: user.email,
+      provider: user.app_metadata?.provider,
+      metadata: user.user_metadata
+    });
+
     // Get user's team membership
     const { data: myMembership, error: membershipError } = await supabase
       .from('team_members')
