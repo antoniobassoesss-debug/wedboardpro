@@ -259,25 +259,33 @@ app.post('/api/auth/signup', express.json(), async (req, res) => {
 });
 
 app.post('/api/auth/login', express.json(), async (req, res) => {
+  console.log('[POST /api/auth/login] Login request received');
+
   const supabase = getSupabaseAnonClient();
   if (!supabase) {
+    console.error('[POST /api/auth/login] ERROR: Supabase client unavailable');
     return res.status(500).json({ error: 'Supabase client unavailable' });
   }
 
   const { email, password } = req.body ?? {};
   if (typeof email !== 'string' || typeof password !== 'string') {
+    console.error('[POST /api/auth/login] ERROR: Invalid email or password format');
     return res.status(400).json({ error: 'Email and password are required' });
   }
+
+  console.log('[POST /api/auth/login] Attempting login for email:', email);
 
   try {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
+      console.error('[POST /api/auth/login] Supabase auth error:', error.message);
       return res.status(400).json({ error: error.message });
     }
+    console.log('[POST /api/auth/login] Login successful for:', email);
     // Send session tokens so the client can store/manage them
     return res.status(200).json({ session: data.session, user: data.user });
   } catch (err: any) {
-    console.error('Supabase login error:', err?.message ?? err);
+    console.error('[POST /api/auth/login] Unexpected error:', err?.message ?? err, err?.stack);
     return res.status(500).json({ error: 'Failed to log in' });
   }
 });
