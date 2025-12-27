@@ -8,11 +8,18 @@ import OpenAI from 'openai';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables first
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
-dotenv.config();
+// Load environment variables from .env files in development
+// In production (Vercel), environment variables are injected directly into process.env
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+  dotenv.config();
+}
 
 const { getSupabaseAnonClient, getSupabaseServiceClient } = await import('./supabaseClient.js');
+
+// Verify Supabase clients are initialized
+console.log('[app.ts] Supabase anon client:', getSupabaseAnonClient() ? 'initialized' : 'NOT AVAILABLE');
+console.log('[app.ts] Supabase service client:', getSupabaseServiceClient() ? 'initialized' : 'NOT AVAILABLE');
 
 const app = express();
 const port = 3000;
