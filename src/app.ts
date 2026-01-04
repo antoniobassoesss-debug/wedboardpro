@@ -521,6 +521,58 @@ app.post('/api/auth/resend-verification', async (req, res) => {
   }
 });
 
+// Request password reset (server-side, works across browsers)
+app.post('/api/auth/request-password-reset', express.json(), async (req, res) => {
+  const { email } = req.body;
+
+  // Basic validation
+  if (!email || typeof email !== 'string' || !email.trim()) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Service unavailable' });
+  }
+
+  try {
+    // For security, always return success even if email doesn't exist
+    // This prevents email enumeration attacks
+
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log('[password-reset] Request for email:', normalizedEmail);
+
+    // Generate password recovery link using admin API (no PKCE, works across browsers)
+    const redirectUrl = `${req.headers.origin || 'https://www.wedboardpro.com'}/auth/callback?type=recovery&next=/reset-password`;
+
+    const { error } = await supabase.auth.admin.generateLink({
+      type: 'recovery',
+      email: normalizedEmail,
+      options: {
+        redirectTo: redirectUrl,
+      },
+    });
+
+    if (error) {
+      // Log error server-side but don't reveal to client
+      console.error('[password-reset] Error generating link:', error);
+    } else {
+      console.log('[password-reset] Reset link generated successfully for:', normalizedEmail);
+    }
+
+    // Always return success to prevent email enumeration
+    return res.status(200).json({
+      message: 'If that email exists, a password reset link has been sent.'
+    });
+  } catch (err: any) {
+    console.error('[password-reset] Unexpected error:', err);
+    // Still return success to client for security
+    return res.status(200).json({
+      message: 'If that email exists, a password reset link has been sent.'
+    });
+  }
+});
+
 // Health check endpoint for debugging
 app.get('/api/health', (req, res) => {
   res.json({
