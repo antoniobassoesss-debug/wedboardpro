@@ -57,14 +57,20 @@ const ForgotPasswordPage: React.FC = () => {
       }
 
       // Request password reset email
-      const redirectUrl = `${window.location.origin}/auth/callback`;
+      // Use a consistent domain so the PKCE code verifier is stored/retrieved on the same origin.
+      const isLocalhost = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
+      const redirectBase = isLocalhost
+        ? 'http://localhost:5173'
+        : 'https://www.wedboardpro.com';
+      const redirectUrl = `${redirectBase}/auth/callback`;
       console.log('[ForgotPassword] Requesting reset with redirect URL:', redirectUrl);
       console.log('[ForgotPassword] window.location.origin:', window.location.origin);
 
       const { error: resetError } = await browserSupabaseClient.auth.resetPasswordForEmail(
         email.toLowerCase().trim(),
         {
-          redirectTo: redirectUrl,
+          // Include explicit type and next so callback can route to reset page without relying on hash params
+          redirectTo: `${redirectUrl}?type=recovery&next=/reset-password`,
         }
       );
 
