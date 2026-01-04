@@ -69,14 +69,24 @@ const AuthCallbackPage: React.FC = () => {
         const user = session.user;
 
         // For password recovery, redirect to reset password page after session is ready
+        console.log('[AuthCallback] Checking recovery type. Type:', type);
+        console.log('[AuthCallback] Session user:', user);
+        console.log('[AuthCallback] About to check if type === recovery');
+
         if (type === 'recovery') {
-          console.log('[AuthCallback] Password recovery detected with valid session, redirecting to /reset-password');
+          console.log('[AuthCallback] ✅ PASSWORD RECOVERY DETECTED! Redirecting to /reset-password');
           // Store session so reset password page can use it
           localStorage.setItem('wedboarpro_session', JSON.stringify(session));
           localStorage.setItem('wedboarpro_user', JSON.stringify(user));
+
+          // Add a flag to indicate this is a password reset flow
+          localStorage.setItem('wedboarpro_password_reset_active', 'true');
+
           navigate('/reset-password', { replace: true });
           return;
         }
+
+        console.log('[AuthCallback] NOT a password recovery, continuing to dashboard');
 
         // Normal OAuth flow - continue to dashboard
         const nextUrl = searchParams.get('next') || '/dashboard';
