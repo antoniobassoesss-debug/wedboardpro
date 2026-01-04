@@ -80,8 +80,28 @@ const LayoutMakerPage: React.FC = () => {
   const [brushSize, setBrushSize] = useState<number>(2);
   const [brushColor, setBrushColor] = useState<string>('#000000');
   
-  // Load projects from localStorage on mount
-  const [projects, setProjects] = useState<Project[]>(() => loadProjectsFromStorage());
+  // Load projects from localStorage on mount with error handling
+  const [projects, setProjects] = useState<Project[]>(() => {
+    try {
+      return loadProjectsFromStorage();
+    } catch (error) {
+      console.error('Error loading projects from localStorage:', error);
+      // Return default project if loading fails
+      return [{
+        id: '1',
+        name: 'Project 1',
+        canvasData: {
+          drawings: [],
+          shapes: [],
+          textElements: [],
+          walls: [],
+          doors: [],
+          powerPoints: [],
+          viewBox: { x: 0, y: 0, width: 0, height: 0 },
+        },
+      }];
+    }
+  });
   
   // Load active project ID from localStorage, or default to '1'
   const [activeProjectId, setActiveProjectId] = useState<string>(() => {
@@ -133,10 +153,37 @@ const LayoutMakerPage: React.FC = () => {
 
   // Always show the loading logo briefly on initial mount (covers refresh navigation)
   useEffect(() => {
+    console.log('[LayoutMakerPage] Component mounted');
     const minDisplayMs = 600;
-    const t = setTimeout(() => setIsLoading(false), minDisplayMs);
+    const t = setTimeout(() => {
+      setIsLoading(false);
+      console.log('[LayoutMakerPage] Loading complete');
+    }, minDisplayMs);
     return () => clearTimeout(t);
   }, []);
+  
+  // Error boundary effect
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      console.error('[LayoutMakerPage] Global error caught:', event.error);
+      // Force hide loading on error so user can see what's wrong
+      setIsLoading(false);
+    };
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, []);
+  
+  // Fallback: Force hide loading after max time (safety net)
+  useEffect(() => {
+    const maxLoadingTime = 3000; // 3 seconds max
+    const timeout = setTimeout(() => {
+      if (isLoading) {
+        console.warn('[LayoutMakerPage] Loading timeout - forcing display');
+        setIsLoading(false);
+      }
+    }, maxLoadingTime);
+    return () => clearTimeout(timeout);
+  }, [isLoading]);
   
   // We'll render a non-blocking overlay in the main return so the Layout Maker mounts beneath it.
 
@@ -579,8 +626,70 @@ const LayoutMakerPage: React.FC = () => {
     return activeProject?.canvasData?.powerPoints || [];
   }, [activeProject?.canvasData?.powerPoints]);
 
+  // Safety check: ensure we have at least one project
+  if (!projects || projects.length === 0) {
+    console.error('[LayoutMakerPage] No projects available');
+    return (
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '100vh',
+        flexDirection: 'column',
+        gap: '1rem',
+        padding: '2rem'
+      }}>
+        <h2>Error: No projects available</h2>
+        <button 
+          onClick={() => {
+            const defaultProject: Project = {
+              id: '1',
+              name: 'Project 1',
+              canvasData: {
+                drawings: [],
+                shapes: [],
+                textElements: [],
+                walls: [],
+                doors: [],
+                powerPoints: [],
+                viewBox: { x: 0, y: 0, width: 1000, height: 1000 },
+              },
+            };
+            setProjects([defaultProject]);
+            setActiveProjectId('1');
+          }}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '8px',
+            border: 'none',
+            background: '#0f172a',
+            color: 'white',
+            cursor: 'pointer',
+          }}
+        >
+          Create Default Project
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
+    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: '#ffffff' }}>
+      {/* Test element - should always be visible to verify component is rendering */}
+      <div style={{
+        position: 'absolute',
+        top: '10px',
+        left: '10px',
+        zIndex: 99999,
+        background: 'red',
+        color: 'white',
+        padding: '4px 8px',
+        fontSize: '12px',
+        pointerEvents: 'none',
+      }}>
+        Layout Maker Loaded
+      </div>
+      
       {/* Layer 0: Infinite Grid Background (always visible, behind everything) */}
       <InfiniteGridBackground />
       
@@ -739,6 +848,29 @@ const LayoutMakerPage: React.FC = () => {
           }}
         >
           <img src="/loadinglogo.png" alt="Loading" style={{ width: '160px', height: 'auto', objectFit: 'contain' }} />
+        </div>
+      )}
+      
+      {/* Debug overlay - shows component state (remove in production) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '10px',
+            right: '10px',
+            background: 'rgba(0,0,0,0.8)',
+            color: 'white',
+            padding: '8px 12px',
+            borderRadius: '6px',
+            fontSize: '11px',
+            zIndex: 30000,
+            fontFamily: 'monospace',
+            pointerEvents: 'none',
+          }}
+        >
+          <div>Loading: {isLoading ? 'YES' : 'NO'}</div>
+          <div>Projects: {projects?.length || 0}</div>
+          <div>Active: {activeProjectId}</div>
         </div>
       )}
     </div>

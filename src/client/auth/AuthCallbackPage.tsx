@@ -57,16 +57,50 @@ const AuthCallbackPage: React.FC = () => {
         // Do NOT call exchangeCodeForSession manually - it will fail because the code
         // verifier was already consumed by Supabase's automatic handling.
 
-        // Give Supabase a moment to finish processing the URL
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait for Supabase to hydrate the session (covers PKCE/hash flows)
+        const session = await (async () => {
+          // Helper: wait for auth state change or timeout
+          const waitForSession = () =>
+            new Promise((resolve) => {
+              const timeout = setTimeout(async () => {
+                const { data } = await browserSupabaseClient.auth.getSession();
+                resolve(data.session || null);
+              }, 500);
+              browserSupabaseClient.auth.onAuthStateChange((_event, session) => {
+                clearTimeout(timeout);
+                resolve(session || null);
+              });
+            });
 
-        const { data, error: sessionError } = await browserSupabaseClient.auth.getSession();
-        if (sessionError) throw sessionError;
-        if (!data.session) {
-          throw new Error('No authentication data received. Please try again.');
+          // Try immediate getSession
+          const { data: initial, error: initialErr } = await browserSupabaseClient.auth.getSession();
+          if (initialErr) throw initialErr;
+          if (initial.session) return initial.session;
+
+          // If code present, attempt exchangeCodeForSession (PKCE)
+          const codeParam = searchParams.get('code');
+          if (codeParam) {
+            try {
+              const { data: exchanged, error: exchangeErr } = await browserSupabaseClient.auth.exchangeCodeForSession(codeParam);
+              if (exchangeErr) {
+                console.warn('[AuthCallback] exchangeCodeForSession error:', exchangeErr.message);
+              } else if (exchanged.session) {
+                return exchanged.session;
+              }
+            } catch (exErr: any) {
+              console.warn('[AuthCallback] exchangeCodeForSession exception:', exErr?.message || exErr);
+            }
+          }
+
+          // Wait briefly for auth state change
+          const waited = await waitForSession();
+          return waited;
+        })();
+
+        if (!session) {
+          throw new Error('No authentication data received. Please try again with the same browser that requested the reset link.');
         }
 
-        const session = data.session;
         const user = session.user;
 
         // For password recovery, redirect to reset password page after session is ready
