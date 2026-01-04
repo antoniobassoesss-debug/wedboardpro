@@ -420,10 +420,11 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           boxShadow: '0 8px 30px rgba(0,0,0,0.08)',
           maxWidth: '700px',
           width: '90vw',
+          maxHeight: '85vh',
           display: 'flex',
           flexDirection: 'column',
           fontFamily: "'Geist', 'Inter', sans-serif",
-          overflow: 'visible',
+          overflow: 'hidden',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -459,9 +460,16 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           ))}
         </div>
 
-        <div style={{ flex: 1, overflow: 'visible', paddingRight: 0 }}>
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          paddingRight: '8px',
+          marginRight: '-8px',
+          minHeight: 0,
+        }}>
           {activeTab === "profile" && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 32, paddingBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
                 <div style={{ width: 64, height: 64, borderRadius: 999, overflow: 'hidden', background: '#ebebeb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: '#0c0c0c' }}>
                   {profile.avatar_url ? (
