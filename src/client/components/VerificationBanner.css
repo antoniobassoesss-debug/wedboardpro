@@ -1,0 +1,118 @@
+.verification-banner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.verification-banner-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.verification-banner-icon {
+  flex-shrink: 0;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+}
+
+.verification-banner-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.875rem;
+  color: #78350f;
+}
+
+.verification-banner-text strong {
+  font-weight: 600;
+  color: #78350f;
+}
+
+.verification-banner-text span {
+  font-size: 0.8rem;
+  color: #92400e;
+}
+
+.verification-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.verification-banner-btn {
+  padding: 6px 16px;
+  background: #78350f;
+  color: #fef3c7;
+  border: none;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.verification-banner-btn:hover:not(:disabled) {
+  background: #92400e;
+}
+
+.verification-banner-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.verification-banner-success {
+  font-size: 0.8rem;
+  color: #15803d;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.verification-banner-dismiss {
+  background: none;
+  border: none;
+  color: #92400e;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.verification-banner-dismiss:hover {
+  opacity: 1;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .verification-banner-content {
+    flex-wrap: wrap;
+  }
+
+  .verification-banner-text {
+    flex: 1 0 100%;
+    order: 1;
+  }
+
+  .verification-banner-icon {
+    order: 0;
+  }
+
+  .verification-banner-actions {
+    order: 2;
+    flex: 1 0 100%;
+    justify-content: space-between;
+  }
+}

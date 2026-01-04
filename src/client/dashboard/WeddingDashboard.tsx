@@ -7,6 +7,7 @@ import NotificationsBell from '../components/NotificationsBell';
 import { NewProjectModal, type NewProjectPayload } from '../components/NewProjectModal';
 import { createEvent } from '../api/eventsPipelineApi';
 import { AccountModal } from '../components/AccountModal';
+import VerificationBanner from '../components/VerificationBanner';
 
 const safeParse = (raw: string | null) => {
   if (!raw) return null;
@@ -59,6 +60,8 @@ const WeddingDashboard: React.FC = () => {
   const [isGlobalProjectModalOpen, setIsGlobalProjectModalOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(true); // Assume verified by default
+  const [checkingVerification, setCheckingVerification] = useState(true);
 
   const fetchProfileFromSupabase = useCallback(async () => {
     if (typeof window === 'undefined') {
@@ -129,8 +132,43 @@ const WeddingDashboard: React.FC = () => {
     };
   }, [fetchProfileFromSupabase]);
 
+  // Check email verification status
+  useEffect(() => {
+    const checkVerificationStatus = async () => {
+      try {
+        const session = JSON.parse(
+          window.localStorage.getItem('wedboarpro_session') || '{}'
+        );
+        const token = session?.access_token;
+
+        if (!token) {
+          setCheckingVerification(false);
+          return;
+        }
+
+        const res = await fetch('/api/auth/verification-status', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setEmailVerified(data.emailVerified);
+        }
+      } catch (err) {
+        console.error('Failed to check verification status:', err);
+      } finally {
+        setCheckingVerification(false);
+      }
+    };
+
+    checkVerificationStatus();
+  }, []);
+
   return (
     <div className="wp-shell">
+      {!checkingVerification && !emailVerified && <VerificationBanner />}
       <Sidebar
         active={active}
         collapsed={collapsed}

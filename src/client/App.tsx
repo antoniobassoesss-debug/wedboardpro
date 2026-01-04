@@ -1,13 +1,16 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MarketingHome from './MarketingHome';
 import { DebugClickProbe } from './components/DebugClickProbe';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
+import EmailConfirmationWaiting from './EmailConfirmationWaiting';
 import { AuthCallbackPage, AuthUrlHandler } from './auth/index.ts';
-import LayoutMakerPage from './LayoutMakerPage';
 import { WeddingDashboard } from './dashboard/index';
 import SuppliersPage from './suppliers/SuppliersPage';
+
+// Lazy load LayoutMakerPage to avoid circular dependency issues
+const LayoutMakerPage = lazy(() => import('./LayoutMakerPage'));
 
 // Simple placeholder component for pages under construction
 const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
@@ -62,9 +65,30 @@ const App: React.FC = () => {
         <Route path="/" element={<MarketingHome />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/confirm-email" element={<EmailConfirmationWaiting />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/dashboard" element={<WeddingDashboard />} />
-        <Route path="/layout-maker" element={<LayoutMakerPage />} />
+        <Route 
+          path="/layout-maker" 
+          element={
+            <Suspense fallback={
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                height: '100vh',
+                background: '#ffffff',
+                flexDirection: 'column',
+                gap: '1rem'
+              }}>
+                <div>Loading Layout Maker...</div>
+                <img src="/loadinglogo.png" alt="Loading" style={{ width: '120px', height: 'auto' }} />
+              </div>
+            }>
+              <LayoutMakerPage />
+            </Suspense>
+          } 
+        />
         <Route path="/suppliers" element={<SuppliersPage />} />
         <Route path="/demo" element={<PlaceholderPage title="Book a Demo" />} />
         <Route path="/pricing" element={<PlaceholderPage title="Pricing" />} />
