@@ -166,6 +166,30 @@ const WeddingDashboard: React.FC = () => {
     checkVerificationStatus();
   }, []);
 
+  const handleLogout = useCallback(async () => {
+    try {
+      // Sign out from Supabase
+      if (browserSupabaseClient) {
+        await browserSupabaseClient.auth.signOut();
+      }
+
+      // Clear all session data from localStorage
+      localStorage.removeItem('wedboarpro_session');
+      localStorage.removeItem('wedboarpro_user');
+      localStorage.removeItem('wedboarpro_display_name');
+
+      // Redirect to landing page
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Even if there's an error, clear local data and redirect
+      localStorage.removeItem('wedboarpro_session');
+      localStorage.removeItem('wedboarpro_user');
+      localStorage.removeItem('wedboarpro_display_name');
+      window.location.href = '/';
+    }
+  }, []);
+
   return (
     <div className="wp-shell">
       {!checkingVerification && !emailVerified && <VerificationBanner />}
@@ -176,6 +200,7 @@ const WeddingDashboard: React.FC = () => {
         onSelect={setActive}
         userName={displayName}
         avatarUrl={avatarUrl}
+        onLogout={handleLogout}
       />
       <div className="wp-main">
         {/* Floating top-right controls */}
