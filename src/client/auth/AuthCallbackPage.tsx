@@ -50,24 +50,15 @@ const AuthCallbackPage: React.FC = () => {
         // Check if this is a password recovery callback (check both query params and hash)
         const type = searchParams.get('type') || hashParams.get('type');
         console.log('[AuthCallback] Type parameter:', type);
-        if (type === 'recovery') {
-          // Password reset flow - redirect to reset password page
-          console.log('[AuthCallback] Password recovery detected, redirecting to /reset-password');
-          navigate('/reset-password', { replace: true });
-          return;
-        }
-
-        const nextUrl = searchParams.get('next') || '/dashboard';
-        const sanitizedNext = nextUrl.startsWith('/') ? nextUrl : '/dashboard';
 
         // With detectSessionInUrl: true, Supabase automatically exchanges the code
         // when the client initializes. We just need to wait a moment and retrieve the session.
         // Do NOT call exchangeCodeForSession manually - it will fail because the code
         // verifier was already consumed by Supabase's automatic handling.
-        
+
         // Give Supabase a moment to finish processing the URL
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
         const { data, error: sessionError } = await browserSupabaseClient.auth.getSession();
         if (sessionError) throw sessionError;
         if (!data.session) {
@@ -76,6 +67,21 @@ const AuthCallbackPage: React.FC = () => {
 
         const session = data.session;
         const user = session.user;
+
+        // For password recovery, redirect to reset password page after session is ready
+        if (type === 'recovery') {
+          console.log('[AuthCallback] Password recovery detected with valid session, redirecting to /reset-password');
+          // Store session so reset password page can use it
+          localStorage.setItem('wedboarpro_session', JSON.stringify(session));
+          localStorage.setItem('wedboarpro_user', JSON.stringify(user));
+          navigate('/reset-password', { replace: true });
+          return;
+        }
+
+        // Normal OAuth flow - continue to dashboard
+        const nextUrl = searchParams.get('next') || '/dashboard';
+        const sanitizedNext = nextUrl.startsWith('/') ? nextUrl : '/dashboard';
+
         const displayName =
           (typeof user?.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim()) ||
           (typeof user?.user_metadata?.name === 'string' && user.user_metadata.name.trim()) ||
