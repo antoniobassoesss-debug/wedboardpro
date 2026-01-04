@@ -1,10 +1,13 @@
 /**
  * ForgotPasswordPage - Request password reset email
  * Professional UX with rate limiting and clear feedback
- * Uses server-side password reset to avoid PKCE browser-locking
+ *
+ * NOTE: Reset link must be opened on same browser/device due to PKCE security.
+ * This is standard for client-side password reset flows.
  */
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { browserSupabaseClient } from './browserSupabaseClient';
 import './auth/auth.css';
 
 const ForgotPasswordPage: React.FC = () => {
@@ -52,26 +55,27 @@ const ForgotPasswordPage: React.FC = () => {
     setLoading(true);
 
     try {
-      // Use server-side password reset to avoid PKCE browser-locking issue
-      // This allows users to open the reset link in any browser/device
-      console.log('[ForgotPassword] Requesting server-side password reset');
-
-      const response = await fetch('/api/auth/request-password-reset', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email.toLowerCase().trim(),
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send reset email');
+      if (!browserSupabaseClient) {
+        throw new Error('Authentication service unavailable');
       }
 
-      console.log('[ForgotPassword] Server-side reset request successful');
+      // Use client-side password reset (sends emails automatically)
+      // Note: The reset link must be opened on the same browser/device for security (PKCE)
+      const redirectUrl = `${window.location.origin}/auth/callback?type=recovery&next=/reset-password`;
+      console.log('[ForgotPassword] Requesting password reset');
+
+      const { error: resetError } = await browserSupabaseClient.auth.resetPasswordForEmail(
+        email.toLowerCase().trim(),
+        {
+          redirectTo: redirectUrl,
+        }
+      );
+
+      if (resetError) {
+        throw resetError;
+      }
+
+      console.log('[ForgotPassword] Reset request successful');
 
       // Success! Show success message
       // Note: For security, we show success even if email doesn't exist
