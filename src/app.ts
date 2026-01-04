@@ -545,7 +545,7 @@ app.post('/api/auth/request-password-reset', express.json(), async (req, res) =>
     // Generate password recovery link using admin API (no PKCE, works across browsers)
     const redirectUrl = `${req.headers.origin || 'https://www.wedboardpro.com'}/auth/callback?type=recovery&next=/reset-password`;
 
-    const { error } = await supabase.auth.admin.generateLink({
+    const result = await supabase.auth.admin.generateLink({
       type: 'recovery',
       email: normalizedEmail,
       options: {
@@ -553,11 +553,22 @@ app.post('/api/auth/request-password-reset', express.json(), async (req, res) =>
       },
     });
 
-    if (error) {
+    console.log('[password-reset] Generate link result:', {
+      hasError: !!result.error,
+      hasData: !!result.data,
+      errorMessage: result.error?.message,
+    });
+
+    if (result.error) {
       // Log error server-side but don't reveal to client
-      console.error('[password-reset] Error generating link:', error);
-    } else {
-      console.log('[password-reset] Reset link generated successfully for:', normalizedEmail);
+      console.error('[password-reset] Error generating link:', result.error);
+    } else if (result.data) {
+      console.log('[password-reset] Link generated successfully');
+      console.log('[password-reset] Action link:', result.data.properties?.action_link);
+      console.log('[password-reset] Email sent:', result.data.properties?.email_otp);
+      // Note: admin.generateLink() does NOT automatically send emails
+      // Supabase emails are only sent by client-side methods or when using admin.inviteUserByEmail
+      // We need to manually send the recovery email or use client-side resetPasswordForEmail
     }
 
     // Always return success to prevent email enumeration
