@@ -13,8 +13,8 @@ const SignupPage: React.FC = () => {
   return (
     <>
       <AuthLayout
-        title="Create your WedBoardPro account"
-        subtitle="Set up access for your planning studio."
+        title="Start Your Free Trial"
+        subtitle="Create your WedBoardPro account in under 2 minutes."
       >
         <EmailPasswordForm mode="signup" />
 

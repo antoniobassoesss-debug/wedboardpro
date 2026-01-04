@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirm Your Email - WedBoardPro</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td align="center" style="padding: 40px 0;">
+        <table role="presentation" style="width: 600px; max-width: 100%; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);">
+
+          <!-- Header with Logo -->
+          <tr>
+            <td style="padding: 40px 40px 20px 40px; text-align: center;">
+              <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #0c0c0c;">
+                Welcome to WedBoardPro! 🎉
+              </h1>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 0 40px 30px 40px;">
+              <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #333333;">
+                Hi there,
+              </p>
+              <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #333333;">
+                Thanks for signing up! We're excited to have you on board. Before you can start using WedBoardPro, we need to verify your email address.
+              </p>
+              <p style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #333333;">
+                Click the button below to confirm your email and activate your account:
+              </p>
+            </td>
+          </tr>
+
+          <!-- Confirmation Button -->
+          <tr>
+            <td style="padding: 0 40px 30px 40px; text-align: center;">
+              <a href="{{ .ConfirmationURL }}"
+                 style="display: inline-block; padding: 16px 40px; background-color: #0c0c0c; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 999px; transition: all 0.2s ease;">
+                Confirm Your Email
+              </a>
+            </td>
+          </tr>
+
+          <!-- Alternative Link -->
+          <tr>
+            <td style="padding: 0 40px 30px 40px;">
+              <p style="margin: 0 0 10px 0; font-size: 14px; line-height: 1.6; color: #6b6b6b; text-align: center;">
+                Button not working? Copy and paste this link into your browser:
+              </p>
+              <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #0ea5e9; word-break: break-all; text-align: center;">
+                {{ .ConfirmationURL }}
+              </p>
+            </td>
+          </tr>
+
+          <!-- Security Notice -->
+          <tr>
+            <td style="padding: 0 40px 40px 40px; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 20px 0 0 0; font-size: 13px; line-height: 1.6; color: #9ca3af; text-align: center;">
+                If you didn't create an account with WedBoardPro, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 0 40px 40px 40px; text-align: center;">
+              <p style="margin: 0; font-size: 13px; color: #9ca3af;">
+                © {{ .Year }} WedBoardPro. All rights reserved.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

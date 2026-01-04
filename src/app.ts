@@ -57,7 +57,7 @@ const openaiClient = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
 console.log('OPENAI_API_KEY present:', Boolean(openaiApiKey), openaiApiKey ? `${String(openaiApiKey).slice(0,8)}...` : '');
 
 // Parse JSON bodies for API routes
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // In production, serve built files
 if (process.env.NODE_ENV === 'production') {
@@ -197,96 +197,425 @@ STYLE EXAMPLES
   }
 });
 
+// Validation helper functions for signup
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+function isValidPassword(password: string): { valid: boolean; error?: string } {
+  if (password.length < 8) {
+    return { valid: false, error: 'Password must be at least 8 characters' };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, error: 'Password must contain at least one uppercase letter' };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, error: 'Password must contain at least one lowercase letter' };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, error: 'Password must contain at least one number' };
+  }
+  return { valid: true };
+}
+
+function isValidPhone(phone: string): boolean {
+  // Remove all non-digit characters
+  const cleaned = phone.replace(/\D/g, '');
+  // Accept 10-15 digits (international format flexibility)
+  return cleaned.length >= 10 && cleaned.length <= 15;
+}
+
+function sanitizeInput(input: string): string {
+  // Remove potential XSS characters and trim whitespace
+  return input.trim().replace(/[<>]/g, '');
+}
+
 app.post('/api/auth/signup', express.json(), async (req, res) => {
   const supabase = getSupabaseServiceClient();
   if (!supabase) {
     return res.status(500).json({ error: 'Supabase service client unavailable' });
   }
 
-  const { email, password } = req.body ?? {};
-  if (typeof email !== 'string' || typeof password !== 'string') {
-    return res.status(400).json({ error: 'Email and password are required' });
+  const { email, password, fullName, phone, businessName } = req.body ?? {};
+
+  // Validate all required fields
+  if (typeof email !== 'string' || !email.trim()) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+  if (typeof password !== 'string' || !password.trim()) {
+    return res.status(400).json({ error: 'Password is required' });
+  }
+  if (typeof fullName !== 'string' || !fullName.trim()) {
+    return res.status(400).json({ error: 'Full name is required' });
+  }
+  if (typeof phone !== 'string' || !phone.trim()) {
+    return res.status(400).json({ error: 'Phone number is required' });
+  }
+  if (typeof businessName !== 'string' || !businessName.trim()) {
+    return res.status(400).json({ error: 'Business/Studio name is required' });
   }
 
+  // Format validation
+  if (!isValidEmail(email)) {
+    return res.status(400).json({ error: 'Please enter a valid email address' });
+  }
+
+  const passwordCheck = isValidPassword(password);
+  if (!passwordCheck.valid) {
+    return res.status(400).json({ error: passwordCheck.error });
+  }
+
+  if (!isValidPhone(phone)) {
+    return res.status(400).json({
+      error: 'Please enter a valid phone number (10-15 digits)'
+    });
+  }
+
+  if (fullName.length < 2 || fullName.length > 100) {
+    return res.status(400).json({
+      error: 'Full name must be between 2 and 100 characters'
+    });
+  }
+
+  if (businessName.length < 2 || businessName.length > 100) {
+    return res.status(400).json({
+      error: 'Business name must be between 2 and 100 characters'
+    });
+  }
+
+  // Sanitize inputs
+  const sanitizedFullName = sanitizeInput(fullName);
+  const sanitizedPhone = sanitizeInput(phone);
+  const sanitizedBusinessName = sanitizeInput(businessName);
+
   try {
-    console.log('/api/auth/signup request from', req.ip, 'body:', { email: String(email).slice(0, 40) });
+    console.log('/api/auth/signup request from', req.ip, 'email:', email.slice(0, 20));
 
-    const result = await supabase.auth.admin.createUser({
-      email,
+    // Use anon client to trigger automatic confirmation email
+    const anonSupabase = getSupabaseAnonClient();
+    if (!anonSupabase) {
+      return res.status(500).json({ error: 'Authentication service unavailable' });
+    }
+
+    // Sign up with automatic confirmation email
+    const { data, error } = await anonSupabase.auth.signUp({
+      email: email.toLowerCase().trim(),
       password,
-      email_confirm: true,
+      options: {
+        data: {
+          full_name: sanitizedFullName,
+          phone: sanitizedPhone,
+          business_name: sanitizedBusinessName,
+        },
+        emailRedirectTo: `${req.protocol}://${req.get('host')}/auth/callback`,
+      },
     });
-
-    // Log full Supabase response for debugging (do not log secrets)
-    console.log('/api/auth/signup supabase response:', {
-      status: result,
-      data: (result as any)?.data ? { ...((result as any).data), user: undefined } : undefined,
-      error: (result as any)?.error,
-    });
-
-    const data = (result as any)?.data;
-    const error = (result as any)?.error;
 
     if (error) {
-      console.error('/api/auth/signup supabase error message:', error.message);
+      console.error('/api/auth/signup supabase error:', error.message);
+
+      // Friendly error messages
+      if (error.message.includes('already registered') || error.message.includes('already been registered')) {
+        return res.status(400).json({
+          error: 'An account with this email already exists. Try logging in instead.'
+        });
+      }
+
       return res.status(400).json({ error: error.message });
     }
 
-    // Best-effort: ensure the new user has a default team so the app works immediately.
-    try {
-      const newUserId = data?.user?.id;
-      if (typeof newUserId === 'string' && newUserId) {
-        await createTeamForUser(supabase, newUserId);
+    const userId = data?.user?.id;
+
+    console.log('[signup] User created, checking email confirmation status:', {
+      userId,
+      email: data?.user?.email,
+      emailConfirmedAt: data?.user?.email_confirmed_at,
+      hasUser: !!data?.user
+    });
+
+    // Update profile with additional fields (fallback if trigger doesn't fire)
+    if (userId) {
+      try {
+        const serviceSupabase = getSupabaseServiceClient();
+        if (serviceSupabase) {
+          await serviceSupabase
+            .from('profiles')
+            .update({
+              full_name: sanitizedFullName,
+              phone: sanitizedPhone,
+              business_name: sanitizedBusinessName,
+            })
+            .eq('id', userId);
+
+          // Create default team with business name
+          try {
+            await createTeamForUser(serviceSupabase, userId, sanitizedBusinessName);
+          } catch (teamErr: any) {
+            console.warn('[signup] team creation failed (non-fatal):', teamErr?.message);
+          }
+        }
+      } catch (profileErr: any) {
+        console.warn('[signup] profile update failed (non-fatal):', profileErr?.message);
       }
-    } catch (teamErr: any) {
-      console.warn('[auth/signup] default team creation failed (non-fatal):', teamErr?.message ?? teamErr);
     }
 
-    return res.status(201).json({ user: data?.user ?? null });
+    // FORCE send confirmation email (workaround for SMTP issues)
+    console.log('[signup] Checking if manual email trigger needed...');
+    if (data?.user && !data.user.email_confirmed_at) {
+      try {
+        console.log('[signup] 🚀 MANUALLY TRIGGERING confirmation email for:', email);
+        const { error: resendError } = await anonSupabase.auth.resend({
+          type: 'signup',
+          email: email.toLowerCase().trim(),
+        });
+
+        if (resendError) {
+          console.error('[signup] ❌ Failed to send confirmation email:', resendError.message);
+          console.error('[signup] Error details:', resendError);
+        } else {
+          console.log('[signup] ✅ Confirmation email sent successfully!');
+        }
+      } catch (resendErr: any) {
+        console.error('[signup] ❌ Exception sending confirmation email:', resendErr?.message);
+      }
+    } else {
+      console.log('[signup] ⚠️ Skipping manual email trigger. Reason:', {
+        hasUser: !!data?.user,
+        emailConfirmedAt: data?.user?.email_confirmed_at,
+        willSkip: !data?.user || !!data.user.email_confirmed_at
+      });
+    }
+
+    console.log('[signup] ✅ Signup process complete');
+
+    return res.status(201).json({
+      user: data?.user ?? null,
+      emailVerified: false,
+      message: 'Account created successfully. Please check your email to verify your account.'
+    });
   } catch (err: any) {
-    console.error('Supabase signup error (unexpected):', err);
-    // In development, return details to help debugging. Do NOT expose in production.
+    console.error('Signup error:', err);
+
     if (process.env.NODE_ENV !== 'production') {
       return res.status(500).json({
         error: 'Failed to create account',
-        details:
-          err?.message ??
-          (typeof err === 'string' ? err : JSON.stringify(err, Object.getOwnPropertyNames(err) || [])),
+        details: err?.message ?? String(err),
       });
     }
-    return res.status(500).json({ error: 'Failed to create account' });
+
+    return res.status(500).json({ error: 'Failed to create account. Please try again.' });
   }
 });
 
-app.post('/api/auth/login', express.json(), async (req, res) => {
-  console.log('[POST /api/auth/login] Login request received');
+// Get user's email verification status
+app.get('/api/auth/verification-status', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
-  const supabase = getSupabaseAnonClient();
+  const token = authHeader.substring(7);
+  const supabase = getSupabaseServiceClient();
   if (!supabase) {
-    console.error('[POST /api/auth/login] ERROR: Supabase client unavailable');
-    return res.status(500).json({ error: 'Supabase client unavailable' });
+    return res.status(500).json({ error: 'Service unavailable' });
   }
-
-  const { email, password } = req.body ?? {};
-  if (typeof email !== 'string' || typeof password !== 'string') {
-    console.error('[POST /api/auth/login] ERROR: Invalid email or password format');
-    return res.status(400).json({ error: 'Email and password are required' });
-  }
-
-  console.log('[POST /api/auth/login] Attempting login for email:', email);
 
   try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    return res.status(200).json({
+      emailVerified: user.email_confirmed_at !== null,
+      email: user.email,
+      confirmedAt: user.email_confirmed_at,
+    });
+  } catch (err: any) {
+    console.error('Verification status error:', err);
+    return res.status(500).json({ error: 'Failed to check verification status' });
+  }
+});
+
+// Check if email is verified (no auth required - for confirmation waiting page)
+app.post('/api/auth/check-verification', express.json(), async (req, res) => {
+  const { email } = req.body;
+
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Service unavailable' });
+  }
+
+  try {
+    // Query users by email to check verification status
+    const { data: users, error } = await supabase.auth.admin.listUsers();
+
+    if (error) {
+      console.error('[check-verification] Error listing users:', error);
+      return res.status(500).json({ error: 'Failed to check verification status' });
+    }
+
+    const user = users?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.status(200).json({
+      verified: !!user.email_confirmed_at,
+      email: user.email,
+    });
+  } catch (err: any) {
+    console.error('[check-verification] Error:', err);
+    return res.status(500).json({ error: 'Failed to check verification status' });
+  }
+});
+
+// Resend verification email
+app.post('/api/auth/resend-verification', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const token = authHeader.substring(7);
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Service unavailable' });
+  }
+
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    if (user.email_confirmed_at) {
+      return res.status(400).json({ error: 'Email already verified' });
+    }
+
+    // Send verification email using Supabase magic link
+    await supabase.auth.admin.generateLink({
+      type: 'magiclink',
+      email: user.email!,
+      options: {
+        redirectTo: `${req.headers.origin || 'https://www.wedboardpro.com'}/dashboard?verified=true`,
+      },
+    });
+
+    console.log('[resend-verification] Email sent to:', user.email);
+
+    return res.status(200).json({
+      message: 'Verification email sent successfully'
+    });
+  } catch (err: any) {
+    console.error('Resend verification error:', err);
+    return res.status(500).json({ error: 'Failed to send verification email' });
+  }
+});
+
+// Health check endpoint for debugging
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    env: {
+      hasSupabaseUrl: !!process.env.SUPABASE_URL,
+      hasAnonKey: !!process.env.SUPABASE_ANON_KEY,
+      hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      nodeEnv: process.env.NODE_ENV,
+      vercel: process.env.VERCEL || 'false',
+    },
+    supabaseClients: {
+      anon: getSupabaseAnonClient() ? 'initialized' : 'NOT AVAILABLE',
+      service: getSupabaseServiceClient() ? 'initialized' : 'NOT AVAILABLE',
+    }
+  });
+});
+
+app.post('/api/auth/login', express.json(), async (req, res) => {
+  try {
+    console.log('[POST /api/auth/login] Login request received');
+    console.log('[POST /api/auth/login] Request body keys:', Object.keys(req.body || {}));
+    console.log('[POST /api/auth/login] Environment check:', {
+      hasSupabaseUrl: !!process.env.SUPABASE_URL,
+      hasAnonKey: !!process.env.SUPABASE_ANON_KEY,
+      nodeEnv: process.env.NODE_ENV,
+      vercel: process.env.VERCEL || 'false',
+    });
+
+    const supabase = getSupabaseAnonClient();
+    if (!supabase) {
+      console.error('[POST /api/auth/login] ERROR: Supabase client unavailable');
+      console.error('[POST /api/auth/login] Missing env vars:', {
+        SUPABASE_URL: process.env.SUPABASE_URL ? 'set' : 'MISSING',
+        SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ? 'set' : 'MISSING',
+      });
+      return res.status(500).json({ 
+        error: 'Authentication service unavailable. Please check server configuration.',
+        details: process.env.NODE_ENV === 'production' 
+          ? 'Backend environment variables may not be configured in Vercel.'
+          : 'Check .env.local file for SUPABASE_URL and SUPABASE_ANON_KEY.'
+      });
+    }
+
+    const { email, password } = req.body ?? {};
+    if (typeof email !== 'string' || typeof password !== 'string') {
+      console.error('[POST /api/auth/login] ERROR: Invalid email or password format');
+      console.error('[POST /api/auth/login] Received body:', req.body);
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    console.log('[POST /api/auth/login] Attempting login for email:', email);
+
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      console.error('[POST /api/auth/login] Supabase auth error:', error.message);
+      console.error('[POST /api/auth/login] Supabase auth error:', error.message, error.status);
+      // Provide more specific error messages
+      if (error.message.includes('Invalid login credentials')) {
+        return res.status(401).json({ error: 'Invalid email or password' });
+      }
+      if (error.message.includes('Email not confirmed')) {
+        return res.status(403).json({
+          error: 'Please confirm your email address before logging in.',
+          requiresEmailConfirmation: true,
+          email: email
+        });
+      }
       return res.status(400).json({ error: error.message });
     }
+    if (!data.session) {
+      console.error('[POST /api/auth/login] ERROR: No session returned from Supabase');
+      return res.status(500).json({ error: 'Login succeeded but no session was created' });
+    }
+
+    // CRITICAL: Block login if email is not confirmed
+    if (!data.user?.email_confirmed_at) {
+      console.warn('[POST /api/auth/login] Login blocked - email not confirmed for:', email);
+      return res.status(403).json({
+        error: 'Please confirm your email address before logging in. Check your inbox for the confirmation link.',
+        requiresEmailConfirmation: true,
+        email: email
+      });
+    }
+
     console.log('[POST /api/auth/login] Login successful for:', email);
     // Send session tokens so the client can store/manage them
     return res.status(200).json({ session: data.session, user: data.user });
   } catch (err: any) {
-    console.error('[POST /api/auth/login] Unexpected error:', err?.message ?? err, err?.stack);
-    return res.status(500).json({ error: 'Failed to log in' });
+    console.error('[POST /api/auth/login] Unexpected error:', err?.message ?? err);
+    console.error('[POST /api/auth/login] Error stack:', err?.stack);
+    return res.status(500).json({ 
+      error: 'Failed to log in. Please try again later.',
+      details: process.env.NODE_ENV === 'development' ? err?.message : undefined
+    });
   }
 });
 
@@ -5101,6 +5430,29 @@ app.get('/api/electrical/projects/:projectId/export.pdf', async (req, res) => {
       res.status(500).json({ error: error?.message || 'Failed to generate PDF' });
     }
   }
+});
+
+// Global error handler for unhandled errors (must be after all routes)
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('[Global Error Handler] Unhandled error:', err);
+  console.error('[Global Error Handler] Stack:', err?.stack);
+  console.error('[Global Error Handler] Request path:', req.path);
+  console.error('[Global Error Handler] Request method:', req.method);
+  
+  if (!res.headersSent) {
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: process.env.NODE_ENV === 'development' ? err?.message : 'An unexpected error occurred'
+    });
+  }
+});
+
+// 404 handler for API routes
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API endpoint not found', path: req.path });
+  }
+  next();
 });
 
 // Export app for Vercel serverless functions
