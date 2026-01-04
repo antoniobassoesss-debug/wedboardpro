@@ -30,18 +30,9 @@ interface SidebarProps {
   onSelect: (id: string) => void;
   userName?: string;
   avatarUrl?: string | null;
-  onLogout?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({
-  active,
-  collapsed,
-  onToggle,
-  onSelect,
-  userName,
-  avatarUrl,
-  onLogout
-}) => {
+const Sidebar: React.FC<SidebarProps> = ({ active, collapsed, onToggle, onSelect }) => {
 
   return (
     <aside className={`wp-sidebar ${collapsed ? 'collapsed' : ''}`}>
@@ -75,33 +66,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         </button>
       ))}
     </nav>
-
-    {/* User Profile Section at Bottom */}
-    <div className="wp-sidebar-profile">
-      <div className="wp-profile-info">
-        <div className="wp-profile-avatar">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt={userName || 'User'} />
-          ) : (
-            <div className="wp-avatar-placeholder">
-              {(userName || 'U')[0].toUpperCase()}
-            </div>
-          )}
-        </div>
-        {!collapsed && (
-          <div className="wp-profile-details">
-            <div className="wp-profile-name">{userName || 'User'}</div>
-            <button
-              type="button"
-              className="wp-logout-button"
-              onClick={onLogout}
-            >
-              Log Out
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
     </aside>
   );
 };

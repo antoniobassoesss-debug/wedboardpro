@@ -552,6 +552,63 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                   />
                 </div>
               </div>
+
+              <div style={{ height: 1, background: '#e3e3e3', margin: '32px 0' }} />
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px 0', color: '#0c0c0c' }}>Account Actions</h3>
+                <button
+                  onClick={async () => {
+                    try {
+                      // Sign out from Supabase
+                      if (browserSupabaseClient) {
+                        await browserSupabaseClient.auth.signOut();
+                      }
+
+                      // Clear all session data from localStorage
+                      localStorage.removeItem('wedboarpro_session');
+                      localStorage.removeItem('wedboarpro_user');
+                      localStorage.removeItem('wedboarpro_display_name');
+
+                      // Close modal and redirect to landing page
+                      onOpenChange(false);
+                      window.location.href = '/';
+                    } catch (error) {
+                      console.error('Logout error:', error);
+                      // Even if there's an error, clear local data and redirect
+                      localStorage.removeItem('wedboarpro_session');
+                      localStorage.removeItem('wedboarpro_user');
+                      localStorage.removeItem('wedboarpro_display_name');
+                      onOpenChange(false);
+                      window.location.href = '/';
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    borderRadius: 999,
+                    padding: '12px 18px',
+                    border: '1px solid #e3e3e3',
+                    background: '#fff',
+                    color: '#dc2626',
+                    fontWeight: 600,
+                    fontSize: 14,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontFamily: "'Geist', 'Inter', sans-serif",
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#fef2f2';
+                    e.currentTarget.style.borderColor = '#dc2626';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#fff';
+                    e.currentTarget.style.borderColor = '#e3e3e3';
+                  }}
+                >
+                  Log Out
+                </button>
+              </div>
             </div>
           )}
 
