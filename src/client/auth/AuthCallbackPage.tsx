@@ -21,6 +21,20 @@ const AuthCallbackPage: React.FC = () => {
       }
 
       try {
+        // Debug: Log all URL parameters
+        const allParams: Record<string, string> = {};
+        searchParams.forEach((value, key) => {
+          allParams[key] = value;
+        });
+        console.log('[AuthCallback] URL parameters:', allParams);
+        console.log('[AuthCallback] Full URL:', window.location.href);
+        console.log('[AuthCallback] Hash fragment:', window.location.hash);
+
+        // Also check hash fragment for type parameter (Supabase might use hash)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const typeFromHash = hashParams.get('type');
+        console.log('[AuthCallback] Type from hash:', typeFromHash);
+
         // Surface provider / Supabase errors directly if present
         const oauthError = searchParams.get('error');
         const oauthErrorDescription = searchParams.get('error_description');
@@ -30,6 +44,16 @@ const AuthCallbackPage: React.FC = () => {
               oauthError ||
               'Google sign-in failed. Please try again.'
           );
+          return;
+        }
+
+        // Check if this is a password recovery callback (check both query params and hash)
+        const type = searchParams.get('type') || hashParams.get('type');
+        console.log('[AuthCallback] Type parameter:', type);
+        if (type === 'recovery') {
+          // Password reset flow - redirect to reset password page
+          console.log('[AuthCallback] Password recovery detected, redirecting to /reset-password');
+          navigate('/reset-password', { replace: true });
           return;
         }
 
