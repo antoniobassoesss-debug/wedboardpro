@@ -49,6 +49,7 @@ const AuthCallbackPage: React.FC = () => {
 
         // Check if this is a password recovery callback (check both query params and hash)
         const type = searchParams.get('type') || hashParams.get('type');
+        const nextParam = searchParams.get('next') || hashParams.get('next');
         console.log('[AuthCallback] Type parameter:', type);
 
         // With detectSessionInUrl: true, Supabase automatically exchanges the code
@@ -69,11 +70,13 @@ const AuthCallbackPage: React.FC = () => {
         const user = session.user;
 
         // For password recovery, redirect to reset password page after session is ready
-        console.log('[AuthCallback] Checking recovery type. Type:', type);
+        console.log('[AuthCallback] Checking recovery type. Type:', type, 'next:', nextParam);
         console.log('[AuthCallback] Session user:', user);
         console.log('[AuthCallback] About to check if type === recovery');
 
-        if (type === 'recovery') {
+        const isRecoveryFlow = type === 'recovery' || nextParam === '/reset-password';
+
+        if (isRecoveryFlow) {
           console.log('[AuthCallback] ✅ PASSWORD RECOVERY DETECTED! Redirecting to /reset-password');
           // Store session so reset password page can use it
           localStorage.setItem('wedboarpro_session', JSON.stringify(session));
