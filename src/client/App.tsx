@@ -4,6 +4,8 @@ import MarketingHome from './MarketingHome';
 import { DebugClickProbe } from './components/DebugClickProbe';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
+import ForgotPasswordPage from './ForgotPasswordPage';
+import ResetPasswordPage from './ResetPasswordPage';
 import EmailConfirmationWaiting from './EmailConfirmationWaiting';
 import { AuthCallbackPage, AuthUrlHandler } from './auth/index.ts';
 import { WeddingDashboard } from './dashboard/index';
@@ -65,6 +67,8 @@ const App: React.FC = () => {
         <Route path="/" element={<MarketingHome />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/confirm-email" element={<EmailConfirmationWaiting />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/dashboard" element={<WeddingDashboard />} />

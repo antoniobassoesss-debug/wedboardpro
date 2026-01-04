@@ -4,7 +4,7 @@
  * mode='signup': 5 fields (email, fullName, phone, businessName, password, passwordConfirm)
  */
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { browserSupabaseClient } from '../browserSupabaseClient';
 import { storeSession } from '../utils/sessionManager';
 import './auth.css';
@@ -30,6 +30,7 @@ const EmailPasswordForm: React.FC<EmailPasswordFormProps> = ({ mode }) => {
   const oauthErrorDirect = searchParams.get('error_description') || searchParams.get('error');
   const emailFromUrl = searchParams.get('email') || '';
   const justVerified = searchParams.get('verified') === 'true';
+  const passwordReset = searchParams.get('reset') === 'success';
 
   // Form state
   const [email, setEmail] = useState(emailFromUrl);
@@ -49,7 +50,11 @@ const EmailPasswordForm: React.FC<EmailPasswordFormProps> = ({ mode }) => {
   const [loading, setLoading] = useState(false);
   const [checkingOAuth, setCheckingOAuth] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(
-    justVerified ? '✓ Email verified! You can now log in.' : null
+    justVerified
+      ? '✓ Email verified! You can now log in.'
+      : passwordReset
+      ? '✓ Password updated successfully! Log in with your new password.'
+      : null
   );
 
   useEffect(() => {
@@ -441,6 +446,23 @@ const EmailPasswordForm: React.FC<EmailPasswordFormProps> = ({ mode }) => {
           <span className="auth-field-help">
             Must be 8+ characters with uppercase, lowercase, and number
           </span>
+        )}
+
+        {/* Forgot password link for login */}
+        {mode === 'login' && (
+          <div style={{ textAlign: 'right', marginTop: '8px' }}>
+            <Link
+              to="/forgot-password"
+              style={{
+                fontSize: '0.85rem',
+                color: '#0c0c0c',
+                fontWeight: 600,
+                textDecoration: 'none'
+              }}
+            >
+              Forgot password?
+            </Link>
+          </div>
         )}
       </label>
 
