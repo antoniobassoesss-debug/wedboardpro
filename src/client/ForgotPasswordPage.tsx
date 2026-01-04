@@ -62,20 +62,31 @@ const ForgotPasswordPage: React.FC = () => {
       // Use client-side password reset (sends emails automatically)
       // Note: The reset link must be opened on the same browser/device for security (PKCE)
       const redirectUrl = `${window.location.origin}/auth/callback?type=recovery&next=/reset-password`;
-      console.log('[ForgotPassword] Requesting password reset');
+      console.log('[ForgotPassword] Starting password reset request');
+      console.log('[ForgotPassword] Email:', email.toLowerCase().trim());
+      console.log('[ForgotPassword] Redirect URL:', redirectUrl);
+      console.log('[ForgotPassword] Supabase client available:', !!browserSupabaseClient);
 
-      const { error: resetError } = await browserSupabaseClient.auth.resetPasswordForEmail(
+      const result = await browserSupabaseClient.auth.resetPasswordForEmail(
         email.toLowerCase().trim(),
         {
           redirectTo: redirectUrl,
         }
       );
 
-      if (resetError) {
-        throw resetError;
+      console.log('[ForgotPassword] Reset result:', {
+        hasError: !!result.error,
+        hasData: !!result.data,
+        error: result.error,
+        data: result.data,
+      });
+
+      if (result.error) {
+        console.error('[ForgotPassword] Reset error:', result.error);
+        throw result.error;
       }
 
-      console.log('[ForgotPassword] Reset request successful');
+      console.log('[ForgotPassword] ✅ Reset request successful - email should be sent by Supabase');
 
       // Success! Show success message
       // Note: For security, we show success even if email doesn't exist
