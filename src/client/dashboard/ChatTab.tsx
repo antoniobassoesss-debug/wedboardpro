@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { browserSupabaseClient } from '../browserSupabaseClient';
 import './chat.css';
+import { groupMessagesBySender, groupByDate } from './chatUtils';
+import MessageGroup from './MessageGroup';
+import DateSeparator from './DateSeparator';
 
 type Message = {
   id: string;
@@ -207,6 +210,14 @@ export default function ChatTab() {
         params.set('limit', '50');
         if (opts?.before) params.set('before', opts.before);
         if (activeRecipientId) params.set('recipientId', activeRecipientId);
+
+        console.log('[ChatTab] Fetching messages:', {
+          activeConversation,
+          activeRecipientId,
+          isDirect: !!activeRecipientId,
+          url: `/api/chat/messages?${params.toString()}`,
+        });
+
         const res = await fetch(`/api/chat/messages?${params.toString()}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
           cache: 'no-store',
@@ -233,12 +244,27 @@ export default function ChatTab() {
           setProfileCache((prev) => ({ ...prev, ...incomingProfiles }));
         }
         const sorted = incoming.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+        console.log('[ChatTab] Setting messages:', {
+          count: sorted.length,
+          activeRecipientId,
+          isDirect: !!activeRecipientId,
+          sample: sorted.slice(0, 3).map(m => ({
+            id: m.id,
+            user_id: m.user_id,
+            recipient_id: m.recipient_id,
+            content: m.content.substring(0, 30),
+          })),
+        });
+
         setMessages(sorted);
         setError(null);
+        console.log('[ChatTab] Messages set successfully, count:', sorted.length);
       } catch (err: any) {
         console.error('[ChatTab] Failed to fetch messages:', err);
         setError(err?.message || 'Failed to load messages');
       } finally {
+        console.log('[ChatTab] Setting loading to false');
         setLoading(false);
       }
     },
@@ -403,15 +429,20 @@ export default function ChatTab() {
 
   const handleSelectConversation = useCallback(
     (convId: string) => {
+      // Extract recipient ID first to ensure states stay in sync
+      const recipientId = convId.startsWith('direct-') ? convId.replace('direct-', '') : null;
+
+      console.log('[ChatTab] Selecting conversation:', {
+        convId,
+        recipientId,
+        isDirect: convId.startsWith('direct-'),
+      });
+
+      // Update all states together
       setActiveConversation(convId);
+      setActiveRecipientId(recipientId);
       setMessages([]);
       setLoading(true);
-      if (convId.startsWith('direct-')) {
-        const recipientId = convId.replace('direct-', '');
-        setActiveRecipientId(recipientId);
-      } else {
-        setActiveRecipientId(null);
-      }
     },
     [],
   );
@@ -497,6 +528,16 @@ export default function ChatTab() {
     if (!activeConversation || !team) {
       return;
     }
+
+    console.log('[ChatTab] useEffect triggered - activeConversation changed:', {
+      activeConversation,
+      activeRecipientId,
+      isDirect: !!activeRecipientId,
+    });
+
+    // Clear messages immediately when conversation changes
+    setMessages([]);
+
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -517,7 +558,8 @@ export default function ChatTab() {
         channelRef.current = null;
       }
     };
-  }, [activeConversation, activeRecipientId, team, fetchMessages, subscribeToRealtime]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeConversation, activeRecipientId, team?.id]);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -675,7 +717,7 @@ export default function ChatTab() {
 
             {/* Messages */}
             <div className="chat-messages" ref={messageListRef}>
-              {loading && messages.length === 0 ? (
+              {loading ? (
                 <div className="chat-loading">Loading messages...</div>
               ) : messages.length === 0 ? (
                 <div className="chat-empty">
@@ -684,24 +726,54 @@ export default function ChatTab() {
                   <p className="chat-empty-text">Start the conversation by sending a message below.</p>
                 </div>
               ) : (
-                messages.map((msg) => {
-                  const isOwnMessage = msg.user_id === authedUserId;
-                  const cachedProfile = msg.profile ?? profileCache[msg.user_id];
-                  const name = cachedProfile?.full_name || cachedProfile?.email || 'Unknown';
-                  const initials = getInitials(name);
-                  const timestamp = formatTime(msg.created_at);
+                (() => {
+                  try {
+                    console.log('[ChatTab] Rendering messages, count:', messages.length);
+                    // Group messages by sender for Instagram-style display
+                    const messageGroups = groupMessagesBySender(messages);
+                    console.log('[ChatTab] Message groups created:', messageGroups.length);
 
-                  return (
-                    <div key={msg.id} className={`chat-message-row ${isOwnMessage ? 'me' : 'them'}`}>
-                      {!isOwnMessage && <div className="chat-message-avatar">{initials}</div>}
-                      <div className={`chat-bubble ${isOwnMessage ? 'me' : 'them'}`}>
-                        {!isOwnMessage && <div className="chat-bubble-sender">{name}</div>}
-                        <div className="chat-bubble-content">{msg.content}</div>
-                        <div className="chat-bubble-time">{timestamp}</div>
+                    // Group by date for date separators
+                    const groupedByDate = groupByDate(messageGroups);
+                    console.log('[ChatTab] Grouped by date:', groupedByDate.length);
+
+                    // Find the last message group sent by the current user
+                    const allGroups = groupedByDate.flatMap(d => d.groups);
+                    const lastOwnMessageGroupIndex = allGroups.map(g => g.user_id === authedUserId).lastIndexOf(true);
+
+                    let groupCounter = 0;
+                    return groupedByDate.map((dateGroup) => (
+                      <React.Fragment key={dateGroup.date}>
+                        {/* Date separator */}
+                        <DateSeparator date={dateGroup.date} timestamp={dateGroup.timestamp} />
+
+                        {/* Message groups for this date */}
+                        {dateGroup.groups.map((group) => {
+                          const isOwnMessage = group.user_id === authedUserId;
+                          const isLastOwnMessageGroup = groupCounter === lastOwnMessageGroupIndex;
+                          groupCounter++;
+                          return (
+                            <MessageGroup
+                              key={`${group.user_id}-${group.timestamp}`}
+                              group={group}
+                              isOwnMessage={isOwnMessage}
+                              profileCache={profileCache}
+                              authedDisplayName={authedDisplayName}
+                              isLastOwnMessageGroup={isLastOwnMessageGroup}
+                            />
+                          );
+                        })}
+                      </React.Fragment>
+                    ));
+                  } catch (err) {
+                    console.error('[ChatTab] Error rendering messages:', err);
+                    return (
+                      <div className="chat-error">
+                        Error rendering messages: {String(err)}
                       </div>
-                    </div>
-                  );
-                })
+                    );
+                  }
+                })()
               )}
             </div>
 

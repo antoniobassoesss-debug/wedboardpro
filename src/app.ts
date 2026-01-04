@@ -2073,6 +2073,14 @@ app.get('/api/chat/messages', express.json(), async (req, res) => {
   const { limit: rawLimit, before, recipientId } = (req.query as any) ?? {};
   const limit = Math.min(Number(rawLimit) || 50, 200);
 
+  console.log('[GET /api/chat/messages] Request:', {
+    userId: user.id,
+    recipientId,
+    isDirect: !!recipientId,
+    before,
+    limit,
+  });
+
   try {
     const { team } = await ensureUserTeamMembership(supabase, user.id);
 
@@ -2085,11 +2093,16 @@ app.get('/api/chat/messages', express.json(), async (req, res) => {
 
     if (recipientId && typeof recipientId === 'string') {
       // Direct message conversation
+      console.log('[GET /api/chat/messages] Filtering for DIRECT messages between:', {
+        user: user.id,
+        recipient: recipientId,
+      });
       query = query
         .not('recipient_id', 'is', null)
         .or(`and(user_id.eq.${user.id},recipient_id.eq.${recipientId}),and(user_id.eq.${recipientId},recipient_id.eq.${user.id})`);
     } else {
       // Team messages
+      console.log('[GET /api/chat/messages] Filtering for TEAM messages (recipient_id is null)');
       query = query.is('recipient_id', null);
     }
 
@@ -2132,6 +2145,17 @@ app.get('/api/chat/messages', express.json(), async (req, res) => {
     }
 
     const rows = data ?? [];
+    console.log('[GET /api/chat/messages] Retrieved messages:', {
+      count: rows.length,
+      isDirect: !!recipientId,
+      sample: rows.slice(0, 3).map(r => ({
+        id: r.id,
+        user_id: r.user_id,
+        recipient_id: r.recipient_id,
+        content: r.content.substring(0, 30),
+      })),
+    });
+
     const userIds = Array.from(new Set(rows.map((r) => r.user_id).filter(Boolean)));
     let profilesById: Record<string, { full_name?: string | null; email?: string | null; avatar_url?: string | null }> =
       {};
