@@ -383,16 +383,20 @@ export default function ChatTab() {
       },
     );
 
+    channelRef.current = channel;
+
     const subscriptionStatus = await channel.subscribe();
     console.log('[ChatTab] Channel subscription status:', subscriptionStatus);
 
-    if (subscriptionStatus !== 'SUBSCRIBED') {
-      console.error('[ChatTab] Failed to subscribe to realtime channel:', subscriptionStatus);
-      return;
+    if (subscriptionStatus === 'SUBSCRIBED') {
+      console.log('[ChatTab] ✅ Successfully subscribed to realtime channel');
+    } else if (subscriptionStatus === 'TIMED_OUT') {
+      console.error('[ChatTab] ⚠️ Subscription timed out, but channel is saved and may reconnect');
+    } else if (subscriptionStatus === 'CLOSED') {
+      console.error('[ChatTab] ⚠️ Subscription closed');
+    } else {
+      console.log('[ChatTab] ⏳ Subscription status:', subscriptionStatus, '- channel will complete connection asynchronously');
     }
-
-    console.log('[ChatTab] ✅ Successfully subscribed to realtime channel');
-    channelRef.current = channel;
   }, [authedUserId, setSupabaseSession, team, activeConversation]);
 
   const sendMessage = useCallback(
