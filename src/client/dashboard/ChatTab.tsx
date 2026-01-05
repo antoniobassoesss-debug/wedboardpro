@@ -386,6 +386,12 @@ export default function ChatTab() {
     const subscriptionStatus = await channel.subscribe();
     console.log('[ChatTab] Channel subscription status:', subscriptionStatus);
 
+    if (subscriptionStatus !== 'SUBSCRIBED') {
+      console.error('[ChatTab] Failed to subscribe to realtime channel:', subscriptionStatus);
+      return;
+    }
+
+    console.log('[ChatTab] ✅ Successfully subscribed to realtime channel');
     channelRef.current = channel;
   }, [authedUserId, setSupabaseSession, team, activeConversation]);
 

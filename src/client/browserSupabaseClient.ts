@@ -25,5 +25,10 @@ export const browserSupabaseClient =
           persistSession: true,
           detectSessionInUrl: true,
         },
+        realtime: {
+          params: {
+            eventsPerSecond: 10,
+          },
+        },
       })
     : null;
