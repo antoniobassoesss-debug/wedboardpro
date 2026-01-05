@@ -610,6 +610,15 @@ export default function ChatTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversation, activeRecipientId, team?.id]);
 
+  // Lightweight polling fallback to ensure other users' messages appear quickly
+  useEffect(() => {
+    if (!activeConversation || !team) return;
+    const interval = setInterval(() => {
+      fetchMessages().catch(() => {});
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [activeConversation, activeRecipientId, team?.id, fetchMessages]);
+
   useEffect(() => {
     if (!accessToken) return;
     const interval = setInterval(() => {
