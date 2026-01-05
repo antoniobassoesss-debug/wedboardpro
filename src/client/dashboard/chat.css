@@ -154,6 +154,15 @@
   background: #e2e8f0;
 }
 
+.chat-conversation-item.unread .chat-conversation-name {
+  font-weight: 700;
+}
+
+.chat-conversation-item.unread .chat-conversation-preview {
+  font-weight: 600;
+  color: #0f172a;
+}
+
 .chat-conversation-avatar {
   width: 48px;
   height: 48px;

@@ -271,16 +271,33 @@ export default function ChatTab() {
     [accessToken, team, activeConversation, activeRecipientId],
   );
 
-  const subscribeToRealtime = useCallback(async () => {
-    if (!browserSupabaseClient || !team || !authedUserId || !activeConversation) return;
+  const subscribeToRealtime = useCallback(async (currentRecipientId: string | null) => {
+    if (!browserSupabaseClient || !team || !authedUserId || !activeConversation) {
+      console.log('[ChatTab] Cannot subscribe - missing requirements:', {
+        hasClient: !!browserSupabaseClient,
+        hasTeam: !!team,
+        hasUser: !!authedUserId,
+        hasConversation: !!activeConversation,
+      });
+      return;
+    }
     await setSupabaseSession();
 
     if (channelRef.current) {
-      browserSupabaseClient.removeChannel(channelRef.current);
+      console.log('[ChatTab] Removing existing channel');
+      await browserSupabaseClient.removeChannel(channelRef.current);
       channelRef.current = null;
     }
 
-    const channel = browserSupabaseClient.channel(`team:${team.id}:chat`, {
+    const channelName = `team:${team.id}:chat:${Date.now()}`;
+    console.log('[ChatTab] Creating new realtime channel:', channelName, {
+      teamId: team.id,
+      activeConversation,
+      currentRecipientId,
+      isDirect: !!currentRecipientId,
+    });
+
+    const channel = browserSupabaseClient.channel(channelName, {
       config: {
         presence: { key: authedUserId },
       },
@@ -295,16 +312,32 @@ export default function ChatTab() {
         filter: `team_id=eq.${team.id}`,
       },
       (payload) => {
+        console.log('[ChatTab] Realtime message received:', payload);
         const data = (payload.new as any) ?? null;
         if (!data?.id) return;
 
         const isTeamMessage = !data.recipient_id;
         const isDirectMessage = data.recipient_id && (data.user_id === authedUserId || data.recipient_id === authedUserId);
         const matchesActive =
-          (activeRecipientId === null && isTeamMessage) ||
-          (activeRecipientId && isDirectMessage && (data.user_id === activeRecipientId || data.recipient_id === activeRecipientId));
+          (currentRecipientId === null && isTeamMessage) ||
+          (currentRecipientId && isDirectMessage && (data.user_id === currentRecipientId || data.recipient_id === currentRecipientId));
 
-        if (!matchesActive) return;
+        console.log('[ChatTab] Message filtering:', {
+          messageId: data.id,
+          isTeamMessage,
+          isDirectMessage,
+          matchesActive,
+          currentRecipientId,
+          messageRecipientId: data.recipient_id,
+          messageUserId: data.user_id,
+        });
+
+        if (!matchesActive) {
+          console.log('[ChatTab] Message does not match active conversation, ignoring');
+          return;
+        }
+
+        console.log('[ChatTab] Adding message to conversation');
 
         setMessages((prev) => {
           if (prev.some((m) => m.id === data.id)) return prev;
@@ -323,7 +356,7 @@ export default function ChatTab() {
           return next.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         });
 
-        if (data.user_id && !profileCache[data.user_id]) {
+        if (data.user_id) {
           (async () => {
             try {
               await setSupabaseSession();
@@ -350,9 +383,11 @@ export default function ChatTab() {
       },
     );
 
-    await channel.subscribe();
+    const subscriptionStatus = await channel.subscribe();
+    console.log('[ChatTab] Channel subscription status:', subscriptionStatus);
+
     channelRef.current = channel;
-  }, [authedUserId, setSupabaseSession, team, activeConversation, activeRecipientId, profileCache]);
+  }, [authedUserId, setSupabaseSession, team, activeConversation]);
 
   const sendMessage = useCallback(
     async (e?: React.FormEvent) => {
@@ -545,7 +580,11 @@ export default function ChatTab() {
       try {
         await fetchMessages();
         if (!cancelled && team && activeConversation) {
-          await subscribeToRealtime();
+          console.log('[ChatTab] About to subscribe to realtime, activeRecipientId:', activeRecipientId);
+          await subscribeToRealtime(activeRecipientId);
+          console.log('[ChatTab] Subscribed to realtime successfully');
+        } else {
+          console.log('[ChatTab] NOT subscribing, conditions:', { cancelled, hasTeam: !!team, hasConversation: !!activeConversation });
         }
       } catch (err) {
         console.error('[ChatTab] Error in message loading effect:', err);
@@ -665,11 +704,12 @@ export default function ChatTab() {
           ) : (
             filteredConversations.map((conv) => {
               const isActive = conv.id === activeConversation;
+              const hasUnread = conv.unread && conv.unread > 0;
               const lastMsgTime = conv.lastMessage ? formatTime(conv.lastMessage.created_at) : null;
               return (
                 <div
                   key={conv.id}
-                  className={`chat-conversation-item ${isActive ? 'active' : ''}`}
+                  className={`chat-conversation-item ${isActive ? 'active' : ''} ${hasUnread ? 'unread' : ''}`}
                   onClick={() => handleSelectConversation(conv.id)}
                 >
                   <div className={`chat-conversation-avatar ${conv.type === 'team' ? 'team' : ''}`}>
@@ -684,7 +724,7 @@ export default function ChatTab() {
                       <div className="chat-conversation-preview">{conv.lastMessage.content}</div>
                     )}
                   </div>
-                  {conv.unread && conv.unread > 0 && (
+                  {hasUnread && (
                     <div className="chat-unread-badge">{conv.unread}</div>
                   )}
                 </div>
@@ -728,14 +768,10 @@ export default function ChatTab() {
               ) : (
                 (() => {
                   try {
-                    console.log('[ChatTab] Rendering messages, count:', messages.length);
                     // Group messages by sender for Instagram-style display
                     const messageGroups = groupMessagesBySender(messages);
-                    console.log('[ChatTab] Message groups created:', messageGroups.length);
-
                     // Group by date for date separators
                     const groupedByDate = groupByDate(messageGroups);
-                    console.log('[ChatTab] Grouped by date:', groupedByDate.length);
 
                     // Find the last message group sent by the current user
                     const allGroups = groupedByDate.flatMap(d => d.groups);
