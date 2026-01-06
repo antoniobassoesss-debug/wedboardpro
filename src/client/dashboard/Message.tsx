@@ -28,39 +28,40 @@ const Message: React.FC<MessageProps> = ({
 }) => {
   const [showTime, setShowTime] = useState(false);
 
-  // Determine border radius based on position in group
+  // Determine border radius based on position in group (Instagram style)
   // Border-radius order: top-left, top-right, bottom-right, bottom-left
-  // Pointy corner (4px) always points outward toward the edge of the chat
+  // Small radius (4px) on corners that connect to adjacent messages
+  // Full radius (18px) on outer corners for aesthetic flow
   const getBorderRadius = () => {
     if (isOwnMessage) {
-      // Sent messages (right side) - pointy corner on bottom-right
+      // Sent messages (right-aligned)
       if (isFirstInGroup && isLastInGroup) {
-        // Single message - pointy on bottom-right only
-        return '18px 18px 4px 18px';
+        // Single message - all corners fully rounded
+        return '18px';
       } else if (isFirstInGroup) {
-        // First in group - rounded on bottom-right (connects to next)
-        return '18px 18px 18px 4px';
-      } else if (isLastInGroup) {
-        // Last in group - pointy on bottom-right (outer edge)
+        // First in group - small radius on bottom-right (connects to next)
         return '18px 18px 4px 18px';
+      } else if (isLastInGroup) {
+        // Last in group - small radius on top-right (connects to previous)
+        return '18px 4px 18px 18px';
       } else {
-        // Middle of group - rounded on both right corners
-        return '18px 18px 18px 4px';
+        // Middle of group - small radius on both right corners (connects both ways)
+        return '18px 4px 4px 18px';
       }
     } else {
-      // Received messages (left side) - pointy corner on bottom-left
+      // Received messages (left-aligned)
       if (isFirstInGroup && isLastInGroup) {
-        // Single message - pointy on bottom-left only
-        return '18px 18px 18px 4px';
+        // Single message - all corners fully rounded
+        return '18px';
       } else if (isFirstInGroup) {
-        // First in group - rounded on bottom-left (connects to next)
-        return '18px 4px 18px 18px';
+        // First in group - small radius on bottom-left (connects to next)
+        return '18px 18px 18px 4px';
       } else if (isLastInGroup) {
-        // Last in group - pointy on bottom-left (outer edge)
-        return '18px 4px 18px 4px';
+        // Last in group - small radius on top-left (connects to previous)
+        return '4px 18px 18px 18px';
       } else {
-        // Middle of group - rounded on both left corners
-        return '18px 4px 18px 18px';
+        // Middle of group - small radius on both left corners (connects both ways)
+        return '4px 18px 18px 4px';
       }
     }
   };
