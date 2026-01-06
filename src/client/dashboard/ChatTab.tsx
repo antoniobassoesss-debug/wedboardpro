@@ -852,11 +852,6 @@ export default function ChatTab() {
                       <div className="chat-conversation-preview">{conv.lastMessage.content}</div>
                     )}
                   </div>
-                  {conv.unread && conv.unread > 0 && (
-                    <div className="chat-unread-badge">
-                      {conv.unread > 99 ? '99+' : conv.unread}
-                    </div>
-                  )}
                 </div>
               );
             })
