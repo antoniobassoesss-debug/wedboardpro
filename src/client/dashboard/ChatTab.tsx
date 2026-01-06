@@ -878,6 +878,7 @@ export default function ChatTab() {
                               profileCache={profileCache}
                               authedDisplayName={authedDisplayName}
                               isLastOwnMessageGroup={isLastOwnMessageGroup}
+                              isDirectMessage={!!activeRecipientId}
                             />
                           );
                         })}

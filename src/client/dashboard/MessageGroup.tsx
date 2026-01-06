@@ -12,6 +12,7 @@ interface MessageGroupProps {
   profileCache: Record<string, { full_name?: string | null; email?: string | null; avatar_url?: string | null }>;
   authedDisplayName: string;
   isLastOwnMessageGroup?: boolean; // True if this group contains the last message sent by user
+  isDirectMessage?: boolean; // True if this is a 1-on-1 conversation (hide sender names)
 }
 
 const MessageGroup: React.FC<MessageGroupProps> = ({
@@ -20,6 +21,7 @@ const MessageGroup: React.FC<MessageGroupProps> = ({
   profileCache,
   authedDisplayName,
   isLastOwnMessageGroup = false,
+  isDirectMessage = false,
 }) => {
   const cachedProfile = profileCache[group.user_id];
   const displayName = cachedProfile?.full_name || cachedProfile?.email || 'Unknown';
@@ -47,8 +49,8 @@ const MessageGroup: React.FC<MessageGroupProps> = ({
 
       {/* Messages container */}
       <div className="instagram-messages-container">
-        {/* Sender name only on first message */}
-        {!isOwnMessage && group.messages[0].isFirstInGroup && (
+        {/* Sender name only on first message in group chats (hide in direct messages) */}
+        {!isOwnMessage && !isDirectMessage && group.messages[0].isFirstInGroup && (
           <div className="instagram-sender-name">{displayName}</div>
         )}
 
