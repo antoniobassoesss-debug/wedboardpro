@@ -9,6 +9,9 @@ import { Label } from "./ui/label";
 import { Separator } from "./ui/separator";
 import { CreditCard, Users, Bell, HardDrive, Shield, Edit2 } from "./ui/icons";
 import { browserSupabaseClient } from "../browserSupabaseClient";
+import { AvatarUploadModal } from "./AvatarUploadModal";
+import { removeAvatar } from "../api/avatarApi";
+import { useToast } from "./ui/toast";
 
 interface AccountModalProps {
   open: boolean;
@@ -43,6 +46,8 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
   const [inviteActionError, setInviteActionError] = useState<string | null>(null);
   const [acceptingToken, setAcceptingToken] = useState<string | null>(null);
   const [acceptSuccessMessage, setAcceptSuccessMessage] = useState<string | null>(null);
+  const [showAvatarUpload, setShowAvatarUpload] = useState(false);
+  const { showToast } = useToast();
 
   const getStoredSession = useCallback(() => {
     if (typeof window === "undefined") return null;
@@ -271,6 +276,22 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
     fetchPendingInvitations();
   }, [open, activeTab, fetchTeamInfo, fetchPendingInvitations]);
 
+  const handleAvatarSuccess = (avatarUrl: string) => {
+    setProfile(prev => ({ ...prev, avatar_url: avatarUrl }));
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!window.confirm('Remove your profile picture?')) return;
+
+    const result = await removeAvatar();
+    if (result.success) {
+      setProfile(prev => ({ ...prev, avatar_url: null }));
+      showToast('Profile picture removed', 'success');
+    } else {
+      showToast(result.error || 'Failed to remove', 'error');
+    }
+  };
+
   const handleInvite = async () => {
     if (!inviteEmail || !inviteEmail.includes("@")) {
       setInviteError("Please enter a valid email address");
@@ -471,7 +492,25 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           {activeTab === "profile" && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 32, paddingBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                <div style={{ width: 64, height: 64, borderRadius: 999, overflow: 'hidden', background: '#ebebeb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: '#0c0c0c' }}>
+                {/* Avatar with hover overlay and click handler */}
+                <div
+                  style={{
+                    position: 'relative',
+                    width: 64,
+                    height: 64,
+                    borderRadius: 999,
+                    overflow: 'hidden',
+                    background: '#ebebeb',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: '#0c0c0c',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => setShowAvatarUpload(true)}
+                >
                   {profile.avatar_url ? (
                     <img src={profile.avatar_url} alt={profile.full_name || profile.email || "Profile"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
@@ -482,13 +521,55 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                       .join("")
                       .toUpperCase()
                   )}
+                  {/* Hover overlay */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'rgba(0,0,0,0.6)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: 0,
+                      transition: 'opacity 0.2s',
+                      gap: 4
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
+                  >
+                    <span style={{ fontSize: 20 }}>📷</span>
+                    <span style={{ fontSize: 11, color: '#fff', fontWeight: 600 }}>
+                      {profile.avatar_url ? 'Change' : 'Upload'}
+                    </span>
+                  </div>
                 </div>
+
                 <div style={{ flex: 1 }}>
                   <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px 0', color: '#0c0c0c' }}>
                     {profile.full_name || profile.email || "Your name"}
                   </h3>
                   <p style={{ fontSize: 14, color: '#7c7c7c', margin: 0 }}>{profile.business_name ?? "Wedding Planner"}</p>
                 </div>
+
+                {/* Remove button (only shown if avatar exists) */}
+                {profile.avatar_url && (
+                  <button
+                    onClick={handleRemoveAvatar}
+                    style={{
+                      padding: '8px 16px',
+                      border: '1px solid #e3e3e3',
+                      borderRadius: 999,
+                      background: '#fff',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      color: '#dc2626'
+                    }}
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
 
               <div style={{ height: 1, background: '#e3e3e3', margin: '0 -40px' }} />
@@ -617,6 +698,13 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                   Log Out
                 </button>
               </div>
+
+              {/* Avatar Upload Modal */}
+              <AvatarUploadModal
+                isOpen={showAvatarUpload}
+                onClose={() => setShowAvatarUpload(false)}
+                onSuccess={handleAvatarSuccess}
+              />
             </div>
           )}
 
