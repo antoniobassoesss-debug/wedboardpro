@@ -4,6 +4,9 @@ import './chat.css';
 import { groupMessagesBySender, groupByDate } from './chatUtils';
 import MessageGroup from './MessageGroup';
 import DateSeparator from './DateSeparator';
+import type { MediaFile, MediaUploadResult } from '../utils/mediaUpload';
+import { validateFile, getMediaType, uploadMediaFile } from '../utils/mediaUpload';
+import { MediaPreviewModal } from '../components/MediaPreviewModal';
 
 type Message = {
   id: string;
@@ -17,6 +20,14 @@ type Message = {
     email?: string | null;
     avatar_url?: string | null;
   } | null;
+  media_type?: 'image' | 'video' | 'document' | 'audio';
+  media_url?: string;
+  media_filename?: string;
+  media_size?: number;
+  media_width?: number;
+  media_height?: number;
+  media_duration?: number;
+  thumbnail_url?: string;
 };
 
 type Conversation = {
@@ -111,6 +122,12 @@ export default function ChatTab() {
   const channelRef = useRef<ReturnType<NonNullable<typeof browserSupabaseClient>['channel']> | null>(null);
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Media upload state
+  const [attachments, setAttachments] = useState<MediaFile[]>([]);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const storedSession = useMemo(() => {
     if (typeof window === 'undefined') return null;
@@ -520,6 +537,147 @@ export default function ChatTab() {
     },
     [accessToken],
   );
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Validate each file
+    const validatedFiles: MediaFile[] = [];
+    for (const file of files) {
+      const validation = validateFile(file);
+      if (!validation.valid) {
+        setError(validation.error || 'Invalid file');
+        continue;
+      }
+
+      const mediaType = getMediaType(file);
+      if (!mediaType) continue;
+
+      validatedFiles.push({ file, type: mediaType });
+    }
+
+    if (validatedFiles.length > 0) {
+      setAttachments(validatedFiles);
+      setShowPreviewModal(true);
+    }
+
+    // Reset file input
+    if (e.target) {
+      e.target.value = '';
+    }
+  }, []);
+
+  const handleSendMedia = useCallback(async (files: MediaFile[]) => {
+    if (!team || !accessToken || !authedUserId || !activeConversation) return;
+
+    setShowPreviewModal(false);
+    setUploading(true);
+
+    try {
+      // Upload media files first
+      let uploadedMedia: MediaUploadResult | null = null;
+
+      if (files.length > 0) {
+        const result = await uploadMediaFile(files[0].file, authedUserId);
+
+        if (!result.success) {
+          setError(result.error || 'Upload failed');
+          setUploading(false);
+          return;
+        }
+
+        uploadedMedia = result;
+      }
+
+      // Create optimistic message with media
+      const caption = files[0]?.caption || '';
+      const currentUserAvatar = authedUserId ? profileCache[authedUserId]?.avatar_url ?? null : null;
+
+      const optimistic: Message = {
+        id: `temp-${Date.now()}`,
+        team_id: team.id,
+        user_id: authedUserId || 'me',
+        recipient_id: activeRecipientId,
+        content: caption,
+        created_at: new Date().toISOString(),
+        profile: {
+          full_name: authedDisplayName,
+          email: authedUser?.email ?? null,
+          avatar_url: currentUserAvatar,
+        },
+        media_type: uploadedMedia ? files[0].type : undefined,
+        media_url: uploadedMedia?.url,
+        media_filename: uploadedMedia?.filename,
+        media_size: uploadedMedia?.fileSize,
+        media_width: uploadedMedia?.width,
+        media_height: uploadedMedia?.height,
+        media_duration: uploadedMedia?.duration,
+        thumbnail_url: uploadedMedia?.thumbnailUrl,
+      };
+
+      setMessages((prev) => [...prev, optimistic]);
+      setSending(true);
+
+      // Send message to backend
+      const res = await fetch('/api/chat/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          content: caption,
+          recipientId: activeRecipientId,
+          media: uploadedMedia ? {
+            type: files[0].type,
+            url: uploadedMedia.url,
+            filename: uploadedMedia.filename,
+            fileSize: uploadedMedia.fileSize,
+            mimeType: uploadedMedia.mimeType,
+            width: uploadedMedia.width,
+            height: uploadedMedia.height,
+            duration: uploadedMedia.duration,
+            thumbnailUrl: uploadedMedia.thumbnailUrl,
+          } : undefined,
+        }),
+      });
+
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body?.error || 'Failed to send');
+      }
+
+      const saved: Message | null = body.message ?? null;
+      if (saved) {
+        setMessages((prev) => {
+          const idx = prev.findIndex((m) => m.id === optimistic.id);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = saved;
+            return next;
+          }
+          return [...prev, saved];
+        });
+      }
+
+      // Clear attachments and refresh conversations
+      setAttachments([]);
+      await fetchConversations();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to send media message');
+      // Remove optimistic message on error
+      setMessages((prev) => prev.filter((m) => !m.id.startsWith('temp-')));
+    } finally {
+      setUploading(false);
+      setSending(false);
+    }
+  }, [team, accessToken, authedUserId, activeConversation, activeRecipientId, authedDisplayName, authedUser, profileCache, fetchConversations]);
+
+  const handleCancelPreview = useCallback(() => {
+    setShowPreviewModal(false);
+    setAttachments([]);
+  }, []);
 
   const handleSelectConversation = useCallback(
     (convId: string) => {
@@ -957,6 +1115,35 @@ export default function ChatTab() {
             {/* Composer */}
             <div className="chat-composer">
               <form className="chat-composer-form" onSubmit={sendMessage}>
+                {/* Attachment Button */}
+                <button
+                  type="button"
+                  className="chat-attach-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Attach files"
+                  disabled={!team}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+
+                {/* Hidden File Input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,audio/*"
+                  multiple
+                  onChange={handleFileSelect}
+                  style={{ display: 'none' }}
+                />
+
                 <div className="chat-input-wrapper">
                   <input
                     ref={inputRef}
@@ -975,11 +1162,12 @@ export default function ChatTab() {
                 </div>
                 <button
                   type="submit"
-                  className="chat-send-btn"
-                  disabled={!team || sending || !input.trim()}
+                  className="chat-send-btn-circular"
+                  disabled={!team || sending || (!input.trim() && attachments.length === 0)}
                 >
-                  <SendIcon />
-                  {sending ? 'Sending...' : 'Send'}
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" strokeWidth="2" />
+                  </svg>
                 </button>
               </form>
             </div>
@@ -1061,6 +1249,14 @@ export default function ChatTab() {
           </div>
         </div>
       )}
+
+      {/* Media Preview Modal */}
+      <MediaPreviewModal
+        isOpen={showPreviewModal}
+        files={attachments}
+        onSend={handleSendMedia}
+        onCancel={handleCancelPreview}
+      />
     </div>
   );
 }

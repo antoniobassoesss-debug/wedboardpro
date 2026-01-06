@@ -1,0 +1,95 @@
+.media-message {
+  max-width: 400px;
+  margin-top: 4px;
+}
+
+.media-message-image {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.media-message-image img {
+  display: block;
+  transition: transform 0.2s ease;
+}
+
+.media-message-image:hover img {
+  transform: scale(1.02);
+}
+
+.media-message-video {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.media-message-video video {
+  display: block;
+  width: 100%;
+}
+
+.media-message-document {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+  text-decoration: none;
+  color: #0f172a;
+  transition: background 0.15s ease;
+  border: 1px solid #e2e8f0;
+}
+
+.media-message-document:hover {
+  background: #f1f5f9;
+}
+
+.media-message-doc-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.media-message-doc-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.media-message-doc-name {
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.media-message-doc-size {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.media-message-audio {
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.media-message-audio audio {
+  height: 40px;
+}
+
+.media-message-size,
+.media-message-duration {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: none;
+}
