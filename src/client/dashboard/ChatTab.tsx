@@ -404,6 +404,7 @@ export default function ChatTab() {
       if (e) e.preventDefault();
       if (!team || !accessToken || !input.trim() || !activeConversation) return;
       const content = input.trim();
+      const currentUserAvatar = authedUserId ? profileCache[authedUserId]?.avatar_url ?? null : null;
       const optimistic: Message = {
         id: `temp-${Date.now()}`,
         team_id: team.id,
@@ -414,19 +415,9 @@ export default function ChatTab() {
         profile: {
           full_name: authedDisplayName,
           email: authedUser?.email ?? null,
-          avatar_url: null,
+          avatar_url: currentUserAvatar,
         },
       };
-      if (authedUserId) {
-        setProfileCache((prev) => ({
-          ...prev,
-          [authedUserId]: {
-            full_name: authedDisplayName,
-            email: authedUser?.email ?? null,
-            avatar_url: null,
-          },
-        }));
-      }
       setMessages((prev) => [...prev, optimistic]);
       setInput('');
       if (inputRef.current) {
@@ -502,7 +493,23 @@ export default function ChatTab() {
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || 'Failed to load team members');
-      setTeamMembers(Array.isArray(body.members) ? body.members : []);
+      const members = Array.isArray(body.members) ? body.members : [];
+      setTeamMembers(members);
+
+      // Cache member profiles for avatar display
+      const memberProfiles: Record<string, { full_name?: string | null; email?: string | null; avatar_url?: string | null }> = {};
+      members.forEach((member: TeamMember) => {
+        if (member.user_id && member.profile) {
+          memberProfiles[member.user_id] = {
+            full_name: member.profile.full_name ?? null,
+            email: member.profile.email ?? null,
+            avatar_url: member.profile.avatar_url ?? null,
+          };
+        }
+      });
+      if (Object.keys(memberProfiles).length > 0) {
+        setProfileCache((prev) => ({ ...prev, ...memberProfiles }));
+      }
     } catch (err: any) {
       console.error('Failed to fetch team members:', err);
     } finally {
@@ -563,11 +570,34 @@ export default function ChatTab() {
       const fetchedTeam = await fetchTeam();
       if (cancelled || !fetchedTeam) return;
       await fetchConversations();
+
+      // Fetch current user's profile for avatar
+      if (authedUserId && browserSupabaseClient) {
+        try {
+          const { data: profileRow } = await browserSupabaseClient
+            .from('profiles')
+            .select('full_name, email, avatar_url')
+            .eq('id', authedUserId)
+            .maybeSingle();
+          if (profileRow) {
+            setProfileCache((prev) => ({
+              ...prev,
+              [authedUserId]: {
+                full_name: profileRow.full_name ?? null,
+                email: profileRow.email ?? null,
+                avatar_url: profileRow.avatar_url ?? null,
+              },
+            }));
+          }
+        } catch (err) {
+          console.error('Failed to fetch current user profile:', err);
+        }
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [fetchTeam, setSupabaseSession, fetchConversations]);
+  }, [fetchTeam, setSupabaseSession, fetchConversations, authedUserId]);
 
   useEffect(() => {
     if (!activeConversation || !team) {
@@ -725,6 +755,9 @@ export default function ChatTab() {
               const isActive = conv.id === activeConversation;
               const hasUnread = conv.unread && conv.unread > 0;
               const lastMsgTime = conv.lastMessage ? formatTime(conv.lastMessage.created_at) : null;
+              const recipientId = conv.id.startsWith('direct-') ? conv.id.replace('direct-', '') : null;
+              const avatarUrl = recipientId ? profileCache[recipientId]?.avatar_url : null;
+
               return (
                 <div
                   key={conv.id}
@@ -732,7 +765,22 @@ export default function ChatTab() {
                   onClick={() => handleSelectConversation(conv.id)}
                 >
                   <div className={`chat-conversation-avatar ${conv.type === 'team' ? 'team' : ''}`}>
-                    {conv.type === 'team' ? '👥' : getInitials(conv.name)}
+                    {conv.type === 'team' ? (
+                      '👥'
+                    ) : avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt={conv.name}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                        }}
+                      />
+                    ) : (
+                      getInitials(conv.name)
+                    )}
                   </div>
                   <div className="chat-conversation-content">
                     <div className="chat-conversation-header">
@@ -764,7 +812,22 @@ export default function ChatTab() {
             {/* Chat Header */}
             <div className="chat-header">
               <div className={`chat-header-avatar ${activeConv?.type === 'team' ? 'team' : ''}`}>
-                {activeConv?.type === 'team' ? '👥' : getInitials(activeConvName)}
+                {activeConv?.type === 'team' ? (
+                  '👥'
+                ) : activeRecipientId && profileCache[activeRecipientId]?.avatar_url ? (
+                  <img
+                    src={profileCache[activeRecipientId].avatar_url!}
+                    alt={activeConvName}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                ) : (
+                  getInitials(activeConvName)
+                )}
               </div>
               <div className="chat-header-info">
                 <h3 className="chat-header-title">{activeConvName}</h3>
@@ -901,6 +964,7 @@ export default function ChatTab() {
                     .map((member) => {
                       const name = member.displayName || member.profile?.full_name || member.displayEmail || 'Unknown';
                       const email = member.displayEmail || member.profile?.email || '';
+                      const avatarUrl = member.profile?.avatar_url || null;
                       return (
                         <button
                           key={member.id}
@@ -908,7 +972,22 @@ export default function ChatTab() {
                           className="chat-member-item"
                           onClick={() => handleStartDirectChat(member)}
                         >
-                          <div className="chat-member-avatar">{getInitials(name)}</div>
+                          <div className="chat-member-avatar">
+                            {avatarUrl ? (
+                              <img
+                                src={avatarUrl}
+                                alt={name}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  borderRadius: '50%',
+                                  objectFit: 'cover',
+                                }}
+                              />
+                            ) : (
+                              getInitials(name)
+                            )}
+                          </div>
                           <div className="chat-member-info">
                             <span className="chat-member-name">{name}</span>
                             {email && <span className="chat-member-email">{email}</span>}
