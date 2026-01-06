@@ -332,8 +332,32 @@ export default function ChatTab() {
           messageUserId: data.user_id,
         });
 
+        // Update unread count for conversations that received a message (unless it's from the current user)
+        if (data.user_id !== authedUserId) {
+          if (!matchesActive) {
+            // Message is for a different conversation - increment unread count
+            setConversations((prev) =>
+              prev.map((conv) => {
+                if (isTeamMessage && conv.type === 'team') {
+                  // Team message for team conversation
+                  return { ...conv, unread: (conv.unread || 0) + 1 };
+                } else if (isDirectMessage) {
+                  // Direct message
+                  const partnerId = data.user_id === authedUserId ? data.recipient_id : data.user_id;
+                  const convRecipientId = conv.id.startsWith('direct-') ? conv.id.replace('direct-', '') : null;
+                  if (convRecipientId === partnerId) {
+                    return { ...conv, unread: (conv.unread || 0) + 1 };
+                  }
+                }
+                return conv;
+              })
+            );
+          }
+          // If it matches active conversation, don't increment (already viewing)
+        }
+
         if (!matchesActive) {
-          console.log('[ChatTab] Message does not match active conversation, ignoring');
+          console.log('[ChatTab] Message does not match active conversation, but unread count updated');
           return;
         }
 
@@ -463,6 +487,40 @@ export default function ChatTab() {
     [accessToken, authedDisplayName, authedUser, authedUserId, input, team, activeConversation, activeRecipientId, fetchConversations],
   );
 
+  const markConversationAsRead = useCallback(
+    async (recipientId: string | null) => {
+      if (!accessToken) return;
+
+      try {
+        await fetch('/api/chat/mark-as-read', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ recipientId }),
+        });
+
+        // Immediately update local state to remove unread indicator
+        setConversations((prev) =>
+          prev.map((conv) => {
+            const convRecipientId = conv.id.startsWith('direct-') ? conv.id.replace('direct-', '') : null;
+            if (
+              (recipientId === null && conv.type === 'team') ||
+              (recipientId !== null && convRecipientId === recipientId)
+            ) {
+              return { ...conv, unread: 0 };
+            }
+            return conv;
+          })
+        );
+      } catch (err) {
+        console.error('Failed to mark conversation as read:', err);
+      }
+    },
+    [accessToken],
+  );
+
   const handleSelectConversation = useCallback(
     (convId: string) => {
       // Extract recipient ID first to ensure states stay in sync
@@ -479,8 +537,11 @@ export default function ChatTab() {
       setActiveRecipientId(recipientId);
       setMessages([]);
       setLoading(true);
+
+      // Mark conversation as read
+      markConversationAsRead(recipientId);
     },
-    [],
+    [markConversationAsRead],
   );
 
   const fetchTeamMembers = useCallback(async () => {
@@ -791,8 +852,10 @@ export default function ChatTab() {
                       <div className="chat-conversation-preview">{conv.lastMessage.content}</div>
                     )}
                   </div>
-                  {hasUnread && (
-                    <div className="chat-unread-badge">{conv.unread}</div>
+                  {conv.unread && conv.unread > 0 && (
+                    <div className="chat-unread-badge">
+                      {conv.unread > 99 ? '99+' : conv.unread}
+                    </div>
                   )}
                 </div>
               );

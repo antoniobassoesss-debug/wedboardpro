@@ -1958,6 +1958,20 @@ app.get('/api/chat/conversations', express.json(), async (req, res) => {
       unread?: number;
     }> = [];
 
+    // Calculate unread count for team conversation
+    let teamUnreadCount = 0;
+    try {
+      const { data: unreadData } = await supabase
+        .rpc('get_unread_count', {
+          p_user_id: user.id,
+          p_team_id: team.id,
+          p_recipient_id: null,
+        });
+      teamUnreadCount = unreadData ?? 0;
+    } catch (err) {
+      console.warn('Failed to get team unread count:', err);
+    }
+
     // Add team conversation
     if (teamMessages) {
       conversations.push({
@@ -1968,12 +1982,14 @@ app.get('/api/chat/conversations', express.json(), async (req, res) => {
           content: teamMessages.content,
           created_at: teamMessages.created_at,
         },
+        unread: teamUnreadCount,
       });
     } else {
       conversations.push({
         type: 'team',
         id: `team-${team.id}`,
         name: team.name,
+        unread: teamUnreadCount,
       });
     }
 
@@ -2023,26 +2039,43 @@ app.get('/api/chat/conversations', express.json(), async (req, res) => {
       }
     }
 
-    // Add direct message conversations
-    directByPartner.forEach((msgs, partnerId) => {
+    // Add direct message conversations with unread counts
+    for (const [partnerId, msgs] of directByPartner.entries()) {
       const profile = partnerProfiles[partnerId];
       const name = profile?.full_name || profile?.email || 'Unknown';
       const lastMsg = msgs?.[0];
+
+      // Calculate unread count for this direct conversation
+      let directUnreadCount = 0;
+      try {
+        const { data: unreadData } = await supabase
+          .rpc('get_unread_count', {
+            p_user_id: user.id,
+            p_team_id: team.id,
+            p_recipient_id: partnerId,
+          });
+        directUnreadCount = unreadData ?? 0;
+      } catch (err) {
+        console.warn(`Failed to get unread count for ${partnerId}:`, err);
+      }
+
       if (lastMsg) {
         conversations.push({
           type: 'direct',
           id: `direct-${partnerId}`,
           name,
           lastMessage: { content: String(lastMsg.content), created_at: String(lastMsg.created_at) },
+          unread: directUnreadCount,
         });
       } else {
         conversations.push({
           type: 'direct',
           id: `direct-${partnerId}`,
           name,
+          unread: directUnreadCount,
         });
       }
-    });
+    }
 
     // Sort by last message time
     conversations.sort((a, b) => {
@@ -2340,6 +2373,42 @@ app.post('/api/chat/messages', express.json(), async (req, res) => {
   } catch (err: any) {
     console.error('Chat send error:', err);
     return res.status(400).json({ error: err?.message || 'Failed to send message' });
+  }
+});
+
+// Chat: mark conversation as read
+app.post('/api/chat/mark-as-read', express.json(), async (req, res) => {
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase service client unavailable' });
+  }
+
+  const { recipientId } = req.body ?? {};
+
+  try {
+    const { team } = await ensureUserTeamMembership(supabase, user.id);
+
+    // Call the database function to mark as read
+    const { error } = await supabase.rpc('mark_conversation_as_read', {
+      p_user_id: user.id,
+      p_team_id: team.id,
+      p_recipient_id: recipientId || null,
+    });
+
+    if (error) {
+      console.error('Mark as read error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Mark as read error:', err);
+    return res.status(400).json({ error: err?.message || 'Failed to mark as read' });
   }
 });
 
