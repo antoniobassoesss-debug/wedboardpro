@@ -4,12 +4,21 @@
  */
 import React, { useState } from 'react';
 import { formatInstagramTime } from './chatUtils';
+import { MediaMessage } from '../components/MediaMessage';
 
 interface MessageProps {
   message: {
     id: string;
     content: string;
     created_at: string;
+    media_type?: 'image' | 'video' | 'document' | 'audio';
+    media_url?: string;
+    media_filename?: string;
+    media_size?: number;
+    media_width?: number;
+    media_height?: number;
+    media_duration?: number;
+    thumbnail_url?: string;
   };
   isOwnMessage: boolean;
   isFirstInGroup: boolean;
@@ -74,7 +83,27 @@ const Message: React.FC<MessageProps> = ({
         onMouseEnter={() => setShowTime(true)}
         onMouseLeave={() => setShowTime(false)}
       >
-        <div className="instagram-bubble-content">{message.content}</div>
+        {/* Media content */}
+        {message.media_type && message.media_url && (
+          <MediaMessage
+            type={message.media_type}
+            url={message.media_url}
+            filename={message.media_filename}
+            fileSize={message.media_size}
+            width={message.media_width}
+            height={message.media_height}
+            duration={message.media_duration}
+            thumbnailUrl={message.thumbnail_url}
+            onImageClick={() => {
+              // Future: Open lightbox gallery
+            }}
+          />
+        )}
+
+        {/* Text content */}
+        {message.content && (
+          <div className="instagram-bubble-content">{message.content}</div>
+        )}
       </div>
 
       {/* Timestamp shown on hover */}

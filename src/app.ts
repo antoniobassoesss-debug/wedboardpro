@@ -2119,7 +2119,7 @@ app.get('/api/chat/messages', express.json(), async (req, res) => {
 
     let query = supabase
       .from('messages')
-      .select('id, team_id, user_id, recipient_id, content, created_at')
+      .select('id, team_id, user_id, recipient_id, content, created_at, media_type, media_url, media_filename, media_size, media_mime_type, media_width, media_height, media_duration, thumbnail_url')
       .eq('team_id', team.id)
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -2243,6 +2243,15 @@ app.get('/api/chat/messages', express.json(), async (req, res) => {
       content: row.content,
       created_at: row.created_at,
       profile: profilesById[row.user_id] ?? null,
+      media_type: row.media_type ?? undefined,
+      media_url: row.media_url ?? undefined,
+      media_filename: row.media_filename ?? undefined,
+      media_size: row.media_size ?? undefined,
+      media_mime_type: row.media_mime_type ?? undefined,
+      media_width: row.media_width ?? undefined,
+      media_height: row.media_height ?? undefined,
+      media_duration: row.media_duration ?? undefined,
+      thumbnail_url: row.thumbnail_url ?? undefined,
     }));
 
     return res.json({ messages: normalized.reverse() });
@@ -2264,14 +2273,16 @@ app.post('/api/chat/messages', express.json(), async (req, res) => {
     return res.status(500).json({ error: 'Supabase service client unavailable' });
   }
 
-  const { content, recipientId } = req.body ?? {};
-  if (typeof content !== 'string' || !content.trim()) {
-    return res.status(400).json({ error: 'Content is required' });
+  const { content, recipientId, media } = req.body ?? {};
+
+  // Validate: must have either content or media
+  const trimmed = (content || '').trim();
+  if (!trimmed && !media) {
+    return res.status(400).json({ error: 'Content or media required' });
   }
 
   try {
     const { team } = await ensureUserTeamMembership(supabase, user.id);
-    const trimmed = content.trim();
 
     // Validate recipient is in same team if direct message
     if (recipientId && typeof recipientId === 'string') {
@@ -2289,16 +2300,29 @@ app.post('/api/chat/messages', express.json(), async (req, res) => {
     const insertPayload: any = {
       team_id: team.id,
       user_id: user.id,
-      content: trimmed,
+      content: trimmed || '',
     };
     if (recipientId && typeof recipientId === 'string') {
       insertPayload.recipient_id = recipientId;
     }
 
+    // Add media fields if present
+    if (media) {
+      insertPayload.media_type = media.type;
+      insertPayload.media_url = media.url;
+      insertPayload.media_filename = media.filename;
+      insertPayload.media_size = media.fileSize;
+      insertPayload.media_mime_type = media.mimeType;
+      if (media.width) insertPayload.media_width = media.width;
+      if (media.height) insertPayload.media_height = media.height;
+      if (media.duration) insertPayload.media_duration = media.duration;
+      if (media.thumbnailUrl) insertPayload.thumbnail_url = media.thumbnailUrl;
+    }
+
     let { data, error } = await supabase
       .from('messages')
       .insert(insertPayload)
-      .select('id, team_id, user_id, recipient_id, content, created_at')
+      .select('id, team_id, user_id, recipient_id, content, created_at, media_type, media_url, media_filename, media_size, media_mime_type, media_width, media_height, media_duration, thumbnail_url')
       .single();
 
     // Fallback if recipient_id column missing: retry without it (team message only)
@@ -2366,6 +2390,15 @@ app.post('/api/chat/messages', express.json(), async (req, res) => {
           content: data.content,
           created_at: data.created_at,
           profile,
+          media_type: data.media_type ?? undefined,
+          media_url: data.media_url ?? undefined,
+          media_filename: data.media_filename ?? undefined,
+          media_size: data.media_size ?? undefined,
+          media_mime_type: data.media_mime_type ?? undefined,
+          media_width: data.media_width ?? undefined,
+          media_height: data.media_height ?? undefined,
+          media_duration: data.media_duration ?? undefined,
+          thumbnail_url: data.thumbnail_url ?? undefined,
         }
       : null;
 
