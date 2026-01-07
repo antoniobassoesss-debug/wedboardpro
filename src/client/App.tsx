@@ -1,7 +1,6 @@
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MarketingHome from './MarketingHome';
-import { DebugClickProbe } from './components/DebugClickProbe';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
 import ForgotPasswordPage from './ForgotPasswordPage';
@@ -62,7 +61,6 @@ const App: React.FC = () => {
   return (
     <BrowserRouter>
       <AuthUrlHandler />
-      <DebugClickProbe />
       <Routes>
         <Route path="/" element={<MarketingHome />} />
         <Route path="/login" element={<LoginPage />} />

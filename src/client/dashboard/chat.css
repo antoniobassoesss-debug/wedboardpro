@@ -4,7 +4,11 @@
 
 .chat-shell {
   display: flex;
-  height: calc(100vh - 140px);
+  /* Use a slightly taller container so chat fills more of the viewport.
+     Subtract the app header + some margin (adjustable). */
+  height: calc(100vh - 100px);
+  min-height: 480px;
+  width: 100%;
   background: #ffffff;
   border: 1px solid var(--border, #e5e5e5);
   border-radius: 24px;
