@@ -39,6 +39,20 @@ const TaskItem: React.FC<TaskItemProps> = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [showPriorityMenu, setShowPriorityMenu] = useState(false);
+
+  // Close priority menu when clicking outside
+  useEffect(() => {
+    if (!showPriorityMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.priority-pill') && !target.closest('[data-priority-menu]')) {
+        setShowPriorityMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showPriorityMenu]);
 
   useEffect(() => {
     if (!onUpdateAssignee) return;
@@ -88,30 +102,6 @@ const TaskItem: React.FC<TaskItemProps> = ({
           onChange={(e) => onUpdateTitle(task.id, e.target.value)}
         />
         <div className="meta-row">
-          {/* Show if task is assigned to current user */}
-          {task.assignee_id && currentUserId && task.assignee_id === currentUserId && task.created_by !== currentUserId && (
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                padding: '2px 8px',
-                borderRadius: 10,
-                background: '#dbeafe',
-                border: '1px solid #3b82f6',
-                fontSize: 11,
-                color: '#1e40af',
-                fontWeight: 500,
-              }}
-            >
-              <span>📌</span>
-              <span>
-                Assigned to you
-                {task.creator && ` by ${task.creator.full_name || task.creator.email || 'someone'}`}
-              </span>
-            </div>
-          )}
-
           {/* Assignee display (no dropdown) */}
           {onUpdateAssignee && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -162,31 +152,68 @@ const TaskItem: React.FC<TaskItemProps> = ({
               )}
             </div>
           )}
-          <label className="date-control">
+          <label className="date-control" style={{ cursor: 'pointer' }}>
             <span>{formatDue(task.dueDate)}</span>
             <input
               className="task-date-input"
               type="date"
               value={task.dueDate ?? ''}
               onChange={(e) => onUpdateDueDate(task.id, e.target.value || null)}
+              style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
             />
           </label>
-          <span
-            className={`priority-pill priority-${task.priority}`}
-            onClick={() => {
-              const priorities: Task['priority'][] = ['low', 'medium', 'high'];
-              const currentIndex = priorities.indexOf(task.priority);
-              const nextIndex = (currentIndex + 1) % priorities.length;
-              onUpdatePriority(task.id, priorities[nextIndex]);
-            }}
-            style={{ cursor: 'pointer' }}
-            title="Click to cycle priority"
-          >
-            {task.priority}
-          </span>
-          <button className="small-btn" onClick={() => onToggleFlag(task.id)}>
-            {task.isFlagged ? 'Flagged' : 'Flag'}
-          </button>
+          <div style={{ position: 'relative' }}>
+            <span
+              className={`priority-pill priority-${task.priority}`}
+              onClick={() => setShowPriorityMenu(!showPriorityMenu)}
+              style={{ cursor: 'pointer' }}
+              title="Click to change priority"
+            >
+              {task.priority}
+            </span>
+            {showPriorityMenu && (
+              <div
+                data-priority-menu
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: 4,
+                  background: 'white',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 8,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  zIndex: 100,
+                  minWidth: 100,
+                }}
+              >
+                {(['low', 'medium', 'high'] as Task['priority'][]).map((priority) => (
+                  <button
+                    key={priority}
+                    onClick={() => {
+                      onUpdatePriority(task.id, priority);
+                      setShowPriorityMenu(false);
+                    }}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: 'none',
+                      background: task.priority === priority ? '#f1f5f9' : 'transparent',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      fontSize: 13,
+                      fontWeight: task.priority === priority ? 600 : 400,
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#f8fafc')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = task.priority === priority ? '#f1f5f9' : 'transparent')}
+                  >
+                    {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button className="small-btn" onClick={() => setExpanded((s) => !s)}>
             {expanded ? 'Hide' : 'Notes'}
           </button>
