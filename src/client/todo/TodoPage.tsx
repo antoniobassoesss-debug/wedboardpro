@@ -462,6 +462,7 @@ const TaskCreateModal: React.FC<{
   const [showAssigneeMenu, setShowAssigneeMenu] = useState(false);
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
+  const dateInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -536,7 +537,7 @@ const TaskCreateModal: React.FC<{
           style={{ fontSize: 16, fontWeight: 600, border: 'none', padding: '8px 0', outline: 'none' }}
         />
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
           {/* Assignee Button */}
           <div style={{ position: 'relative' }}>
             <button
@@ -552,6 +553,8 @@ const TaskCreateModal: React.FC<{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 4,
+                width: '100%',
+                textAlign: 'left',
               }}
             >
               <span style={{ color: '#64748b' }}>👤</span>
@@ -635,6 +638,8 @@ const TaskCreateModal: React.FC<{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 4,
+                width: '100%',
+                textAlign: 'left',
               }}
             >
               <span style={{ color: '#64748b' }}>📁</span>
@@ -706,7 +711,7 @@ const TaskCreateModal: React.FC<{
               type="button"
               onClick={() => setShowPriorityMenu(!showPriorityMenu)}
               className={`priority-pill priority-${newTaskData.priority}`}
-              style={{ cursor: 'pointer', border: 'none' }}
+              style={{ cursor: 'pointer', border: 'none', width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 4 }}
             >
               {newTaskData.priority}
             </button>
@@ -752,9 +757,10 @@ const TaskCreateModal: React.FC<{
           </div>
 
           {/* Due Date Button */}
-          <label style={{ position: 'relative', cursor: 'pointer' }}>
+          <div style={{ position: 'relative' }}>
             <button
               type="button"
+              onClick={() => dateInputRef.current?.showPicker()}
               style={{
                 padding: '6px 12px',
                 borderRadius: 8,
@@ -765,18 +771,20 @@ const TaskCreateModal: React.FC<{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 4,
+                width: '100%',
               }}
             >
               <span style={{ color: '#64748b' }}>📅</span>
               <span>{newTaskData.dueDate || 'No due date'}</span>
             </button>
             <input
+              ref={dateInputRef}
               type="date"
               value={newTaskData.dueDate}
               onChange={(e) => setNewTaskData((prev) => ({ ...prev, dueDate: e.target.value }))}
-              style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
+              style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', top: 0, left: 0 }}
             />
-          </label>
+          </div>
         </div>
 
         <textarea
