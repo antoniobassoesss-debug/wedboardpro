@@ -83,7 +83,6 @@ const TodoPage: React.FC = () => {
     priority: Priority;
     dueDate: string;
     notes: string;
-    isFlagged: boolean;
     assignee_id: string | null;
     event_id: string | null;
   }>({
@@ -91,7 +90,6 @@ const TodoPage: React.FC = () => {
     priority: 'low',
     dueDate: '',
     notes: '',
-    isFlagged: false,
     assignee_id: null,
     event_id: null,
   });
@@ -170,7 +168,6 @@ const TodoPage: React.FC = () => {
       priority: 'low',
       dueDate: '',
       notes: '',
-      isFlagged: false,
       assignee_id: null,
       event_id: null,
     });
@@ -184,7 +181,7 @@ const TodoPage: React.FC = () => {
       title: newTaskData.title,
       description: newTaskData.notes,
       priority: newTaskData.priority,
-      is_flagged: newTaskData.isFlagged,
+      is_flagged: false,
       due_date: newTaskData.dueDate || null,
       assignee_id: newTaskData.assignee_id,
       event_id: newTaskData.event_id,
@@ -462,6 +459,9 @@ const TaskCreateModal: React.FC<{
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [projects, setProjects] = useState<any[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [showAssigneeMenu, setShowAssigneeMenu] = useState(false);
+  const [showProjectMenu, setShowProjectMenu] = useState(false);
+  const [showPriorityMenu, setShowPriorityMenu] = useState(false);
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -511,94 +511,288 @@ const TaskCreateModal: React.FC<{
     fetchProjects();
   }, []);
 
+  const getAssigneeName = () => {
+    if (!newTaskData.assignee_id) return 'Unassigned';
+    const member = teamMembers.find((m) => m.user_id === newTaskData.assignee_id);
+    return member?.profile?.full_name || member?.displayName || member?.profile?.email || 'Unknown';
+  };
+
+  const getProjectName = () => {
+    if (!newTaskData.event_id) return 'No Project';
+    const project = projects.find((p) => p.id === newTaskData.event_id);
+    return project?.title || 'Unknown';
+  };
+
   return (
-    <div className="todo-modal-overlay" role="dialog" aria-modal="true">
-      <div className="todo-modal">
+    <div className="todo-modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="todo-modal" onClick={(e) => e.stopPropagation()}>
         <h3>Create Task</h3>
-        <label>
-          Title
-          <input
-            type="text"
-            value={newTaskData.title}
-            onChange={(e) => setNewTaskData((prev) => ({ ...prev, title: e.target.value }))}
-            placeholder="Task title"
-          />
-        </label>
-        <label>
-          Assignee
-          <select
-            value={newTaskData.assignee_id || ''}
-            onChange={(e) => setNewTaskData((prev) => ({ ...prev, assignee_id: e.target.value || null }))}
-            disabled={loadingMembers}
-          >
-            <option value="">Unassigned</option>
-            {teamMembers.map((member) => {
-              const name = member.profile?.full_name || member.displayName || member.profile?.email || 'Unknown';
-              return (
-                <option key={member.user_id} value={member.user_id}>
-                  {name}
-                </option>
-              );
-            })}
-          </select>
-        </label>
-        <label>
-          Project/Event
-          <select
-            value={newTaskData.event_id || ''}
-            onChange={(e) => setNewTaskData((prev) => ({ ...prev, event_id: e.target.value || null }))}
-            disabled={loadingProjects}
-          >
-            <option value="">No Project</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Priority
-          <select
-            value={newTaskData.priority}
-            onChange={(e) => setNewTaskData((prev) => ({ ...prev, priority: e.target.value as Priority }))}
-          >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </label>
-        <label>
-          Due date
-          <input
-            type="date"
-            value={newTaskData.dueDate}
-            onChange={(e) => setNewTaskData((prev) => ({ ...prev, dueDate: e.target.value }))}
-          />
-        </label>
-        <label className="toggle-control">
-          <input
-            type="checkbox"
-            checked={newTaskData.isFlagged}
-            onChange={(e) => setNewTaskData((prev) => ({ ...prev, isFlagged: e.target.checked }))}
-          />
-          <span>Flag as important</span>
-        </label>
-        <label>
-          Notes
-          <textarea
-            rows={4}
-            value={newTaskData.notes}
-            onChange={(e) => setNewTaskData((prev) => ({ ...prev, notes: e.target.value }))}
-            placeholder="Add a quick description…"
-          />
-        </label>
+
+        <input
+          type="text"
+          value={newTaskData.title}
+          onChange={(e) => setNewTaskData((prev) => ({ ...prev, title: e.target.value }))}
+          placeholder="Task title"
+          style={{ fontSize: 16, fontWeight: 600, border: 'none', padding: '8px 0', outline: 'none' }}
+        />
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+          {/* Assignee Button */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setShowAssigneeMenu(!showAssigneeMenu)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: '1px solid #e2e8f0',
+                background: 'white',
+                cursor: 'pointer',
+                fontSize: 13,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <span style={{ color: '#64748b' }}>👤</span>
+              <span>{getAssigneeName()}</span>
+            </button>
+            {showAssigneeMenu && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: 4,
+                  background: 'white',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 8,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  zIndex: 1000,
+                  minWidth: 180,
+                  maxHeight: 200,
+                  overflow: 'auto',
+                }}
+              >
+                <button
+                  onClick={() => {
+                    setNewTaskData((prev) => ({ ...prev, assignee_id: null }));
+                    setShowAssigneeMenu(false);
+                  }}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: 'none',
+                    background: !newTaskData.assignee_id ? '#f1f5f9' : 'transparent',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                  }}
+                >
+                  Unassigned
+                </button>
+                {teamMembers.map((member) => {
+                  const name = member.profile?.full_name || member.displayName || member.profile?.email || 'Unknown';
+                  return (
+                    <button
+                      key={member.user_id}
+                      onClick={() => {
+                        setNewTaskData((prev) => ({ ...prev, assignee_id: member.user_id }));
+                        setShowAssigneeMenu(false);
+                      }}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: 'none',
+                        background: newTaskData.assignee_id === member.user_id ? '#f1f5f9' : 'transparent',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        fontSize: 13,
+                      }}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Project Button */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setShowProjectMenu(!showProjectMenu)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: '1px solid #e2e8f0',
+                background: 'white',
+                cursor: 'pointer',
+                fontSize: 13,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <span style={{ color: '#64748b' }}>📁</span>
+              <span>{getProjectName()}</span>
+            </button>
+            {showProjectMenu && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: 4,
+                  background: 'white',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 8,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  zIndex: 1000,
+                  minWidth: 180,
+                  maxHeight: 200,
+                  overflow: 'auto',
+                }}
+              >
+                <button
+                  onClick={() => {
+                    setNewTaskData((prev) => ({ ...prev, event_id: null }));
+                    setShowProjectMenu(false);
+                  }}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: 'none',
+                    background: !newTaskData.event_id ? '#f1f5f9' : 'transparent',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                  }}
+                >
+                  No Project
+                </button>
+                {projects.map((project) => (
+                  <button
+                    key={project.id}
+                    onClick={() => {
+                      setNewTaskData((prev) => ({ ...prev, event_id: project.id }));
+                      setShowProjectMenu(false);
+                    }}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: 'none',
+                      background: newTaskData.event_id === project.id ? '#f1f5f9' : 'transparent',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      fontSize: 13,
+                    }}
+                  >
+                    {project.title}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Priority Button */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setShowPriorityMenu(!showPriorityMenu)}
+              className={`priority-pill priority-${newTaskData.priority}`}
+              style={{ cursor: 'pointer', border: 'none' }}
+            >
+              {newTaskData.priority}
+            </button>
+            {showPriorityMenu && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: 4,
+                  background: 'white',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 8,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  zIndex: 1000,
+                  minWidth: 100,
+                }}
+              >
+                {(['low', 'medium', 'high'] as Priority[]).map((priority) => (
+                  <button
+                    key={priority}
+                    onClick={() => {
+                      setNewTaskData((prev) => ({ ...prev, priority }));
+                      setShowPriorityMenu(false);
+                    }}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: 'none',
+                      background: newTaskData.priority === priority ? '#f1f5f9' : 'transparent',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      fontSize: 13,
+                      fontWeight: newTaskData.priority === priority ? 600 : 400,
+                    }}
+                  >
+                    {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Due Date Button */}
+          <label style={{ position: 'relative', cursor: 'pointer' }}>
+            <button
+              type="button"
+              style={{
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: '1px solid #e2e8f0',
+                background: 'white',
+                cursor: 'pointer',
+                fontSize: 13,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <span style={{ color: '#64748b' }}>📅</span>
+              <span>{newTaskData.dueDate || 'No due date'}</span>
+            </button>
+            <input
+              type="date"
+              value={newTaskData.dueDate}
+              onChange={(e) => setNewTaskData((prev) => ({ ...prev, dueDate: e.target.value }))}
+              style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
+            />
+          </label>
+        </div>
+
+        <textarea
+          rows={4}
+          value={newTaskData.notes}
+          onChange={(e) => setNewTaskData((prev) => ({ ...prev, notes: e.target.value }))}
+          placeholder="Add notes..."
+          style={{ marginTop: 16, width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: 8, fontSize: 13, resize: 'vertical' }}
+        />
+
         <div className="modal-actions">
           <button type="button" className="secondary-btn" onClick={onClose}>
             Cancel
           </button>
           <button type="button" className="primary-btn" onClick={onSave}>
-            Save Task
+            Create Task
           </button>
         </div>
       </div>
