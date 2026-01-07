@@ -73,7 +73,7 @@ const TodoPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [dueFilter, setDueFilter] = useState<DueFilter>('all');
-  const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilter>('all');
+  const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilter>('me');
   const [sortBy, setSortBy] = useState<'due' | 'priority' | 'created' | 'assignee'>('due');
   const [showCompletedBottom, setShowCompletedBottom] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -115,7 +115,7 @@ const TodoPage: React.FC = () => {
     try {
       const options: any = {};
       if (assigneeFilter === 'me' && currentUserId) {
-        options.assignee_id = currentUserId;
+        options.my_tasks = true;
       } else if (assigneeFilter === 'unassigned') {
         options.unassigned = true;
       }
@@ -125,7 +125,7 @@ const TodoPage: React.FC = () => {
         options.completed = true;
       }
 
-      const { data, error } = await listTasks(options);
+      const { data, error} = await listTasks(options);
       if (error) {
         console.error('Failed to fetch tasks:', error);
         return;
@@ -375,6 +375,17 @@ const TodoPage: React.FC = () => {
 
       <div className="filters-row">
         <FilterDropdown
+          label="Assignee"
+          value={assigneeFilter}
+          options={[
+            { value: 'me', label: 'My tasks' },
+            { value: 'all', label: 'All team tasks' },
+            { value: 'unassigned', label: 'Unassigned' },
+          ]}
+          onChange={setAssigneeFilter}
+          defaultValue="me"
+        />
+        <FilterDropdown
           label="Status"
           value={statusFilter}
           options={[
@@ -383,17 +394,6 @@ const TodoPage: React.FC = () => {
             { value: 'completed', label: 'Completed' },
           ]}
           onChange={setStatusFilter}
-        />
-        <FilterDropdown
-          label="Priority"
-          value={priorityFilter}
-          options={[
-            { value: 'all', label: 'All' },
-            { value: 'low', label: 'Low' },
-            { value: 'medium', label: 'Medium' },
-            { value: 'high', label: 'High' },
-          ]}
-          onChange={setPriorityFilter}
         />
         <FilterDropdown
           label="Due"
@@ -405,16 +405,6 @@ const TodoPage: React.FC = () => {
             { value: 'overdue', label: 'Overdue' },
           ]}
           onChange={setDueFilter}
-        />
-        <FilterDropdown
-          label="Assignee"
-          value={assigneeFilter}
-          options={[
-            { value: 'all', label: 'All' },
-            { value: 'me', label: 'My tasks' },
-            { value: 'unassigned', label: 'Unassigned' },
-          ]}
-          onChange={setAssigneeFilter}
         />
         <FilterDropdown
           label="Sort"

@@ -21,7 +21,7 @@ const formatDue = (value?: string | null) => {
   const diff = Math.floor((target.setHours(0, 0, 0, 0) - today.setHours(0, 0, 0, 0)) / (1000 * 60 * 60 * 24));
   if (diff === 0) return 'Today';
   if (diff === 1) return 'Tomorrow';
-  if (diff < 0) return 'Overdue';
+  if (diff < 0) return target.toLocaleDateString(); // Show date instead of "Overdue"
   return target.toLocaleDateString();
 };
 
@@ -112,7 +112,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
             </div>
           )}
 
-          {/* Assignee display/selector */}
+          {/* Assignee display (no dropdown) */}
           {onUpdateAssignee && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {task.assignee ? (
@@ -160,21 +160,6 @@ const TaskItem: React.FC<TaskItemProps> = ({
               ) : (
                 <span style={{ fontSize: 12, color: '#999' }}>Unassigned</span>
               )}
-              <select
-                style={{ fontSize: 11, padding: '2px 4px', borderRadius: 4, border: '1px solid #ddd' }}
-                value={task.assignee_id || ''}
-                onChange={(e) => onUpdateAssignee(task.id, e.target.value || null)}
-              >
-                <option value="">Unassigned</option>
-                {teamMembers.map((member) => {
-                  const name = member.profile?.full_name || member.displayName || member.profile?.email || 'Unknown';
-                  return (
-                    <option key={member.user_id} value={member.user_id}>
-                      {name}
-                    </option>
-                  );
-                })}
-              </select>
             </div>
           )}
           <label className="date-control">
@@ -186,16 +171,19 @@ const TaskItem: React.FC<TaskItemProps> = ({
               onChange={(e) => onUpdateDueDate(task.id, e.target.value || null)}
             />
           </label>
-          <select
-            className="priority-select"
-            value={task.priority}
-            onChange={(e) => onUpdatePriority(task.id, e.target.value as Task['priority'])}
+          <span
+            className={`priority-pill priority-${task.priority}`}
+            onClick={() => {
+              const priorities: Task['priority'][] = ['low', 'medium', 'high'];
+              const currentIndex = priorities.indexOf(task.priority);
+              const nextIndex = (currentIndex + 1) % priorities.length;
+              onUpdatePriority(task.id, priorities[nextIndex]);
+            }}
+            style={{ cursor: 'pointer' }}
+            title="Click to cycle priority"
           >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-          <span className={`priority-pill priority-${task.priority}`}>{task.priority}</span>
+            {task.priority}
+          </span>
           <button className="small-btn" onClick={() => onToggleFlag(task.id)}>
             {task.isFlagged ? 'Flagged' : 'Flag'}
           </button>
