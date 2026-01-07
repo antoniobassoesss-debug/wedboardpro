@@ -3831,6 +3831,7 @@ app.get('/api/tasks', async (req, res) => {
     // Get query parameters for filtering
     const assigneeId = req.query.assignee_id as string | undefined;
     const showUnassigned = req.query.unassigned === 'true';
+    const showMyTasks = req.query.my_tasks === 'true';
     const isCompleted = req.query.completed as string | undefined;
 
     let query = supabase
@@ -3839,8 +3840,11 @@ app.get('/api/tasks', async (req, res) => {
       .eq('team_id', team.team_id)
       .order('created_at', { ascending: false });
 
-    // Filter by assignee
-    if (showUnassigned) {
+    // Filter by "my tasks" (created by me OR assigned to me)
+    if (showMyTasks) {
+      query = query.or(`created_by.eq.${user.id},assignee_id.eq.${user.id}`);
+    } else if (showUnassigned) {
+      // Filter by assignee
       query = query.is('assignee_id', null);
     } else if (assigneeId) {
       query = query.eq('assignee_id', assigneeId);
