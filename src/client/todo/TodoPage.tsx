@@ -78,6 +78,8 @@ const TodoPage: React.FC = () => {
   const [showCompletedBottom, setShowCompletedBottom] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [newTaskData, setNewTaskData] = useState<{
     title: string;
     priority: Priority;
@@ -105,6 +107,48 @@ const TodoPage: React.FC = () => {
     } catch {
       // ignore
     }
+  }, []);
+
+  // Preload team members and projects for faster modal experience
+  useEffect(() => {
+    const fetchTeamMembers = async () => {
+      try {
+        const session = JSON.parse(localStorage.getItem('wedboarpro_session') || '{}');
+        const token = session?.access_token;
+        if (!token) return;
+
+        const res = await fetch('/api/teams/members', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setTeamMembers(data.members || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch team members:', err);
+      }
+    };
+
+    const fetchProjects = async () => {
+      try {
+        const session = JSON.parse(localStorage.getItem('wedboarpro_session') || '{}');
+        const token = session?.access_token;
+        if (!token) return;
+
+        const res = await fetch('/api/events', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setProjects(data.events || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch projects:', err);
+      }
+    };
+
+    fetchTeamMembers();
+    fetchProjects();
   }, []);
 
   // Fetch tasks from API
@@ -441,6 +485,8 @@ const TodoPage: React.FC = () => {
           onSave={handleModalSave}
           onClose={() => setShowModal(false)}
           currentUserId={currentUserId}
+          teamMembers={teamMembers}
+          projects={projects}
         />
       )}
     </div>
@@ -454,63 +500,13 @@ const TaskCreateModal: React.FC<{
   onSave: () => void;
   onClose: () => void;
   currentUserId: string | null;
-}> = ({ newTaskData, setNewTaskData, onSave, onClose, currentUserId }) => {
-  const [teamMembers, setTeamMembers] = useState<any[]>([]);
-  const [loadingMembers, setLoadingMembers] = useState(false);
-  const [projects, setProjects] = useState<any[]>([]);
-  const [loadingProjects, setLoadingProjects] = useState(false);
+  teamMembers: any[];
+  projects: any[];
+}> = ({ newTaskData, setNewTaskData, onSave, onClose, currentUserId, teamMembers, projects }) => {
   const [showAssigneeMenu, setShowAssigneeMenu] = useState(false);
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
   const dateInputRef = React.useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const fetchMembers = async () => {
-      setLoadingMembers(true);
-      try {
-        const session = JSON.parse(localStorage.getItem('wedboarpro_session') || '{}');
-        const token = session?.access_token;
-        if (!token) return;
-
-        const res = await fetch('/api/teams/members', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setTeamMembers(data.members || []);
-        }
-      } catch (err) {
-        console.error('Failed to fetch team members:', err);
-      } finally {
-        setLoadingMembers(false);
-      }
-    };
-    fetchMembers();
-  }, []);
-
-  useEffect(() => {
-    const fetchProjects = async () => {
-      setLoadingProjects(true);
-      try {
-        const session = JSON.parse(localStorage.getItem('wedboarpro_session') || '{}');
-        const token = session?.access_token;
-        if (!token) return;
-
-        const res = await fetch('/api/events', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setProjects(data.events || []);
-        }
-      } catch (err) {
-        console.error('Failed to fetch projects:', err);
-      } finally {
-        setLoadingProjects(false);
-      }
-    };
-    fetchProjects();
-  }, []);
 
   const getAssigneeName = () => {
     if (!newTaskData.assignee_id) return 'Unassigned';
