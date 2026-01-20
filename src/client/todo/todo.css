@@ -258,25 +258,37 @@
   cursor: pointer;
 }
 
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 .todo-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.35);
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 4000;
+  z-index: 9999;
+  padding: 16px;
 }
 
 .todo-modal {
-  width: min(420px, 100%);
-  background: #fff;
-  border-radius: 24px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  width: 100%;
+  max-width: 520px;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  animation: modalIn 200ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .todo-modal input,

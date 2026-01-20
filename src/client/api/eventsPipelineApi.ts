@@ -42,6 +42,8 @@ export type FileCategory = 'contract' | 'layout' | 'menu' | 'photo' | 'other';
 export interface Event {
   id: string;
   planner_id: string;
+  team_id: string | null; // null = personal event, set = team event
+  created_by: string; // user who created the event
   title: string;
   wedding_date: string; // ISO date
   current_stage: string | null;
@@ -155,6 +157,7 @@ export type Result<T> = { data: T | null; error: string | null };
 export interface CreateEventInput {
   title: string;
   wedding_date: string; // ISO date
+  visibility?: 'team' | 'personal'; // 'team' = shared with team, 'personal' = only creator sees it (default: 'team')
   guest_count_expected?: number;
   guest_count_confirmed?: number | null;
   budget_planned?: string | null;

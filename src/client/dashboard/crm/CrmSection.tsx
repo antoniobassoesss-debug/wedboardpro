@@ -885,7 +885,44 @@ export default function CrmSection() {
       {/* Header */}
       <div className="crm-header">
         <div className="crm-header-right">
-          <select className="crm-view-select" value={activeView} onChange={(e) => handleViewChange(e.target.value as CrmViewPreset)}>
+          <select 
+            className="crm-view-select" 
+            value={activeView} 
+            onChange={(e) => handleViewChange(e.target.value as CrmViewPreset)}
+            style={{
+              borderRadius: 999,
+              border: '1px solid #e5e7eb',
+              padding: '9px 36px 9px 16px',
+              fontSize: 14,
+              fontWeight: 500,
+              background: '#ffffff',
+              color: '#0f172a',
+              cursor: 'pointer',
+              outline: 'none',
+              transition: 'all 150ms ease',
+              appearance: 'none',
+              backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2394a3b8\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'%3E%3C/polyline%3E%3C/svg%3E")',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 12px center',
+              backgroundSize: '16px',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.04)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#e5e7eb';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = '#0f172a';
+              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.08)';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = '#e5e7eb';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
             {CRM_VIEW_PRESETS.map((v) => (<option key={v.id} value={v.id}>{v.label}</option>))}
           </select>
           <button type="button" className="crm-new-deal-btn" onClick={() => setIsNewDealOpen(true)}>+ New deal</button>
@@ -896,7 +933,44 @@ export default function CrmSection() {
       <div className="crm-toolbar">
         <input type="text" className="crm-search" placeholder="Search by couple, email, or location…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         
-        <select className="crm-filter-select" value={filterStageIds.length === 1 ? filterStageIds[0] : ''} onChange={(e) => setFilterStageIds(e.target.value ? [e.target.value] : [])}>
+        <select 
+          className="crm-filter-select" 
+          value={filterStageIds.length === 1 ? filterStageIds[0] : ''} 
+          onChange={(e) => setFilterStageIds(e.target.value ? [e.target.value] : [])}
+          style={{
+            borderRadius: 999,
+            border: '1px solid #e5e7eb',
+            padding: '9px 36px 9px 16px',
+            fontSize: 14,
+            fontWeight: 500,
+            background: '#ffffff',
+            color: '#0f172a',
+            cursor: 'pointer',
+            outline: 'none',
+            transition: 'all 150ms ease',
+            appearance: 'none',
+            backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2394a3b8\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'%3E%3C/polyline%3E%3C/svg%3E")',
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'right 12px center',
+            backgroundSize: '16px',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#cbd5e1';
+            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.04)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = '#e5e7eb';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = '#0f172a';
+            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.08)';
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = '#e5e7eb';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
+        >
           <option value="">All stages</option>
           {stages.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
         </select>

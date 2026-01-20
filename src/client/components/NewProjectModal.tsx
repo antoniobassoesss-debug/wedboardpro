@@ -8,6 +8,7 @@ export type NewProjectPayload = {
   clientEmail: string;
   estimatedSize: 'micro' | 'standard' | 'large' | '';
   initialStage: 'inquiry' | 'referral' | 'proposal_sent';
+  visibility?: 'team' | 'personal'; // 'team' = shared with team, 'personal' = only creator sees it
 };
 
 type NewProjectModalProps = {
@@ -27,6 +28,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
   const [clientEmail, setClientEmail] = useState('');
   const [estimatedSize, setEstimatedSize] = useState<NewProjectPayload['estimatedSize']>('');
   const [initialStage, setInitialStage] = useState<NewProjectPayload['initialStage']>('inquiry');
+  const [visibility, setVisibility] = useState<'team' | 'personal'>('team'); // Default to team event
 
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -47,6 +49,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
       setClientEmail('');
       setEstimatedSize('');
       setInitialStage('inquiry');
+      setVisibility('team'); // Reset to default
     }
   }, [isOpen]);
 
@@ -67,6 +70,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
       clientEmail: clientEmail.trim(),
       estimatedSize,
       initialStage,
+      visibility,
     });
   };
 
@@ -399,6 +403,53 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 <option value="referral">Referral</option>
                 <option value="proposal_sent">Proposal Sent</option>
               </select>
+            </div>
+
+            {/* Event Visibility */}
+            <div>
+              <label
+                htmlFor="event-visibility"
+                style={{
+                  display: 'block',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: 6,
+                }}
+              >
+                Event Visibility
+              </label>
+              <select
+                id="event-visibility"
+                value={visibility}
+                onChange={(e) => setVisibility(e.target.value as 'team' | 'personal')}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  fontSize: 14,
+                  border: '1px solid #e5e5e5',
+                  borderRadius: 10,
+                  background: '#fafafa',
+                  color: '#111827',
+                  outline: 'none',
+                }}
+                onFocus={(e) => {
+                  e.target.style.border = '1px solid #0f172a';
+                  e.target.style.background = '#ffffff';
+                }}
+                onBlur={(e) => {
+                  e.target.style.border = '1px solid #e5e5e5';
+                  e.target.style.background = '#fafafa';
+                }}
+              >
+                <option value="team">Team Event (visible to all team members)</option>
+                <option value="personal">Personal Event (only visible to me)</option>
+              </select>
+              <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#6b7280' }}>
+                {visibility === 'team'
+                  ? 'All team members will see and can edit this event.'
+                  : 'Only you will see this event in your pipeline.'}
+              </p>
             </div>
           </div>
 

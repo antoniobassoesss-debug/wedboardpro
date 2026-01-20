@@ -927,25 +927,55 @@ export default function ChatTab() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="chat-filter-tabs">
+          <div style={{ display: 'flex', gap: 4, background: '#f8fafc', padding: 3, borderRadius: 999 }}>
             <button
               type="button"
-              className={`chat-filter-tab ${filterType === 'all' ? 'active' : ''}`}
               onClick={() => setFilterType('all')}
+              style={{
+                borderRadius: 999,
+                padding: '7px 16px',
+                border: 'none',
+                background: filterType === 'all' ? '#0f172a' : 'transparent',
+                color: filterType === 'all' ? '#ffffff' : '#64748b',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 150ms ease',
+              }}
             >
               All
             </button>
             <button
               type="button"
-              className={`chat-filter-tab ${filterType === 'team' ? 'active' : ''}`}
               onClick={() => setFilterType('team')}
+              style={{
+                borderRadius: 999,
+                padding: '7px 16px',
+                border: 'none',
+                background: filterType === 'team' ? '#0f172a' : 'transparent',
+                color: filterType === 'team' ? '#ffffff' : '#64748b',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 150ms ease',
+              }}
             >
               Team
             </button>
             <button
               type="button"
-              className={`chat-filter-tab ${filterType === 'direct' ? 'active' : ''}`}
               onClick={() => setFilterType('direct')}
+              style={{
+                borderRadius: 999,
+                padding: '7px 16px',
+                border: 'none',
+                background: filterType === 'direct' ? '#0f172a' : 'transparent',
+                color: filterType === 'direct' ? '#ffffff' : '#64748b',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 150ms ease',
+              }}
             >
               Direct
             </button>
@@ -985,7 +1015,12 @@ export default function ChatTab() {
                 >
                   <div className={`chat-conversation-avatar ${conv.type === 'team' ? 'team' : ''}`}>
                     {conv.type === 'team' ? (
-                      '👥'
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                      </svg>
                     ) : avatarUrl ? (
                       <img
                         src={avatarUrl}
@@ -1029,7 +1064,12 @@ export default function ChatTab() {
             <div className="chat-header">
               <div className={`chat-header-avatar ${activeConv?.type === 'team' ? 'team' : ''}`}>
                 {activeConv?.type === 'team' ? (
-                  '👥'
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                  </svg>
                 ) : activeRecipientId && profileCache[activeRecipientId]?.avatar_url ? (
                   <img
                     src={profileCache[activeRecipientId].avatar_url!}

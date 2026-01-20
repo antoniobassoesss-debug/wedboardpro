@@ -212,19 +212,20 @@ body {
   align-items: center;
   justify-content: center;
   transition: all 150ms ease;
-  color: #0f172a;
+  color: #6B7280;
 }
 
 .wp-floating-notifications:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  transform: scale(1.05);
 }
 
 .wp-floating-notifications-badge {
   position: absolute;
   top: -2px;
   right: -2px;
-  background: #ef4444;
-  color: white;
+  background: #EF4444;
+  color: #FFFFFF;
   border-radius: 999px;
   min-width: 18px;
   height: 18px;
@@ -235,6 +236,7 @@ body {
   align-items: center;
   justify-content: center;
   border: 2px solid #ffffff;
+  line-height: 1;
 }
 
 .wp-actions {

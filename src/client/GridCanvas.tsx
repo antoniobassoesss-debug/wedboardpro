@@ -9,6 +9,9 @@ import { createPowerPoint } from './types/powerPoint.js';
 import ElectricalIcon from './components/ElectricalIcon.js';
 import ElectricalDrawer from './components/ElectricalDrawer.js';
 
+// Set to true for verbose debugging output
+const DEBUG_CANVAS = false;
+
 const WALLMAKER_PIXELS_PER_METER = 100;
 
 interface ViewBox {
@@ -1396,13 +1399,13 @@ const GridCanvas = forwardRef<{
 
   const drawCanvas = useCallback(() => {
     if (!svgRef.current) {
-      console.log('drawCanvas: svgRef.current is null');
+      DEBUG_CANVAS && console.log(\x27drawCanvas: svgRef.current is null');
       return;
     }
 
     const svg = svgRef.current;
-    console.log('drawCanvas called. Current shapes count:', shapes.length);
-    console.log('drawCanvas: Clearing SVG innerHTML');
+    DEBUG_CANVAS && console.log(\x27drawCanvas called. Current shapes count:', shapes.length);
+    DEBUG_CANVAS && console.log(\x27drawCanvas: Clearing SVG innerHTML');
     svg.innerHTML = '';
 
     const vb = viewBox;
@@ -1430,7 +1433,7 @@ const GridCanvas = forwardRef<{
     const imageShapes = shapes.filter(s => s.type === 'image' && s.imageUrl);
     const regularShapes = shapes.filter(s => s.type !== 'image' && !(s.type === 'rectangle' && !s.imageUrl));
     
-    console.log('Shape filtering - Total:', shapes.length, 'Spaces:', spaceShapes.length, 'Regular:', regularShapes.length, 'Images:', imageShapes.length);
+    DEBUG_CANVAS && console.log('Shape filtering - Total:', shapes.length, 'Spaces:', spaceShapes.length, 'Regular:', regularShapes.length, 'Images:', imageShapes.length);
 
     // Draw spaces first (background layer)
     spaceShapes.forEach(shape => {
@@ -1621,13 +1624,13 @@ const GridCanvas = forwardRef<{
     });
 
     // Draw images last (top layer - tables)
-    console.log('Drawing image shapes:', imageShapes.length, imageShapes);
+    DEBUG_CANVAS && console.log('Drawing image shapes:', imageShapes.length, imageShapes);
     imageShapes.forEach((shape, index) => {
         if (shape.imageUrl) {
-        console.log(`[${index}] Creating image element for:`, shape.imageUrl);
-        console.log(`[${index}] Shape data:`, { x: shape.x, y: shape.y, width: shape.width, height: shape.height });
-        console.log(`[${index}] ViewBox:`, viewBox);
-        console.log(`[${index}] A4 Dimensions:`, a4Dimensions);
+        DEBUG_CANVAS && console.log(`[${index}] Creating image element for:`, shape.imageUrl);
+        DEBUG_CANVAS && console.log(`[${index}] Shape data:`, { x: shape.x, y: shape.y, width: shape.width, height: shape.height });
+        DEBUG_CANVAS && console.log(`[${index}] ViewBox:`, viewBox);
+        DEBUG_CANVAS && console.log(`[${index}] A4 Dimensions:`, a4Dimensions);
         
         const image = document.createElementNS("http://www.w3.org/2000/svg", "image");
         
@@ -1642,7 +1645,7 @@ const GridCanvas = forwardRef<{
         const checkImg = new Image();
         checkImg.onload = () => {
           const imgAspectRatio = checkImg.naturalWidth / checkImg.naturalHeight;
-          console.log(`[${index}] Image aspect ratio check:`, {
+          DEBUG_CANVAS && console.log(`[${index}] Image aspect ratio check:`, {
             shapeWidth: shape.width,
             shapeHeight: shape.height,
             shapeAspectRatio: shapeAspectRatio,
@@ -1669,13 +1672,13 @@ const GridCanvas = forwardRef<{
           
           // If the shape dimensions don't match the natural aspect ratio, recalculate (only when not forcing exact)
           if (Math.abs(naturalAspectRatio - shapeAspectRatio) > 0.001) {
-            console.log(`[${index}] Aspect ratio mismatch detected, recalculating:`, {
+            DEBUG_CANVAS && console.log(`[${index}] Aspect ratio mismatch detected, recalculating:`, {
               naturalAspectRatio,
               shapeAspectRatio,
               naturalWidth: shape.imageNaturalWidth,
               naturalHeight: shape.imageNaturalHeight
             });
-            
+
             // Recalculate to match natural aspect ratio exactly
             if (shape.width >= shape.height) {
               renderWidth = shape.width;
@@ -1684,8 +1687,8 @@ const GridCanvas = forwardRef<{
               renderHeight = shape.height;
               renderWidth = shape.height * naturalAspectRatio;
             }
-            
-            console.log(`[${index}] Corrected dimensions:`, {
+
+            DEBUG_CANVAS && console.log(`[${index}] Corrected dimensions:`, {
               original: { width: shape.width, height: shape.height },
               corrected: { width: renderWidth, height: renderHeight }
             });
@@ -1740,28 +1743,27 @@ const GridCanvas = forwardRef<{
           }
         });
         
-        console.log(`[${index}] Image rendered:`, {
+        DEBUG_CANVAS && console.log(`[${index}] Image rendered:`, {
           width: renderWidth,
           height: renderHeight,
           naturalWidth: shape.imageNaturalWidth,
           naturalHeight: shape.imageNaturalHeight
         });
-        
-        // Add error handler
-        image.onerror = (e) => {
+
+        // Add error handler (keep this one for debugging failed loads)
+        image.onerror = () => {
           console.error(`[${index}] Image failed to load:`, shape.imageUrl);
-          console.error(`[${index}] Trying to load from:`, window.location.origin + shape.imageUrl);
         };
-        
+
         image.onload = () => {
-          console.log(`[${index}] Image loaded successfully:`, shape.imageUrl);
+          DEBUG_CANVAS && console.log(`[${index}] Image loaded successfully:`, shape.imageUrl);
         };
-        
-        console.log(`[${index}] Appending image to SVG at:`, shape.x, shape.y, 'size:', shape.width, shape.height);
+
+        DEBUG_CANVAS && console.log(`[${index}] Appending image to SVG at:`, shape.x, shape.y, 'size:', shape.width, shape.height);
         svg.appendChild(image);
-        console.log(`[${index}] Image appended. SVG children:`, svg.children.length);
+        DEBUG_CANVAS && console.log(`[${index}] Image appended. SVG children:`, svg.children.length);
       } else {
-        console.log(`[${index}] Shape has no imageUrl:`, shape);
+        DEBUG_CANVAS && console.log(`[${index}] Shape has no imageUrl:`, shape);
       }
     });
 
@@ -1780,7 +1782,7 @@ const GridCanvas = forwardRef<{
 
   // Force redraw when shapes change (especially for images)
   useEffect(() => {
-    console.log('Shapes changed, redrawing canvas. Total shapes:', shapes.length);
+    DEBUG_CANVAS && console.log('Shapes changed, redrawing canvas. Total shapes:', shapes.length);
     drawCanvas();
   }, [shapes, drawCanvas]);
 

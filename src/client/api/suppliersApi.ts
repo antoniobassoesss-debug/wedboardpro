@@ -17,16 +17,21 @@ export type SupplierCategory =
 export type SupplierFileCategory = 'contract' | 'price_list' | 'portfolio' | 'other';
 
 export type EventSupplierStatus =
-  | 'researched'
+  | 'potential'
+  | 'contacted'
   | 'quote_requested'
   | 'quote_received'
-  | 'shortlisted'
-  | 'selected'
-  | 'rejected';
+  | 'negotiating'
+  | 'confirmed'
+  | 'paid_completed'
+  | 'declined_lost';
 
 export interface Supplier {
   id: string;
   planner_id: string;
+  team_id?: string | null;
+  created_by?: string;
+  visibility?: 'team' | 'private';
   name: string;
   category: SupplierCategory;
   company_name: string | null;
@@ -60,6 +65,14 @@ export interface EventSupplier {
   quoted_price: string | null; // numeric as string
   currency: string;
   notes: string | null;
+  deposit_amount?: number | null;
+  deposit_paid_date?: string | null;
+  final_payment_amount?: number | null;
+  final_payment_paid_date?: string | null;
+  budget_allocated?: number | null;
+  contract_signed_date?: string | null;
+  decision_deadline?: string | null;
+  service_delivery_date?: string | null;
   created_at: string;
   supplier?: Supplier;
 }
@@ -119,6 +132,8 @@ export interface CreateSupplierInput {
   website?: string | null;
   location?: string | null;
   notes?: string | null;
+  private?: boolean;
+  visibility?: 'team' | 'private';
 }
 
 export async function createSupplier(input: CreateSupplierInput): Promise<Result<Supplier>> {
@@ -268,7 +283,21 @@ export async function addEventSupplier(
 }
 
 export type UpdateEventSupplierInput = Partial<
-  Pick<EventSupplier, 'status' | 'quoted_price' | 'currency' | 'notes'>
+  Pick<
+    EventSupplier,
+    | 'status'
+    | 'quoted_price'
+    | 'currency'
+    | 'notes'
+    | 'deposit_amount'
+    | 'deposit_paid_date'
+    | 'final_payment_amount'
+    | 'final_payment_paid_date'
+    | 'budget_allocated'
+    | 'contract_signed_date'
+    | 'decision_deadline'
+    | 'service_delivery_date'
+  >
 >;
 
 export async function updateEventSupplier(
@@ -297,6 +326,90 @@ export async function updateEventSupplier(
     return { data: body.eventSupplier as EventSupplier, error: null };
   } catch (err: any) {
     return { data: null, error: err?.message || 'Failed to update event supplier' };
+  }
+}
+
+// ============================================================================
+// Custom Vendor Categories
+// ============================================================================
+
+export interface CustomVendorCategory {
+  id: string;
+  category_id: string; // e.g. 'makeup', 'entertainment'
+  label: string; // e.g. 'Makeup', 'Entertainment'
+  created_at: string;
+}
+
+export async function listCustomVendorCategories(): Promise<Result<CustomVendorCategory[]>> {
+  try {
+    const token = await getValidAccessToken();
+    if (!token) return { data: null, error: 'Not authenticated' };
+
+    const res = await fetch('/api/custom-vendor-categories', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { data: null, error: body.error || `Request failed (${res.status})` };
+    }
+
+    const body = await res.json();
+    return { data: body.categories as CustomVendorCategory[], error: null };
+  } catch (err: any) {
+    return { data: null, error: err?.message || 'Failed to fetch custom categories' };
+  }
+}
+
+export async function createCustomVendorCategory(label: string): Promise<Result<CustomVendorCategory>> {
+  try {
+    const token = await getValidAccessToken();
+    if (!token) return { data: null, error: 'Not authenticated' };
+
+    const res = await fetch('/api/custom-vendor-categories', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ label }),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { data: null, error: body.error || `Request failed (${res.status})` };
+    }
+
+    const body = await res.json();
+    return { data: body.category as CustomVendorCategory, error: null };
+  } catch (err: any) {
+    return { data: null, error: err?.message || 'Failed to create custom category' };
+  }
+}
+
+export async function deleteCustomVendorCategory(id: string): Promise<Result<void>> {
+  try {
+    const token = await getValidAccessToken();
+    if (!token) return { data: null, error: 'Not authenticated' };
+
+    const res = await fetch(`/api/custom-vendor-categories/${id}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { data: null, error: body.error || `Request failed (${res.status})` };
+    }
+
+    return { data: null, error: null };
+  } catch (err: any) {
+    return { data: null, error: err?.message || 'Failed to delete custom category' };
   }
 }
 

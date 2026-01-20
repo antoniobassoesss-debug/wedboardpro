@@ -237,6 +237,13 @@ export default function TeamsSection() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Invite modal state
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState(false);
 
   const loadMembers = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -313,6 +320,67 @@ export default function TeamsSection() {
     setIsDrawerOpen(false);
   };
 
+  const handleInvite = async () => {
+    if (!inviteEmail || !inviteEmail.includes('@')) {
+      setInviteError('Please enter a valid email address');
+      return;
+    }
+
+    const accessToken = localStorage.getItem('wedboarpro_session');
+    if (!accessToken) {
+      setInviteError('Not authenticated');
+      return;
+    }
+
+    let token: string;
+    try {
+      const session = JSON.parse(accessToken);
+      token = session?.access_token;
+      if (!token) {
+        setInviteError('Not authenticated');
+        return;
+      }
+    } catch {
+      setInviteError('Not authenticated');
+      return;
+    }
+
+    setInviting(true);
+    setInviteError(null);
+    setInviteSuccess(false);
+
+    try {
+      const response = await fetch('/api/teams/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email: inviteEmail }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setInviteError(data.error || 'Failed to send invitation');
+        return;
+      }
+
+      setInviteSuccess(true);
+      setInviteEmail('');
+      // Refresh members list after successful invite
+      setTimeout(() => {
+        loadMembers(false);
+        setShowInviteModal(false);
+        setInviteSuccess(false);
+      }, 1500);
+    } catch (e: any) {
+      setInviteError(e.message || 'Failed to send invitation');
+    } finally {
+      setInviting(false);
+    }
+  };
+
   // Filter members
   const filteredMembers = useMemo(() => {
     let result = members;
@@ -352,7 +420,7 @@ export default function TeamsSection() {
       <div className="teams-header">
         <div className="teams-header-right">
           <span className="teams-count">{members.length} members</span>
-          <button type="button" className="teams-add-btn">
+          <button type="button" className="teams-add-btn" onClick={() => setShowInviteModal(true)}>
             + Add team member
           </button>
         </div>
@@ -362,7 +430,14 @@ export default function TeamsSection() {
         // Empty State
         <div className="teams-empty-state">
           <div className="teams-empty-illustration">
-            <div className="teams-empty-icon">👥</div>
+            <div className="teams-empty-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+            </div>
           </div>
           <h2 className="teams-empty-title">No team members yet</h2>
           <p className="teams-empty-description">
@@ -387,6 +462,39 @@ export default function TeamsSection() {
               className="teams-filter-select"
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
+              style={{
+                borderRadius: 999,
+                border: '1px solid #e5e7eb',
+                padding: '9px 36px 9px 16px',
+                fontSize: 14,
+                fontWeight: 500,
+                background: '#ffffff',
+                color: '#0f172a',
+                cursor: 'pointer',
+                outline: 'none',
+                transition: 'all 150ms ease',
+                appearance: 'none',
+                backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2394a3b8\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'%3E%3C/polyline%3E%3C/svg%3E")',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 12px center',
+                backgroundSize: '16px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#cbd5e1';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.04)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#0f172a';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.08)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
             >
               <option value="all">All roles</option>
               <option value="owner">Owner</option>
@@ -397,6 +505,39 @@ export default function TeamsSection() {
               className="teams-filter-select"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+              style={{
+                borderRadius: 999,
+                border: '1px solid #e5e7eb',
+                padding: '9px 36px 9px 16px',
+                fontSize: 14,
+                fontWeight: 500,
+                background: '#ffffff',
+                color: '#0f172a',
+                cursor: 'pointer',
+                outline: 'none',
+                transition: 'all 150ms ease',
+                appearance: 'none',
+                backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2394a3b8\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'%3E%3C/polyline%3E%3C/svg%3E")',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 12px center',
+                backgroundSize: '16px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#cbd5e1';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.04)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#0f172a';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.08)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
             >
               <option value="all">All statuses</option>
               <option value="active">Active</option>
@@ -501,6 +642,215 @@ export default function TeamsSection() {
         isLoading={loadingMember}
         onClose={handleCloseDrawer}
       />
+
+      {/* Invite Modal */}
+      {showInviteModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.4)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 16,
+          }}
+          onClick={() => {
+            setShowInviteModal(false);
+            setInviteEmail('');
+            setInviteError(null);
+            setInviteSuccess(false);
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 460,
+              background: '#ffffff',
+              borderRadius: 20,
+              boxShadow: '0 24px 48px rgba(0,0,0,0.2)',
+              overflow: 'hidden',
+              animation: 'modalIn 200ms cubic-bezier(0.32, 0.72, 0, 1)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '20px 24px',
+                borderBottom: '1px solid #f1f5f9',
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#0f172a' }}>
+                  Invite Team Member
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#64748b' }}>
+                  Send an invitation to join your team
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowInviteModal(false);
+                  setInviteEmail('');
+                  setInviteError(null);
+                  setInviteSuccess(false);
+                }}
+                style={{
+                  width: 32,
+                  height: 32,
+                  border: 'none',
+                  background: '#f1f5f9',
+                  borderRadius: 999,
+                  fontSize: 18,
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  transition: 'all 150ms ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e2e8f0';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f1f5f9';
+                  e.currentTarget.style.color = '#64748b';
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => {
+                    setInviteEmail(e.target.value);
+                    setInviteError(null);
+                  }}
+                  placeholder="colleague@example.com"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleInvite();
+                    }
+                  }}
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 500,
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 8,
+                    padding: '10px 12px',
+                    outline: 'none',
+                    transition: 'all 150ms ease',
+                    background: '#ffffff',
+                    color: '#0f172a',
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#0f172a';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.08)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e5e7eb';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                />
+                {inviteError && (
+                  <p style={{ fontSize: 12, color: '#ef4444', margin: 0 }}>{inviteError}</p>
+                )}
+                {inviteSuccess && (
+                  <p style={{ fontSize: 12, color: '#10b981', margin: 0 }}>
+                    Invitation sent successfully!
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 10,
+                padding: '16px 24px',
+                borderTop: '1px solid #f1f5f9',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setShowInviteModal(false);
+                  setInviteEmail('');
+                  setInviteError(null);
+                  setInviteSuccess(false);
+                }}
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: 999,
+                  border: '1px solid #e5e7eb',
+                  background: '#ffffff',
+                  color: '#64748b',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 150ms ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f8fafc';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#ffffff';
+                  e.currentTarget.style.color = '#64748b';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleInvite}
+                disabled={inviting || !inviteEmail}
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: 999,
+                  border: 'none',
+                  background: inviting || !inviteEmail ? '#e5e7eb' : '#0f172a',
+                  color: inviting || !inviteEmail ? '#94a3b8' : '#ffffff',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: inviting || !inviteEmail ? 'not-allowed' : 'pointer',
+                  transition: 'all 150ms ease',
+                }}
+                onMouseEnter={(e) => {
+                  if (inviteEmail && !inviting) {
+                    e.currentTarget.style.background = '#1e293b';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (inviteEmail && !inviting) {
+                    e.currentTarget.style.background = '#0f172a';
+                  }
+                }}
+              >
+                {inviting ? 'Sending...' : 'Send Invitation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

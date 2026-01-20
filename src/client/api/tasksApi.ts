@@ -51,6 +51,7 @@ export async function listTasks(options?: {
   assignee_id?: string;
   unassigned?: boolean;
   completed?: boolean;
+  my_tasks?: boolean;
 }): Promise<{ data: Task[] | null; error: string | null }> {
   try {
     const token = await getValidAccessToken();
@@ -62,6 +63,7 @@ export async function listTasks(options?: {
     if (options?.assignee_id) params.append('assignee_id', options.assignee_id);
     if (options?.unassigned) params.append('unassigned', 'true');
     if (options?.completed !== undefined) params.append('completed', String(options.completed));
+    if (options?.my_tasks) params.append('my_tasks', 'true');
 
     const res = await fetch(`/api/tasks?${params.toString()}`, {
       headers: { Authorization: `Bearer ${token}` },

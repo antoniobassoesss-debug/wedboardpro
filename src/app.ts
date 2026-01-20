@@ -3,6 +3,7 @@ import { fileURLToPath } from 'url';
 import express from 'express';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
+import Stripe from 'stripe';
 
 // Get __dirname equivalent for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -20,6 +21,14 @@ const { getSupabaseAnonClient, getSupabaseServiceClient } = await import('./supa
 // Verify Supabase clients are initialized
 console.log('[app.ts] Supabase anon client:', getSupabaseAnonClient() ? 'initialized' : 'NOT AVAILABLE');
 console.log('[app.ts] Supabase service client:', getSupabaseServiceClient() ? 'initialized' : 'NOT AVAILABLE');
+
+// Initialize Stripe client
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+const stripeClient = stripeSecretKey 
+  ? new Stripe(stripeSecretKey, { apiVersion: '2024-12-18.acacia' })
+  : null;
+const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+console.log('[app.ts] Stripe client:', stripeClient ? 'initialized' : 'NOT AVAILABLE (set STRIPE_SECRET_KEY)');
 
 const app = express();
 const port = 3000;
@@ -735,6 +744,48 @@ async function createTeamForUser(
     });
 
   return newTeam;
+}
+// Helper function to check if user can access an event (team member or creator)
+async function canAccessEvent(
+  supabase: NonNullable<ReturnType<typeof getSupabaseServiceClient>>,
+  eventId: string,
+  userId: string,
+): Promise<{ canAccess: boolean; event: any | null; error: string | null }> {
+  try {
+    const { data: event, error } = await supabase
+      .from('events')
+      .select('id, team_id, created_by, planner_id')
+      .eq('id', eventId)
+      .single();
+
+    if (error || !event) {
+      return { canAccess: false, event: null, error: 'Event not found' };
+    }
+
+    // Personal event: user must be the creator
+    if (!event.team_id) {
+      if (event.created_by === userId) {
+        return { canAccess: true, event, error: null };
+      }
+      return { canAccess: false, event, error: 'Not authorized' };
+    }
+
+    // Team event: user must be a team member
+    const { data: membership } = await supabase
+      .from('team_members')
+      .select('user_id')
+      .eq('team_id', event.team_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (membership) {
+      return { canAccess: true, event, error: null };
+    }
+
+    return { canAccess: false, event, error: 'Not authorized' };
+  } catch (err: any) {
+    return { canAccess: false, event: null, error: err?.message || 'Failed to check access' };
+  }
 }
 
 async function getUserTeam(
@@ -1772,6 +1823,9 @@ app.post('/api/teams/invite', express.json(), async (req, res) => {
         return res.status(500).json({ error: updateError.message });
       }
 
+      // Send notification to invitee (only if user exists with this email)
+      await notifyTeamInvitation(supabase, normalizedEmail, team.id, team.name ?? null, user.id);
+
       return res.status(200).json({ invitation: updatedInvite, resent: true });
     }
 
@@ -1792,6 +1846,9 @@ app.post('/api/teams/invite', express.json(), async (req, res) => {
       console.error('Create invitation error:', inviteError);
       return res.status(500).json({ error: inviteError.message });
     }
+
+    // Send in-app notification to invitee (only if user exists with this email)
+    await notifyTeamInvitation(supabase, normalizedEmail, team.id, team.name ?? null, user.id);
 
     // TODO: Send email notification here (using a service like SendGrid, Resend, etc.)
 
@@ -2490,11 +2547,63 @@ app.get('/api/events', async (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }
 
-    const { data: events, error } = await supabase
+    // Get user's team to fetch team events (with error handling)
+    let userTeamId: string | null = null;
+    try {
+      const teamResult = await getUserTeam(supabase, user.id);
+      userTeamId = teamResult?.team?.id ?? null;
+    } catch (teamErr: any) {
+      console.warn('[GET /api/events] Error getting user team (non-fatal):', teamErr?.message);
+      // Continue without team - user will only see personal events
+    }
+
+    // Build query: team events OR personal events
+    // Try new team-aware columns first, fallback to planner_id if migration not run
+    let query = supabase
       .from('events')
       .select('*')
-      .eq('planner_id', user.id)
       .order('wedding_date', { ascending: true });
+
+    let events;
+    let error;
+
+    // Try new query with created_by/team_id, with automatic fallback
+    try {
+      if (userTeamId) {
+        // User has a team: get team events + personal events
+        query = query.or(`team_id.eq.${userTeamId},and(team_id.is.null,created_by.eq.${user.id})`);
+      } else {
+        // User has no team: only personal events
+        query = query.eq('created_by', user.id).is('team_id', null);
+      }
+
+      const result = await query;
+      events = result.data;
+      error = result.error;
+      
+      // If error indicates missing column, immediately fallback
+      if (error && (error.message?.includes('created_by') || error.message?.includes('team_id') || error.code === '42703' || error.code === 'PGRST116' || error.code === 'PGRST205')) {
+        throw error; // Re-throw to trigger fallback
+      }
+    } catch (queryErr: any) {
+      // Check if it's a column error - if so, use fallback
+      if (queryErr?.message?.includes('created_by') || queryErr?.message?.includes('team_id') || queryErr?.code === '42703' || queryErr?.code === 'PGRST116' || queryErr?.code === 'PGRST205') {
+        console.warn('[GET /api/events] Migration not complete, using planner_id fallback. Error:', queryErr.message);
+        const fallbackResult = await supabase
+          .from('events')
+          .select('*')
+          .eq('planner_id', user.id)
+          .order('wedding_date', { ascending: true });
+        
+        if (fallbackResult.error) {
+          console.error('[GET /api/events] Fallback query error:', fallbackResult.error);
+          return res.status(500).json({ error: fallbackResult.error.message });
+        }
+        return res.json({ events: fallbackResult.data ?? [] });
+      }
+      // If it's a different error, set it for handling below
+      error = queryErr;
+    }
 
     if (error) {
       console.error('[GET /api/events] Error:', error);
@@ -2524,6 +2633,7 @@ app.post('/api/events', express.json(), async (req, res) => {
       budget_planned,
       budget_actual,
       notes_internal,
+      visibility, // 'team' | 'personal' - defaults to 'team'
     } = req.body ?? {};
 
     if (!title || typeof title !== 'string' || !wedding_date) {
@@ -2535,10 +2645,25 @@ app.post('/api/events', express.json(), async (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }
 
+    // Determine team_id and created_by based on visibility
+    let teamId: string | null = null;
+    const isTeamEvent = visibility !== 'personal'; // Default to 'team' if not specified
+
+    if (isTeamEvent) {
+      // Get user's team
+      const teamResult = await getUserTeam(supabase, user.id);
+      if (!teamResult?.team) {
+        return res.status(400).json({ error: 'You must be part of a team to create team events. Create a personal event instead.' });
+      }
+      teamId = teamResult.team.id;
+    }
+
     const { data: event, error } = await supabase
       .from('events')
       .insert({
-        planner_id: user.id,
+        planner_id: user.id, // Keep for backward compatibility
+        team_id: teamId,
+        created_by: user.id,
         title: title.trim(),
         wedding_date,
         status: 'on_track',
@@ -2604,20 +2729,32 @@ app.get('/api/events/:id', async (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }
 
-    const { data: event, error: eventError } = await supabase
+    // Check access (team member or creator)
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(accessCheck.error === 'Event not found' ? 404 : 403).json({ error: accessCheck.error || 'Not authorized' });
+    }
+
+    const event = accessCheck.event;
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    // Fetch full event data
+    const { data: fullEvent, error: eventError } = await supabase
       .from('events')
       .select('*')
       .eq('id', eventId)
-      .eq('planner_id', user.id)
       .single();
 
-    if (eventError || !event) {
+    if (eventError || !fullEvent) {
       return res.status(404).json({ error: 'Event not found' });
     }
 
     const [
       stagesResult,
-      tasksResult,
+      stageTasksResult,
+      generalTasksResult,
       clientResult,
       venueResult,
       vendorsResult,
@@ -2626,6 +2763,7 @@ app.get('/api/events/:id', async (req, res) => {
     ] = await Promise.all([
       supabase.from('pipeline_stages').select('*').eq('event_id', event.id).order('order_index', { ascending: true }),
       supabase.from('stage_tasks').select('*').eq('event_id', event.id),
+      supabase.from('tasks').select('*').eq('event_id', event.id),
       supabase.from('clients').select('*').eq('event_id', event.id).maybeSingle(),
       supabase.from('venues').select('*').eq('event_id', event.id).maybeSingle(),
       supabase.from('vendors').select('*').eq('event_id', event.id),
@@ -2638,10 +2776,11 @@ app.get('/api/events/:id', async (req, res) => {
         .limit(100),
     ]);
 
-    if (stagesResult.error || tasksResult.error || clientResult.error || venueResult.error || vendorsResult.error || filesResult.error || activityResult.error) {
+    if (stagesResult.error || stageTasksResult.error || generalTasksResult.error || clientResult.error || venueResult.error || vendorsResult.error || filesResult.error || activityResult.error) {
       console.error('[GET /api/events/:id] Error loading workspace', {
         stagesError: stagesResult.error,
-        tasksError: tasksResult.error,
+        stageTasksError: stageTasksResult.error,
+        generalTasksError: generalTasksResult.error,
         clientError: clientResult.error,
         venueError: venueResult.error,
         vendorsError: vendorsResult.error,
@@ -2651,11 +2790,29 @@ app.get('/api/events/:id', async (req, res) => {
       return res.status(500).json({ error: 'Failed to load event workspace' });
     }
 
+    // Merge stage_tasks and general tasks from tasks table
+    // Transform general tasks to match stage_tasks format
+    const stageTasks = stageTasksResult.data ?? [];
+    const generalTasks = (generalTasksResult.data ?? []).map((task: any) => ({
+      id: task.id,
+      event_id: task.event_id,
+      stage_id: null, // general tasks don't belong to a specific stage
+      title: task.title,
+      description: task.description || '',
+      assigned_to: task.assignee_id,
+      status: task.is_completed ? 'done' : 'todo',
+      priority: task.priority,
+      due_date: task.due_date,
+      created_at: task.created_at,
+    }));
+
+    const allTasks = [...stageTasks, ...generalTasks];
+
     return res.json({
       workspace: {
         event,
         stages: stagesResult.data ?? [],
-        tasks: tasksResult.data ?? [],
+        tasks: allTasks,
         client: clientResult.data ?? null,
         venue: venueResult.data ?? null,
         vendors: vendorsResult.data ?? [],
@@ -2683,20 +2840,10 @@ app.delete('/api/events/:id', async (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }
 
-    // Ensure the event belongs to the current planner
-    const { data: event, error: fetchError } = await supabase
-      .from('events')
-      .select('id, planner_id')
-      .eq('id', eventId)
-      .single();
-
-    if (fetchError || !event) {
-      console.error('[DELETE /api/events/:id] Failed to load event:', fetchError);
-      return res.status(404).json({ error: 'Event not found' });
-    }
-
-    if (event.planner_id !== user.id) {
-      return res.status(403).json({ error: 'Forbidden' });
+    // Check access (team member or creator)
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(accessCheck.error === 'Event not found' ? 404 : 403).json({ error: accessCheck.error || 'Not authorized' });
     }
 
     const { error: deleteError } = await supabase.from('events').delete().eq('id', eventId);
@@ -2726,12 +2873,17 @@ app.patch('/api/events/:id', express.json(), async (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }
 
-    // Ensure event belongs to user
+    // Check access (team member or creator)
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(accessCheck.error === 'Event not found' ? 404 : 403).json({ error: accessCheck.error || 'Not authorized' });
+    }
+
+    // Fetch full event data
     const { data: existingEvent, error: fetchError } = await supabase
       .from('events')
       .select('*')
       .eq('id', eventId)
-      .eq('planner_id', user.id)
       .single();
 
     if (fetchError || !existingEvent) {
@@ -2785,15 +2937,10 @@ app.get('/api/events/:id/stages', async (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }
 
-    const { data: event, error: eventError } = await supabase
-      .from('events')
-      .select('id')
-      .eq('id', eventId)
-      .eq('planner_id', user.id)
-      .single();
-
-    if (eventError || !event) {
-      return res.status(404).json({ error: 'Event not found' });
+    // Check access (team member or creator)
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(accessCheck.error === 'Event not found' ? 404 : 403).json({ error: accessCheck.error || 'Not authorized' });
     }
 
     const { data: stages, error } = await supabase
@@ -2838,16 +2985,10 @@ app.patch('/api/stages/:id', express.json(), async (req, res) => {
       return res.status(404).json({ error: 'Stage not found' });
     }
 
-    // Ensure event belongs to user
-    const { data: event, error: eventError } = await supabase
-      .from('events')
-      .select('id')
-      .eq('id', stageRow.event_id)
-      .eq('planner_id', user.id)
-      .single();
-
-    if (eventError || !event) {
-      return res.status(403).json({ error: 'Not authorized to update this stage' });
+    // Check event access (team member or creator)
+    const accessCheck = await canAccessEvent(supabase, stageRow.event_id, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(accessCheck.error === 'Event not found' ? 404 : 403).json({ error: accessCheck.error || 'Not authorized to update this stage' });
     }
 
     const patch: any = {};
@@ -3090,15 +3231,10 @@ app.get('/api/events/:id/vendors', async (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }
 
-    const { data: event, error: eventError } = await supabase
-      .from('events')
-      .select('id')
-      .eq('id', eventId)
-      .eq('planner_id', user.id)
-      .single();
-
-    if (eventError || !event) {
-      return res.status(404).json({ error: 'Event not found' });
+    // Check access (team member or creator)
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(accessCheck.error === 'Event not found' ? 404 : 403).json({ error: accessCheck.error || 'Not authorized' });
     }
 
     const { data: vendors, error } = await supabase.from('vendors').select('*').eq('event_id', eventId);
@@ -3198,15 +3334,27 @@ app.get('/api/suppliers', async (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }
 
+    // Get user's team to fetch team-shared suppliers
+    const teamResult = await getUserTeam(supabase, user.id);
+    const userTeamId = teamResult?.team?.id ?? null;
+
     const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
     const category = typeof req.query.category === 'string' ? req.query.category.trim() : '';
     const favorite =
       typeof req.query.favorite === 'string' && req.query.favorite.toLowerCase() === 'true';
 
+    // Build query: team-shared suppliers OR user's private suppliers
     let query = supabase
       .from('suppliers')
-      .select('id, planner_id, name, category, company_name, email, phone, website, location, notes, rating_internal, is_favorite, created_at, updated_at')
-      .eq('planner_id', user.id);
+      .select('id, planner_id, team_id, created_by, visibility, name, category, company_name, email, phone, website, location, notes, rating_internal, is_favorite, created_at, updated_at');
+
+    if (userTeamId) {
+      // User has a team: get team-shared suppliers + user's private suppliers
+      query = query.or(`and(team_id.eq.${userTeamId},visibility.eq.team),and(created_by.eq.${user.id},visibility.eq.private)`);
+    } else {
+      // User has no team: only private suppliers
+      query = query.eq('created_by', user.id).eq('visibility', 'private');
+    }
 
     if (category) {
       query = query.eq('category', category);
@@ -3260,7 +3408,7 @@ app.post('/api/suppliers', express.json(), async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { name, category, company_name, email, phone, website, location, notes } = req.body ?? {};
+    const { name, category, company_name, email, phone, website, location, notes, visibility, private: isPrivate } = req.body ?? {};
 
     if (!name || typeof name !== 'string' || !category || typeof category !== 'string') {
       return res.status(400).json({ error: 'name and category are required' });
@@ -3271,10 +3419,32 @@ app.post('/api/suppliers', express.json(), async (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }
 
+    // Determine visibility: 'private' if explicitly set, or if user has no team
+    const teamResult = await getUserTeam(supabase, user.id);
+    const userTeamId = teamResult?.team?.id ?? null;
+    
+    let finalVisibility: 'team' | 'private' = 'team';
+    let finalTeamId: string | null = null;
+
+    if (isPrivate === true || visibility === 'private') {
+      finalVisibility = 'private';
+      finalTeamId = null;
+    } else if (userTeamId) {
+      finalVisibility = 'team';
+      finalTeamId = userTeamId;
+    } else {
+      // User has no team and wants to share - fallback to private
+      finalVisibility = 'private';
+      finalTeamId = null;
+    }
+
     const { data: supplier, error } = await supabase
       .from('suppliers')
       .insert({
-        planner_id: user.id,
+        planner_id: user.id, // Keep for backward compatibility
+        team_id: finalTeamId,
+        created_by: user.id,
+        visibility: finalVisibility,
         name: name.trim(),
         category: category.trim(),
         company_name: company_name ?? null,
@@ -3315,12 +3485,26 @@ app.patch('/api/suppliers/:id', express.json(), async (req, res) => {
 
     const { data: supplierRow, error: loadError } = await supabase
       .from('suppliers')
-      .select('id, planner_id')
+      .select('id, planner_id, team_id, created_by, visibility')
       .eq('id', supplierId)
       .single();
 
-    if (loadError || !supplierRow || supplierRow.planner_id !== user.id) {
+    if (loadError || !supplierRow) {
       return res.status(404).json({ error: 'Supplier not found' });
+    }
+
+    // Check authorization: user can update if:
+    // 1. Supplier is team-shared and user is in the team, OR
+    // 2. Supplier is private and user is the creator
+    const teamResult = await getUserTeam(supabase, user.id);
+    const userTeamId = teamResult?.team?.id ?? null;
+    
+    const canUpdate = 
+      (supplierRow.visibility === 'team' && supplierRow.team_id === userTeamId) ||
+      (supplierRow.visibility === 'private' && supplierRow.created_by === user.id);
+
+    if (!canUpdate) {
+      return res.status(403).json({ error: 'Not authorized to update this supplier' });
     }
 
     const body = req.body ?? {};
@@ -3371,12 +3555,26 @@ app.delete('/api/suppliers/:id', async (req, res) => {
 
     const { data: supplierRow, error: loadError } = await supabase
       .from('suppliers')
-      .select('id, planner_id')
+      .select('id, planner_id, team_id, created_by, visibility')
       .eq('id', supplierId)
       .single();
 
-    if (loadError || !supplierRow || supplierRow.planner_id !== user.id) {
+    if (loadError || !supplierRow) {
       return res.status(404).json({ error: 'Supplier not found' });
+    }
+
+    // Check authorization: user can delete if:
+    // 1. Supplier is team-shared and user is in the team, OR
+    // 2. Supplier is private and user is the creator
+    const teamResult = await getUserTeam(supabase, user.id);
+    const userTeamId = teamResult?.team?.id ?? null;
+    
+    const canDelete = 
+      (supplierRow.visibility === 'team' && supplierRow.team_id === userTeamId) ||
+      (supplierRow.visibility === 'private' && supplierRow.created_by === user.id);
+
+    if (!canDelete) {
+      return res.status(403).json({ error: 'Not authorized to delete this supplier' });
     }
 
     const { error } = await supabase.from('suppliers').delete().eq('id', supplierId);
@@ -3391,6 +3589,390 @@ app.delete('/api/suppliers/:id', async (req, res) => {
     return res.status(500).json({ error: error?.message || 'Internal server error' });
   }
 });
+
+// ============================================================================
+// Team Contacts Directory API
+// ============================================================================
+
+// List contacts (team-shared + user's private)
+app.get('/api/contacts', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    // Get user's team to fetch team-shared contacts
+    const teamResult = await getUserTeam(supabase, user.id);
+    const userTeamId = teamResult?.team?.id ?? null;
+
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+
+    // Build query: team-shared contacts OR user's private contacts
+    let query = supabase
+      .from('team_contacts')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (userTeamId) {
+      // User has a team: get ALL team-shared contacts (regardless of creator or when created) + user's private contacts
+      // This ensures new team members see all existing team contacts
+      // The query filters by team_id and visibility='team', which includes ALL team contacts regardless of creator
+      query = query.or(`and(team_id.eq.${userTeamId},visibility.eq.team),and(created_by.eq.${user.id},visibility.eq.private)`);
+    } else {
+      // User has no team: only private contacts
+      query = query.eq('created_by', user.id).eq('visibility', 'private');
+    }
+
+    if (search) {
+      // Apply search filter - PostgREST will combine this with the existing filter
+      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
+    }
+
+    const { data: contacts, error } = await query;
+
+    if (error) {
+      console.error('[GET /api/contacts] Error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.json({ contacts: contacts ?? [] });
+  } catch (error: any) {
+    console.error('[GET /api/contacts] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Create contact
+app.post('/api/contacts', express.json(), async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { name, email, phone, company, notes, visibility, private: isPrivate } = req.body ?? {};
+
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'name is required' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    // Determine visibility: 'private' if explicitly set, or if user has no team
+    const teamResult = await getUserTeam(supabase, user.id);
+    const userTeamId = teamResult?.team?.id ?? null;
+    
+    let finalVisibility: 'team' | 'private' = 'team';
+    let finalTeamId: string | null = null;
+
+    if (isPrivate === true || visibility === 'private') {
+      finalVisibility = 'private';
+      finalTeamId = null;
+    } else if (userTeamId) {
+      finalVisibility = 'team';
+      finalTeamId = userTeamId;
+    } else {
+      // User has no team and wants to share - fallback to private
+      finalVisibility = 'private';
+      finalTeamId = null;
+    }
+
+    const { data: contact, error } = await supabase
+      .from('team_contacts')
+      .insert({
+        team_id: finalTeamId,
+        created_by: user.id,
+        visibility: finalVisibility,
+        name: name.trim(),
+        email: email?.trim() ?? null,
+        phone: phone?.trim() ?? null,
+        company: company?.trim() ?? null,
+        notes: notes?.trim() ?? null,
+      })
+      .select('*')
+      .single();
+
+    if (error || !contact) {
+      console.error('[POST /api/contacts] Error:', error);
+      return res.status(500).json({ error: error?.message || 'Failed to create contact' });
+    }
+
+    return res.status(201).json({ contact });
+  } catch (error: any) {
+    console.error('[POST /api/contacts] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Update contact
+app.patch('/api/contacts/:id', express.json(), async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const contactId = req.params.id;
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const { data: contactRow, error: loadError } = await supabase
+      .from('team_contacts')
+      .select('id, team_id, created_by, visibility')
+      .eq('id', contactId)
+      .single();
+
+    if (loadError || !contactRow) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    // Check authorization: user can update if:
+    // 1. Contact is team-shared and user is in the team, OR
+    // 2. Contact is private and user is the creator
+    const teamResult = await getUserTeam(supabase, user.id);
+    const userTeamId = teamResult?.team?.id ?? null;
+    
+    const canUpdate = 
+      (contactRow.visibility === 'team' && contactRow.team_id === userTeamId) ||
+      (contactRow.visibility === 'private' && contactRow.created_by === user.id);
+
+    if (!canUpdate) {
+      return res.status(403).json({ error: 'Not authorized to update this contact' });
+    }
+
+    const body = req.body ?? {};
+    const patch: any = {};
+    if (body.name !== undefined) patch.name = body.name;
+    if (body.email !== undefined) patch.email = body.email;
+    if (body.phone !== undefined) patch.phone = body.phone;
+    if (body.company !== undefined) patch.company = body.company;
+    if (body.notes !== undefined) patch.notes = body.notes;
+
+    const { data: updated, error } = await supabase
+      .from('team_contacts')
+      .update(patch)
+      .eq('id', contactId)
+      .select('*')
+      .single();
+
+    if (error || !updated) {
+      console.error('[PATCH /api/contacts/:id] Error:', error);
+      return res.status(500).json({ error: error?.message || 'Failed to update contact' });
+    }
+
+    return res.json({ contact: updated });
+  } catch (error: any) {
+    console.error('[PATCH /api/contacts/:id] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Delete contact
+app.delete('/api/contacts/:id', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const contactId = req.params.id;
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const { data: contactRow, error: loadError } = await supabase
+      .from('team_contacts')
+      .select('id, team_id, created_by, visibility')
+      .eq('id', contactId)
+      .single();
+
+    if (loadError || !contactRow) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    // Check authorization: user can delete if:
+    // 1. Contact is team-shared and user is in the team, OR
+    // 2. Contact is private and user is the creator
+    const teamResult = await getUserTeam(supabase, user.id);
+    const userTeamId = teamResult?.team?.id ?? null;
+    
+    const canDelete = 
+      (contactRow.visibility === 'team' && contactRow.team_id === userTeamId) ||
+      (contactRow.visibility === 'private' && contactRow.created_by === user.id);
+
+    if (!canDelete) {
+      return res.status(403).json({ error: 'Not authorized to delete this contact' });
+    }
+
+    const { error } = await supabase.from('team_contacts').delete().eq('id', contactId);
+    if (error) {
+      console.error('[DELETE /api/contacts/:id] Error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.status(204).json({});
+  } catch (error: any) {
+    console.error('[DELETE /api/contacts/:id] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// ============================================================================
+// Custom Vendor Categories Endpoints
+// ============================================================================
+
+// List custom vendor categories for current planner
+app.get('/api/custom-vendor-categories', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const { data: categories, error } = await supabase
+      .from('custom_vendor_categories')
+      .select('id, category_id, label, created_at')
+      .eq('planner_id', user.id)
+      .order('label', { ascending: true });
+
+    if (error) {
+      console.error('[GET /api/custom-vendor-categories] Error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.json({ categories: categories ?? [] });
+  } catch (error: any) {
+    console.error('[GET /api/custom-vendor-categories] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Create custom vendor category
+app.post('/api/custom-vendor-categories', express.json(), async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { label } = req.body ?? {};
+
+    if (!label || typeof label !== 'string' || label.trim().length === 0) {
+      return res.status(400).json({ error: 'label is required' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    // Generate category_id from label (lowercase, replace spaces with underscores)
+    const categoryId = label
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-z0-9_]/g, '');
+
+    if (categoryId.length === 0) {
+      return res.status(400).json({ error: 'Invalid category label' });
+    }
+
+    // Check if category_id already exists for this planner
+    const { data: existing } = await supabase
+      .from('custom_vendor_categories')
+      .select('id')
+      .eq('planner_id', user.id)
+      .eq('category_id', categoryId)
+      .single();
+
+    if (existing) {
+      return res.status(400).json({ error: 'Category already exists' });
+    }
+
+    const { data: category, error } = await supabase
+      .from('custom_vendor_categories')
+      .insert({
+        planner_id: user.id,
+        category_id: categoryId,
+        label: label.trim(),
+      })
+      .select('*')
+      .single();
+
+    if (error || !category) {
+      console.error('[POST /api/custom-vendor-categories] Error:', error);
+      return res.status(500).json({ error: error?.message || 'Failed to create category' });
+    }
+
+    return res.status(201).json({ category });
+  } catch (error: any) {
+    console.error('[POST /api/custom-vendor-categories] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Delete custom vendor category
+app.delete('/api/custom-vendor-categories/:id', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const categoryId = req.params.id;
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    // Verify ownership
+    const { data: category, error: loadError } = await supabase
+      .from('custom_vendor_categories')
+      .select('id, planner_id')
+      .eq('id', categoryId)
+      .single();
+
+    if (loadError || !category || category.planner_id !== user.id) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+
+    const { error } = await supabase
+      .from('custom_vendor_categories')
+      .delete()
+      .eq('id', categoryId);
+
+    if (error) {
+      console.error('[DELETE /api/custom-vendor-categories/:id] Error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.status(204).json({});
+  } catch (error: any) {
+    console.error('[DELETE /api/custom-vendor-categories/:id] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// ============================================================================
+// Event Suppliers Endpoints
+// ============================================================================
 
 // List event suppliers
 app.get('/api/events/:id/suppliers', async (req, res) => {
@@ -3428,6 +4010,14 @@ app.get('/api/events/:id/suppliers', async (req, res) => {
         quoted_price,
         currency,
         notes,
+        deposit_amount,
+        deposit_paid_date,
+        final_payment_amount,
+        final_payment_paid_date,
+        budget_allocated,
+        contract_signed_date,
+        decision_deadline,
+        service_delivery_date,
         created_at,
         suppliers:supplier_id (
           id,
@@ -3572,6 +4162,15 @@ app.patch('/api/event-suppliers/:id', express.json(), async (req, res) => {
     if (body.quoted_price !== undefined) patch.quoted_price = body.quoted_price;
     if (body.currency !== undefined) patch.currency = body.currency;
     if (body.notes !== undefined) patch.notes = body.notes;
+    // Financial tracking fields
+    if (body.deposit_amount !== undefined) patch.deposit_amount = body.deposit_amount;
+    if (body.deposit_paid_date !== undefined) patch.deposit_paid_date = body.deposit_paid_date;
+    if (body.final_payment_amount !== undefined) patch.final_payment_amount = body.final_payment_amount;
+    if (body.final_payment_paid_date !== undefined) patch.final_payment_paid_date = body.final_payment_paid_date;
+    if (body.budget_allocated !== undefined) patch.budget_allocated = body.budget_allocated;
+    if (body.contract_signed_date !== undefined) patch.contract_signed_date = body.contract_signed_date;
+    if (body.decision_deadline !== undefined) patch.decision_deadline = body.decision_deadline;
+    if (body.service_delivery_date !== undefined) patch.service_delivery_date = body.service_delivery_date;
 
     const { data: updated, error } = await supabase
       .from('event_suppliers')
@@ -3606,15 +4205,10 @@ app.post('/api/events/:id/files', express.json(), async (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }
 
-    const { data: event, error: eventError } = await supabase
-      .from('events')
-      .select('id')
-      .eq('id', eventId)
-      .eq('planner_id', user.id)
-      .single();
-
-    if (eventError || !event) {
-      return res.status(404).json({ error: 'Event not found' });
+    // Check access (team member or creator)
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(accessCheck.error === 'Event not found' ? 404 : 403).json({ error: accessCheck.error || 'Not authorized' });
     }
 
     const { file_name, file_url, category } = req.body ?? {};
@@ -3661,15 +4255,10 @@ app.post('/api/events/:id/client', express.json(), async (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }
 
-    const { data: event, error: eventError } = await supabase
-      .from('events')
-      .select('id')
-      .eq('id', eventId)
-      .eq('planner_id', user.id)
-      .single();
-
-    if (eventError || !event) {
-      return res.status(404).json({ error: 'Event not found' });
+    // Check access (team member or creator)
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(accessCheck.error === 'Event not found' ? 404 : 403).json({ error: accessCheck.error || 'Not authorized' });
     }
 
     const { bride_name, groom_name, email, phone, address, preferences, communication_notes } = req.body ?? {};
@@ -3748,15 +4337,10 @@ app.patch('/api/events/:id/client', express.json(), async (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }
 
-    const { data: event, error: eventError } = await supabase
-      .from('events')
-      .select('id')
-      .eq('id', eventId)
-      .eq('planner_id', user.id)
-      .single();
-
-    if (eventError || !event) {
-      return res.status(404).json({ error: 'Event not found' });
+    // Check access (team member or creator)
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(accessCheck.error === 'Event not found' ? 404 : 403).json({ error: accessCheck.error || 'Not authorized' });
     }
 
     const { data: existing, error: findError } = await supabase
@@ -3804,6 +4388,1469 @@ app.patch('/api/events/:id/client', express.json(), async (req, res) => {
   }
 });
 
+// ===== WEDDING VISION API =====
+
+// Get or create wedding vision for an event
+app.get('/api/events/:id/vision', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const eventId = req.params.id;
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    // Check access (team member or creator)
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(accessCheck.error === 'Event not found' ? 404 : 403).json({ error: accessCheck.error || 'Not authorized' });
+    }
+
+    // Try to get existing vision record
+    const { data: existing, error: findError } = await supabase
+      .from('wedding_vision')
+      .select('*')
+      .eq('event_id', eventId)
+      .maybeSingle();
+
+    if (findError) {
+      console.error('[GET /api/events/:id/vision] Find error:', findError);
+      return res.status(500).json({ error: 'Failed to fetch vision data' });
+    }
+
+    // If exists, return it
+    if (existing) {
+      return res.json({ vision: existing });
+    }
+
+    // Create new vision record with defaults
+    const { data: newVision, error: createError } = await supabase
+      .from('wedding_vision')
+      .insert({
+        event_id: eventId,
+        mood_board_images: [],
+        style_quiz_result: null,
+        color_palette: [],
+        keywords: [],
+        must_haves: [],
+        inspiration_links: [],
+      })
+      .select('*')
+      .single();
+
+    if (createError || !newVision) {
+      console.error('[GET /api/events/:id/vision] Create error:', createError);
+      return res.status(500).json({ error: createError?.message || 'Failed to create vision data' });
+    }
+
+    return res.json({ vision: newVision });
+  } catch (error: any) {
+    console.error('[GET /api/events/:id/vision] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Update wedding vision for an event
+app.patch('/api/events/:id/vision', express.json(), async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const eventId = req.params.id;
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    // Check access (team member or creator)
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(accessCheck.error === 'Event not found' ? 404 : 403).json({ error: accessCheck.error || 'Not authorized' });
+    }
+
+    // Check if vision record exists
+    const { data: existing, error: findError } = await supabase
+      .from('wedding_vision')
+      .select('id')
+      .eq('event_id', eventId)
+      .maybeSingle();
+
+    if (findError) {
+      console.error('[PATCH /api/events/:id/vision] Find error:', findError);
+      return res.status(500).json({ error: 'Failed to find vision data' });
+    }
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Vision record not found. GET first to create.' });
+    }
+
+    // Build patch object from allowed fields
+    const body = req.body ?? {};
+    const patch: any = {};
+
+    if (body.mood_board_images !== undefined) {
+      if (!Array.isArray(body.mood_board_images)) {
+        return res.status(400).json({ error: 'mood_board_images must be an array' });
+      }
+      if (body.mood_board_images.length > 20) {
+        return res.status(400).json({ error: 'Maximum 20 mood board images allowed' });
+      }
+      patch.mood_board_images = body.mood_board_images;
+    }
+
+    if (body.style_quiz_result !== undefined) {
+      const validStyles = ['romantic', 'modern', 'rustic', 'bohemian', 'classic', 'industrial', null];
+      if (!validStyles.includes(body.style_quiz_result)) {
+        return res.status(400).json({ error: 'Invalid style_quiz_result value' });
+      }
+      patch.style_quiz_result = body.style_quiz_result;
+    }
+
+    if (body.color_palette !== undefined) {
+      if (!Array.isArray(body.color_palette)) {
+        return res.status(400).json({ error: 'color_palette must be an array' });
+      }
+      if (body.color_palette.length > 6) {
+        return res.status(400).json({ error: 'Maximum 6 colors allowed' });
+      }
+      patch.color_palette = body.color_palette;
+    }
+
+    if (body.keywords !== undefined) {
+      if (!Array.isArray(body.keywords)) {
+        return res.status(400).json({ error: 'keywords must be an array' });
+      }
+      if (body.keywords.length > 15) {
+        return res.status(400).json({ error: 'Maximum 15 keywords allowed' });
+      }
+      patch.keywords = body.keywords;
+    }
+
+    if (body.must_haves !== undefined) {
+      if (!Array.isArray(body.must_haves)) {
+        return res.status(400).json({ error: 'must_haves must be an array' });
+      }
+      patch.must_haves = body.must_haves;
+    }
+
+    if (body.inspiration_links !== undefined) {
+      if (!Array.isArray(body.inspiration_links)) {
+        return res.status(400).json({ error: 'inspiration_links must be an array' });
+      }
+      patch.inspiration_links = body.inspiration_links;
+    }
+
+    // Update the record
+    const { data: updated, error: updateError } = await supabase
+      .from('wedding_vision')
+      .update(patch)
+      .eq('id', existing.id)
+      .select('*')
+      .single();
+
+    if (updateError || !updated) {
+      console.error('[PATCH /api/events/:id/vision] Update error:', updateError);
+      return res.status(500).json({ error: updateError?.message || 'Failed to update vision data' });
+    }
+
+    return res.json({ vision: updated });
+  } catch (error: any) {
+    console.error('[PATCH /api/events/:id/vision] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// ===== WEDDING VENUE API =====
+
+// Get or create wedding venue for an event
+app.get('/api/events/:id/venue', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const eventId = req.params.id;
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    // Check access (team member or creator)
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(accessCheck.error === 'Event not found' ? 404 : 403).json({ error: accessCheck.error || 'Not authorized' });
+    }
+
+    // Try to get existing venue record
+    const { data: existing, error: findError } = await supabase
+      .from('wedding_venues')
+      .select('*')
+      .eq('event_id', eventId)
+      .maybeSingle();
+
+    if (findError) {
+      console.error('[GET /api/events/:id/venue] Find error:', findError);
+      return res.status(500).json({ error: 'Failed to fetch venue data' });
+    }
+
+    // If exists, return it
+    if (existing) {
+      return res.json({ venue: existing });
+    }
+
+    // Create new venue record with defaults
+    const { data: newVenue, error: createError } = await supabase
+      .from('wedding_venues')
+      .insert({
+        event_id: eventId,
+        venue_name: null,
+        venue_address: null,
+        venue_latitude: null,
+        venue_longitude: null,
+        venue_capacity: null,
+        venue_type: null,
+        wedding_date: null,
+        contact_name: null,
+        contact_phone: null,
+        contact_email: null,
+        site_visit_notes: null,
+        contract_file_url: null,
+        contract_status: 'not_uploaded',
+        deposit_amount: 0,
+        deposit_due_date: null,
+        deposit_paid_date: null,
+        restrictions: [],
+      })
+      .select('*')
+      .single();
+
+    if (createError || !newVenue) {
+      console.error('[GET /api/events/:id/venue] Create error:', createError);
+      return res.status(500).json({ error: createError?.message || 'Failed to create venue data' });
+    }
+
+    return res.json({ venue: newVenue });
+  } catch (error: any) {
+    console.error('[GET /api/events/:id/venue] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Update wedding venue for an event
+app.patch('/api/events/:id/venue', express.json(), async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const eventId = req.params.id;
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    // Check access (team member or creator)
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(accessCheck.error === 'Event not found' ? 404 : 403).json({ error: accessCheck.error || 'Not authorized' });
+    }
+
+    // Check if venue record exists
+    const { data: existing, error: findError } = await supabase
+      .from('wedding_venues')
+      .select('id')
+      .eq('event_id', eventId)
+      .maybeSingle();
+
+    if (findError) {
+      console.error('[PATCH /api/events/:id/venue] Find error:', findError);
+      return res.status(500).json({ error: 'Failed to find venue data' });
+    }
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Venue record not found. GET first to create.' });
+    }
+
+    // Build patch object from allowed fields
+    const body = req.body ?? {};
+    const patch: any = {};
+
+    // Venue details
+    if (body.venue_name !== undefined) patch.venue_name = body.venue_name;
+    if (body.venue_address !== undefined) patch.venue_address = body.venue_address;
+    if (body.venue_latitude !== undefined) patch.venue_latitude = body.venue_latitude;
+    if (body.venue_longitude !== undefined) patch.venue_longitude = body.venue_longitude;
+    if (body.venue_capacity !== undefined) patch.venue_capacity = body.venue_capacity;
+
+    if (body.venue_type !== undefined) {
+      const validTypes = ['indoor', 'outdoor', 'both', null];
+      if (!validTypes.includes(body.venue_type)) {
+        return res.status(400).json({ error: 'Invalid venue_type value' });
+      }
+      patch.venue_type = body.venue_type;
+    }
+
+    // Date
+    if (body.wedding_date !== undefined) patch.wedding_date = body.wedding_date;
+
+    // Contact info
+    if (body.contact_name !== undefined) patch.contact_name = body.contact_name;
+    if (body.contact_phone !== undefined) patch.contact_phone = body.contact_phone;
+    if (body.contact_email !== undefined) patch.contact_email = body.contact_email;
+
+    // Notes
+    if (body.site_visit_notes !== undefined) patch.site_visit_notes = body.site_visit_notes;
+
+    // Contract
+    if (body.contract_file_url !== undefined) patch.contract_file_url = body.contract_file_url;
+
+    if (body.contract_status !== undefined) {
+      const validStatuses = ['not_uploaded', 'pending', 'signed'];
+      if (!validStatuses.includes(body.contract_status)) {
+        return res.status(400).json({ error: 'Invalid contract_status value' });
+      }
+      patch.contract_status = body.contract_status;
+    }
+
+    // Deposit
+    if (body.deposit_amount !== undefined) patch.deposit_amount = body.deposit_amount;
+    if (body.deposit_due_date !== undefined) patch.deposit_due_date = body.deposit_due_date;
+    if (body.deposit_paid_date !== undefined) patch.deposit_paid_date = body.deposit_paid_date;
+
+    // Restrictions
+    if (body.restrictions !== undefined) {
+      if (!Array.isArray(body.restrictions)) {
+        return res.status(400).json({ error: 'restrictions must be an array' });
+      }
+      if (body.restrictions.length > 20) {
+        return res.status(400).json({ error: 'Maximum 20 restrictions allowed' });
+      }
+      patch.restrictions = body.restrictions;
+    }
+
+    // Update the record
+    const { data: updated, error: updateError } = await supabase
+      .from('wedding_venues')
+      .update(patch)
+      .eq('id', existing.id)
+      .select('*')
+      .single();
+
+    if (updateError || !updated) {
+      console.error('[PATCH /api/events/:id/venue] Update error:', updateError);
+      return res.status(500).json({ error: updateError?.message || 'Failed to update venue data' });
+    }
+
+    return res.json({ venue: updated });
+  } catch (error: any) {
+    console.error('[PATCH /api/events/:id/venue] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// ===== WEDDING GUESTS API =====
+
+// Get guests for an event with filtering and pagination
+app.get('/api/events/:id/guests', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const eventId = req.params.id;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Parse query params
+    const search = req.query.search as string | undefined;
+    const side = req.query.side as string | undefined;
+    const guest_group = req.query.guest_group as string | undefined;
+    const rsvp_status = req.query.rsvp_status as string | undefined;
+    const dietary = req.query.dietary as string | undefined;
+    const needs_accessibility = req.query.needs_accessibility as string | undefined;
+    const is_child = req.query.is_child as string | undefined;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const sort_by = req.query.sort_by as string || 'created_at';
+    const sort_order = req.query.sort_order === 'asc' ? true : false;
+
+    // Build query
+    let query = supabase
+      .from('wedding_guests')
+      .select('*', { count: 'exact' })
+      .eq('event_id', eventId)
+      .is('deleted_at', null);
+
+    // Apply filters
+    if (search) {
+      query = query.or(`guest_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
+    }
+    if (side && ['bride', 'groom', 'both'].includes(side)) {
+      query = query.eq('side', side);
+    }
+    if (guest_group && ['family', 'friends', 'coworkers', 'other'].includes(guest_group)) {
+      query = query.eq('guest_group', guest_group);
+    }
+    if (rsvp_status && ['pending', 'yes', 'no'].includes(rsvp_status)) {
+      query = query.eq('rsvp_status', rsvp_status);
+    }
+    if (dietary) {
+      query = query.contains('dietary_restrictions', [dietary]);
+    }
+    if (needs_accessibility === 'true') {
+      query = query.eq('needs_accessibility', true);
+    }
+    if (is_child === 'true') {
+      query = query.eq('is_child', true);
+    }
+
+    // Apply sorting and pagination
+    const validSortColumns = ['guest_name', 'email', 'phone', 'side', 'guest_group', 'rsvp_status', 'created_at'];
+    const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'created_at';
+    query = query.order(sortColumn, { ascending: sort_order });
+    query = query.range((page - 1) * limit, page * limit - 1);
+
+    const { data: guests, error: guestsError, count } = await query;
+
+    if (guestsError) {
+      console.error('[GET /api/events/:id/guests] Query error:', guestsError);
+      return res.status(500).json({ error: guestsError.message });
+    }
+
+    // Get stats (separate query without pagination)
+    const { data: allGuests, error: statsError } = await supabase
+      .from('wedding_guests')
+      .select('rsvp_status, dietary_restrictions, is_child, needs_accessibility')
+      .eq('event_id', eventId)
+      .is('deleted_at', null);
+
+    if (statsError) {
+      console.error('[GET /api/events/:id/guests] Stats error:', statsError);
+    }
+
+    // Calculate stats
+    const stats = {
+      total: allGuests?.length || 0,
+      rsvp_yes: allGuests?.filter(g => g.rsvp_status === 'yes').length || 0,
+      rsvp_no: allGuests?.filter(g => g.rsvp_status === 'no').length || 0,
+      rsvp_pending: allGuests?.filter(g => g.rsvp_status === 'pending').length || 0,
+      children_count: allGuests?.filter(g => g.is_child).length || 0,
+      accessibility_count: allGuests?.filter(g => g.needs_accessibility).length || 0,
+      dietary_counts: {} as Record<string, number>,
+    };
+
+    // Count dietary restrictions
+    const dietaryOptions = ['vegetarian', 'vegan', 'gluten_free', 'dairy_free', 'nut_allergy', 'kosher', 'halal', 'other'];
+    dietaryOptions.forEach(d => {
+      stats.dietary_counts[d] = allGuests?.filter(g => g.dietary_restrictions?.includes(d)).length || 0;
+    });
+
+    return res.json({
+      guests: guests || [],
+      stats,
+      total_count: count || 0,
+      page,
+      limit,
+    });
+  } catch (error: any) {
+    console.error('[GET /api/events/:id/guests] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Create a new guest
+app.post('/api/events/:id/guests', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const eventId = req.params.id;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const body = req.body || {};
+
+    // Validate required fields
+    if (!body.guest_name || typeof body.guest_name !== 'string' || body.guest_name.trim().length < 2) {
+      return res.status(400).json({ error: 'guest_name is required (min 2 characters)' });
+    }
+
+    // Validate enums
+    if (body.side && !['bride', 'groom', 'both'].includes(body.side)) {
+      return res.status(400).json({ error: 'Invalid side value' });
+    }
+    if (body.guest_group && !['family', 'friends', 'coworkers', 'other'].includes(body.guest_group)) {
+      return res.status(400).json({ error: 'Invalid guest_group value' });
+    }
+    if (body.rsvp_status && !['pending', 'yes', 'no'].includes(body.rsvp_status)) {
+      return res.status(400).json({ error: 'Invalid rsvp_status value' });
+    }
+
+    // Validate dietary restrictions
+    const validDietary = ['vegetarian', 'vegan', 'gluten_free', 'dairy_free', 'nut_allergy', 'kosher', 'halal', 'other'];
+    if (body.dietary_restrictions) {
+      if (!Array.isArray(body.dietary_restrictions)) {
+        return res.status(400).json({ error: 'dietary_restrictions must be an array' });
+      }
+      for (const d of body.dietary_restrictions) {
+        if (!validDietary.includes(d)) {
+          return res.status(400).json({ error: `Invalid dietary restriction: ${d}` });
+        }
+      }
+    }
+
+    const guestData = {
+      event_id: eventId,
+      guest_name: body.guest_name.trim(),
+      email: body.email || null,
+      phone: body.phone || null,
+      side: body.side || null,
+      guest_group: body.guest_group || null,
+      rsvp_status: body.rsvp_status || 'pending',
+      dietary_restrictions: body.dietary_restrictions || [],
+      dietary_notes: body.dietary_notes || null,
+      plus_one_allowed: body.plus_one_allowed || false,
+      plus_one_name: body.plus_one_name || null,
+      is_child: body.is_child || false,
+      needs_accessibility: body.needs_accessibility || false,
+      accessibility_notes: body.accessibility_notes || null,
+      gift_received: body.gift_received || false,
+      gift_notes: body.gift_notes || null,
+      table_assignment: body.table_assignment || null,
+    };
+
+    const { data: guest, error: insertError } = await supabase
+      .from('wedding_guests')
+      .insert(guestData)
+      .select('*')
+      .single();
+
+    if (insertError || !guest) {
+      console.error('[POST /api/events/:id/guests] Insert error:', insertError);
+      return res.status(500).json({ error: insertError?.message || 'Failed to create guest' });
+    }
+
+    return res.status(201).json({ guest });
+  } catch (error: any) {
+    console.error('[POST /api/events/:id/guests] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Update a guest
+app.patch('/api/events/:id/guests/:guestId', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const eventId = req.params.id;
+    const guestId = req.params.guestId;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const body = req.body || {};
+    const patch: Record<string, any> = {};
+
+    // Validate and build patch
+    if (body.guest_name !== undefined) {
+      if (typeof body.guest_name !== 'string' || body.guest_name.trim().length < 2) {
+        return res.status(400).json({ error: 'guest_name must be at least 2 characters' });
+      }
+      patch.guest_name = body.guest_name.trim();
+    }
+
+    if (body.email !== undefined) patch.email = body.email;
+    if (body.phone !== undefined) patch.phone = body.phone;
+
+    if (body.side !== undefined) {
+      if (body.side !== null && !['bride', 'groom', 'both'].includes(body.side)) {
+        return res.status(400).json({ error: 'Invalid side value' });
+      }
+      patch.side = body.side;
+    }
+
+    if (body.guest_group !== undefined) {
+      if (body.guest_group !== null && !['family', 'friends', 'coworkers', 'other'].includes(body.guest_group)) {
+        return res.status(400).json({ error: 'Invalid guest_group value' });
+      }
+      patch.guest_group = body.guest_group;
+    }
+
+    if (body.rsvp_status !== undefined) {
+      if (!['pending', 'yes', 'no'].includes(body.rsvp_status)) {
+        return res.status(400).json({ error: 'Invalid rsvp_status value' });
+      }
+      patch.rsvp_status = body.rsvp_status;
+    }
+
+    if (body.dietary_restrictions !== undefined) {
+      const validDietary = ['vegetarian', 'vegan', 'gluten_free', 'dairy_free', 'nut_allergy', 'kosher', 'halal', 'other'];
+      if (!Array.isArray(body.dietary_restrictions)) {
+        return res.status(400).json({ error: 'dietary_restrictions must be an array' });
+      }
+      for (const d of body.dietary_restrictions) {
+        if (!validDietary.includes(d)) {
+          return res.status(400).json({ error: `Invalid dietary restriction: ${d}` });
+        }
+      }
+      patch.dietary_restrictions = body.dietary_restrictions;
+    }
+
+    if (body.dietary_notes !== undefined) patch.dietary_notes = body.dietary_notes;
+    if (body.plus_one_allowed !== undefined) patch.plus_one_allowed = body.plus_one_allowed;
+    if (body.plus_one_name !== undefined) patch.plus_one_name = body.plus_one_name;
+    if (body.is_child !== undefined) patch.is_child = body.is_child;
+    if (body.needs_accessibility !== undefined) patch.needs_accessibility = body.needs_accessibility;
+    if (body.accessibility_notes !== undefined) patch.accessibility_notes = body.accessibility_notes;
+    if (body.gift_received !== undefined) patch.gift_received = body.gift_received;
+    if (body.gift_notes !== undefined) patch.gift_notes = body.gift_notes;
+    if (body.table_assignment !== undefined) patch.table_assignment = body.table_assignment;
+
+    if (Object.keys(patch).length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    const { data: guest, error: updateError } = await supabase
+      .from('wedding_guests')
+      .update(patch)
+      .eq('id', guestId)
+      .eq('event_id', eventId)
+      .is('deleted_at', null)
+      .select('*')
+      .single();
+
+    if (updateError || !guest) {
+      console.error('[PATCH /api/events/:id/guests/:guestId] Update error:', updateError);
+      return res.status(500).json({ error: updateError?.message || 'Failed to update guest' });
+    }
+
+    return res.json({ guest });
+  } catch (error: any) {
+    console.error('[PATCH /api/events/:id/guests/:guestId] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Delete a guest (soft delete)
+app.delete('/api/events/:id/guests/:guestId', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const eventId = req.params.id;
+    const guestId = req.params.guestId;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { error: deleteError } = await supabase
+      .from('wedding_guests')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', guestId)
+      .eq('event_id', eventId);
+
+    if (deleteError) {
+      console.error('[DELETE /api/events/:id/guests/:guestId] Delete error:', deleteError);
+      return res.status(500).json({ error: deleteError.message });
+    }
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error('[DELETE /api/events/:id/guests/:guestId] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Bulk update guests
+app.patch('/api/events/:id/guests/bulk', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const eventId = req.params.id;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { guest_ids, updates } = req.body || {};
+
+    if (!Array.isArray(guest_ids) || guest_ids.length === 0) {
+      return res.status(400).json({ error: 'guest_ids array is required' });
+    }
+    if (!updates || typeof updates !== 'object') {
+      return res.status(400).json({ error: 'updates object is required' });
+    }
+
+    // Validate updates
+    const patch: Record<string, any> = {};
+    if (updates.rsvp_status !== undefined) {
+      if (!['pending', 'yes', 'no'].includes(updates.rsvp_status)) {
+        return res.status(400).json({ error: 'Invalid rsvp_status value' });
+      }
+      patch.rsvp_status = updates.rsvp_status;
+    }
+    if (updates.guest_group !== undefined) {
+      if (updates.guest_group !== null && !['family', 'friends', 'coworkers', 'other'].includes(updates.guest_group)) {
+        return res.status(400).json({ error: 'Invalid guest_group value' });
+      }
+      patch.guest_group = updates.guest_group;
+    }
+    if (updates.side !== undefined) {
+      if (updates.side !== null && !['bride', 'groom', 'both'].includes(updates.side)) {
+        return res.status(400).json({ error: 'Invalid side value' });
+      }
+      patch.side = updates.side;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return res.status(400).json({ error: 'No valid updates provided' });
+    }
+
+    const { data, error: updateError } = await supabase
+      .from('wedding_guests')
+      .update(patch)
+      .in('id', guest_ids)
+      .eq('event_id', eventId)
+      .is('deleted_at', null)
+      .select('id');
+
+    if (updateError) {
+      console.error('[PATCH /api/events/:id/guests/bulk] Update error:', updateError);
+      return res.status(500).json({ error: updateError.message });
+    }
+
+    return res.json({ updated: data?.length || 0 });
+  } catch (error: any) {
+    console.error('[PATCH /api/events/:id/guests/bulk] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Bulk delete guests
+app.delete('/api/events/:id/guests/bulk', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const eventId = req.params.id;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { guest_ids } = req.body || {};
+
+    if (!Array.isArray(guest_ids) || guest_ids.length === 0) {
+      return res.status(400).json({ error: 'guest_ids array is required' });
+    }
+
+    const { data, error: deleteError } = await supabase
+      .from('wedding_guests')
+      .update({ deleted_at: new Date().toISOString() })
+      .in('id', guest_ids)
+      .eq('event_id', eventId)
+      .select('id');
+
+    if (deleteError) {
+      console.error('[DELETE /api/events/:id/guests/bulk] Delete error:', deleteError);
+      return res.status(500).json({ error: deleteError.message });
+    }
+
+    return res.json({ deleted: data?.length || 0 });
+  } catch (error: any) {
+    console.error('[DELETE /api/events/:id/guests/bulk] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Import guests from CSV data
+app.post('/api/events/:id/guests/import', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const eventId = req.params.id;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { guests, start_row = 0 } = req.body || {};
+
+    if (!Array.isArray(guests) || guests.length === 0) {
+      return res.status(400).json({ error: 'guests array is required' });
+    }
+
+    const validDietary = ['vegetarian', 'vegan', 'gluten_free', 'dairy_free', 'nut_allergy', 'kosher', 'halal', 'other'];
+    const errors: Array<{ row: number; error: string }> = [];
+    const validGuests: any[] = [];
+
+    guests.forEach((guest, idx) => {
+      const row = start_row + idx + 1;
+
+      // Validate required fields
+      if (!guest.guest_name || typeof guest.guest_name !== 'string' || guest.guest_name.trim().length < 2) {
+        errors.push({ row, error: 'Missing or invalid guest_name' });
+        return;
+      }
+
+      // Validate enums
+      if (guest.side && !['bride', 'groom', 'both'].includes(guest.side)) {
+        errors.push({ row, error: `Invalid side value: ${guest.side}` });
+        return;
+      }
+      if (guest.guest_group && !['family', 'friends', 'coworkers', 'other'].includes(guest.guest_group)) {
+        errors.push({ row, error: `Invalid guest_group value: ${guest.guest_group}` });
+        return;
+      }
+      if (guest.rsvp_status && !['pending', 'yes', 'no'].includes(guest.rsvp_status)) {
+        errors.push({ row, error: `Invalid rsvp_status value: ${guest.rsvp_status}` });
+        return;
+      }
+
+      // Validate dietary
+      if (guest.dietary_restrictions) {
+        if (!Array.isArray(guest.dietary_restrictions)) {
+          errors.push({ row, error: 'dietary_restrictions must be an array' });
+          return;
+        }
+        for (const d of guest.dietary_restrictions) {
+          if (!validDietary.includes(d)) {
+            errors.push({ row, error: `Invalid dietary restriction: ${d}` });
+            return;
+          }
+        }
+      }
+
+      validGuests.push({
+        event_id: eventId,
+        guest_name: guest.guest_name.trim(),
+        email: guest.email || null,
+        phone: guest.phone || null,
+        side: guest.side || null,
+        guest_group: guest.guest_group || null,
+        rsvp_status: guest.rsvp_status || 'pending',
+        dietary_restrictions: guest.dietary_restrictions || [],
+        dietary_notes: guest.dietary_notes || null,
+        plus_one_allowed: guest.plus_one_allowed || false,
+        plus_one_name: guest.plus_one_name || null,
+        is_child: guest.is_child || false,
+        needs_accessibility: guest.needs_accessibility || false,
+        accessibility_notes: guest.accessibility_notes || null,
+      });
+    });
+
+    let imported = 0;
+    if (validGuests.length > 0) {
+      const { data, error: insertError } = await supabase
+        .from('wedding_guests')
+        .insert(validGuests)
+        .select('id');
+
+      if (insertError) {
+        console.error('[POST /api/events/:id/guests/import] Insert error:', insertError);
+        return res.status(500).json({ error: insertError.message });
+      }
+
+      imported = data?.length || 0;
+    }
+
+    return res.json({ imported, errors });
+  } catch (error: any) {
+    console.error('[POST /api/events/:id/guests/import] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Export guests to CSV
+app.get('/api/events/:id/guests/export', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const eventId = req.params.id;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { data: guests, error: fetchError } = await supabase
+      .from('wedding_guests')
+      .select('*')
+      .eq('event_id', eventId)
+      .is('deleted_at', null)
+      .order('guest_name', { ascending: true });
+
+    if (fetchError) {
+      console.error('[GET /api/events/:id/guests/export] Fetch error:', fetchError);
+      return res.status(500).json({ error: fetchError.message });
+    }
+
+    // Build CSV
+    const headers = [
+      'guest_name',
+      'email',
+      'phone',
+      'side',
+      'guest_group',
+      'rsvp_status',
+      'dietary_restrictions',
+      'dietary_notes',
+      'plus_one_allowed',
+      'plus_one_name',
+      'is_child',
+      'needs_accessibility',
+      'accessibility_notes',
+      'gift_received',
+      'gift_notes',
+      'table_assignment',
+    ];
+
+    const escapeCSV = (val: any): string => {
+      if (val === null || val === undefined) return '';
+      const str = String(val);
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const rows = (guests || []).map(g => [
+      escapeCSV(g.guest_name),
+      escapeCSV(g.email),
+      escapeCSV(g.phone),
+      escapeCSV(g.side),
+      escapeCSV(g.guest_group),
+      escapeCSV(g.rsvp_status),
+      escapeCSV((g.dietary_restrictions || []).join(',')),
+      escapeCSV(g.dietary_notes),
+      escapeCSV(g.plus_one_allowed),
+      escapeCSV(g.plus_one_name),
+      escapeCSV(g.is_child),
+      escapeCSV(g.needs_accessibility),
+      escapeCSV(g.accessibility_notes),
+      escapeCSV(g.gift_received),
+      escapeCSV(g.gift_notes),
+      escapeCSV(g.table_assignment),
+    ].join(','));
+
+    const csv = [headers.join(','), ...rows].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="guests-${eventId}.csv"`);
+    return res.send(csv);
+  } catch (error: any) {
+    console.error('[GET /api/events/:id/guests/export] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// ===== WEDDING BUDGET API =====
+
+// Get budget overview for an event
+app.get('/api/events/:id/budget', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const eventId = req.params.id;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Get or create budget record
+    let { data: budget, error: budgetError } = await supabase
+      .from('wedding_budgets')
+      .select('*')
+      .eq('event_id', eventId)
+      .single();
+
+    if (budgetError && budgetError.code === 'PGRST116') {
+      // No budget exists, create one
+      const { data: newBudget, error: createError } = await supabase
+        .from('wedding_budgets')
+        .insert({ event_id: eventId, total_budget: 0, currency: 'EUR' })
+        .select('*')
+        .single();
+
+      if (createError || !newBudget) {
+        console.error('[GET /api/events/:id/budget] Create error:', createError);
+        return res.status(500).json({ error: createError?.message || 'Failed to create budget' });
+      }
+      budget = newBudget;
+    } else if (budgetError) {
+      console.error('[GET /api/events/:id/budget] Budget error:', budgetError);
+      return res.status(500).json({ error: budgetError.message });
+    }
+
+    // Get categories
+    const { data: categories, error: categoriesError } = await supabase
+      .from('budget_categories')
+      .select('*')
+      .eq('event_id', eventId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true });
+
+    if (categoriesError) {
+      console.error('[GET /api/events/:id/budget] Categories error:', categoriesError);
+      return res.status(500).json({ error: categoriesError.message });
+    }
+
+    // Calculate totals
+    const activeCategories = categories || [];
+    const total_budgeted = activeCategories.reduce((sum: number, c: any) => sum + (c.budgeted_amount || 0), 0);
+    const total_contracted = activeCategories.reduce((sum: number, c: any) => sum + (c.contracted_amount || 0), 0);
+    const total_paid = activeCategories.reduce((sum: number, c: any) => sum + (c.paid_amount || 0), 0);
+    const total_remaining = total_contracted - total_paid;
+
+    // Calculate alerts
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const overdue_payments: any[] = [];
+    const upcoming_payments: any[] = [];
+    const over_budget_categories: any[] = [];
+
+    activeCategories.forEach((category: any) => {
+      const schedule = category.payment_schedule || [];
+      schedule.forEach((payment: any) => {
+        if (payment.paid) return;
+        const dueDate = new Date(payment.due_date);
+        dueDate.setHours(0, 0, 0, 0);
+        const days = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (days < 0) {
+          overdue_payments.push({ category_id: category.id, category_name: category.category_name, payment });
+        } else if (days <= 7) {
+          upcoming_payments.push({ category_id: category.id, category_name: category.category_name, payment, days_until: days });
+        }
+      });
+
+      if (category.contracted_amount && category.contracted_amount > category.budgeted_amount) {
+        over_budget_categories.push({
+          category_id: category.id,
+          category_name: category.category_name,
+          overage: category.contracted_amount - category.budgeted_amount,
+        });
+      }
+    });
+
+    return res.json({
+      budget,
+      categories: activeCategories,
+      totals: { total_budgeted, total_contracted, total_paid, total_remaining },
+      alerts: { overdue_payments, upcoming_payments, over_budget_categories },
+    });
+  } catch (error: any) {
+    console.error('[GET /api/events/:id/budget] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Update budget (total budget, currency)
+app.patch('/api/events/:id/budget', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const eventId = req.params.id;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const body = req.body || {};
+    const patch: Record<string, any> = {};
+
+    if (body.total_budget !== undefined) {
+      if (typeof body.total_budget !== 'number' || body.total_budget < 0) {
+        return res.status(400).json({ error: 'total_budget must be a non-negative number' });
+      }
+      patch.total_budget = body.total_budget;
+    }
+
+    if (body.currency !== undefined) {
+      if (!['USD', 'EUR', 'GBP'].includes(body.currency)) {
+        return res.status(400).json({ error: 'Invalid currency' });
+      }
+      patch.currency = body.currency;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    const { data: budget, error: updateError } = await supabase
+      .from('wedding_budgets')
+      .update(patch)
+      .eq('event_id', eventId)
+      .select('*')
+      .single();
+
+    if (updateError || !budget) {
+      console.error('[PATCH /api/events/:id/budget] Update error:', updateError);
+      return res.status(500).json({ error: updateError?.message || 'Failed to update budget' });
+    }
+
+    return res.json({ budget });
+  } catch (error: any) {
+    console.error('[PATCH /api/events/:id/budget] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Create a budget category
+app.post('/api/events/:id/budget/categories', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const eventId = req.params.id;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const body = req.body || {};
+
+    // Validate category name
+    const validCategories = [
+      'venue', 'catering', 'photography', 'videography', 'flowers',
+      'music_dj', 'dress_attire', 'rings', 'invitations', 'favors',
+      'transportation', 'accommodation', 'hair_makeup', 'cake',
+      'decor', 'rentals', 'officiant', 'planner', 'other',
+    ];
+
+    if (!body.category_name || !validCategories.includes(body.category_name)) {
+      return res.status(400).json({ error: 'Invalid category_name' });
+    }
+
+    if (typeof body.budgeted_amount !== 'number' || body.budgeted_amount < 0) {
+      return res.status(400).json({ error: 'budgeted_amount must be a non-negative number' });
+    }
+
+    const categoryData = {
+      event_id: eventId,
+      category_name: body.category_name,
+      custom_name: body.custom_name || null,
+      budgeted_amount: body.budgeted_amount,
+      contracted_amount: body.contracted_amount || null,
+      paid_amount: body.paid_amount || 0,
+      payment_schedule: body.payment_schedule || [],
+      is_contracted: body.is_contracted || false,
+      notes: body.notes || null,
+    };
+
+    const { data: category, error: createError } = await supabase
+      .from('budget_categories')
+      .insert(categoryData)
+      .select('*')
+      .single();
+
+    if (createError || !category) {
+      console.error('[POST /api/events/:id/budget/categories] Create error:', createError);
+      return res.status(500).json({ error: createError?.message || 'Failed to create category' });
+    }
+
+    return res.status(201).json({ category });
+  } catch (error: any) {
+    console.error('[POST /api/events/:id/budget/categories] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Update a budget category
+app.patch('/api/events/:id/budget/categories/:categoryId', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const eventId = req.params.id;
+    const categoryId = req.params.categoryId;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const body = req.body || {};
+    const patch: Record<string, any> = {};
+
+    const validCategories = [
+      'venue', 'catering', 'photography', 'videography', 'flowers',
+      'music_dj', 'dress_attire', 'rings', 'invitations', 'favors',
+      'transportation', 'accommodation', 'hair_makeup', 'cake',
+      'decor', 'rentals', 'officiant', 'planner', 'other',
+    ];
+
+    if (body.category_name !== undefined) {
+      if (!validCategories.includes(body.category_name)) {
+        return res.status(400).json({ error: 'Invalid category_name' });
+      }
+      patch.category_name = body.category_name;
+    }
+
+    if (body.custom_name !== undefined) patch.custom_name = body.custom_name;
+    if (body.budgeted_amount !== undefined) {
+      if (typeof body.budgeted_amount !== 'number' || body.budgeted_amount < 0) {
+        return res.status(400).json({ error: 'budgeted_amount must be non-negative' });
+      }
+      patch.budgeted_amount = body.budgeted_amount;
+    }
+    if (body.contracted_amount !== undefined) {
+      if (body.contracted_amount !== null && (typeof body.contracted_amount !== 'number' || body.contracted_amount < 0)) {
+        return res.status(400).json({ error: 'contracted_amount must be non-negative or null' });
+      }
+      patch.contracted_amount = body.contracted_amount;
+    }
+    if (body.paid_amount !== undefined) {
+      if (typeof body.paid_amount !== 'number' || body.paid_amount < 0) {
+        return res.status(400).json({ error: 'paid_amount must be non-negative' });
+      }
+      patch.paid_amount = body.paid_amount;
+    }
+    if (body.payment_schedule !== undefined) {
+      if (!Array.isArray(body.payment_schedule)) {
+        return res.status(400).json({ error: 'payment_schedule must be an array' });
+      }
+      patch.payment_schedule = body.payment_schedule;
+    }
+    if (body.is_contracted !== undefined) patch.is_contracted = body.is_contracted;
+    if (body.notes !== undefined) patch.notes = body.notes;
+
+    if (Object.keys(patch).length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    const { data: category, error: updateError } = await supabase
+      .from('budget_categories')
+      .update(patch)
+      .eq('id', categoryId)
+      .eq('event_id', eventId)
+      .is('deleted_at', null)
+      .select('*')
+      .single();
+
+    if (updateError || !category) {
+      console.error('[PATCH /api/events/:id/budget/categories/:id] Update error:', updateError);
+      return res.status(500).json({ error: updateError?.message || 'Failed to update category' });
+    }
+
+    return res.json({ category });
+  } catch (error: any) {
+    console.error('[PATCH /api/events/:id/budget/categories/:id] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Delete a budget category (soft delete)
+app.delete('/api/events/:id/budget/categories/:categoryId', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const eventId = req.params.id;
+    const categoryId = req.params.categoryId;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { error: deleteError } = await supabase
+      .from('budget_categories')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', categoryId)
+      .eq('event_id', eventId);
+
+    if (deleteError) {
+      console.error('[DELETE /api/events/:id/budget/categories/:id] Delete error:', deleteError);
+      return res.status(500).json({ error: deleteError.message });
+    }
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error('[DELETE /api/events/:id/budget/categories/:id] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
+// Mark a payment as paid/unpaid
+app.patch('/api/events/:id/budget/categories/:categoryId/payments/:paymentId', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const eventId = req.params.id;
+    const categoryId = req.params.categoryId;
+    const paymentId = req.params.paymentId;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const accessCheck = await canAccessEvent(supabase, eventId, user.id);
+    if (!accessCheck.canAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { paid, paid_date } = req.body || {};
+
+    // Fetch current category
+    const { data: category, error: fetchError } = await supabase
+      .from('budget_categories')
+      .select('*')
+      .eq('id', categoryId)
+      .eq('event_id', eventId)
+      .is('deleted_at', null)
+      .single();
+
+    if (fetchError || !category) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+
+    // Update payment in schedule
+    const schedule = category.payment_schedule || [];
+    const paymentIndex = schedule.findIndex((p: any) => p.id === paymentId);
+
+    if (paymentIndex === -1) {
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+
+    schedule[paymentIndex].paid = paid;
+    schedule[paymentIndex].paid_date = paid_date || null;
+
+    // Recalculate paid_amount based on paid payments
+    const newPaidAmount = schedule
+      .filter((p: any) => p.paid)
+      .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+    const { data: updated, error: updateError } = await supabase
+      .from('budget_categories')
+      .update({ payment_schedule: schedule, paid_amount: newPaidAmount })
+      .eq('id', categoryId)
+      .select('*')
+      .single();
+
+    if (updateError || !updated) {
+      console.error('[PATCH payment] Update error:', updateError);
+      return res.status(500).json({ error: updateError?.message || 'Failed to update payment' });
+    }
+
+    return res.json({ category: updated });
+  } catch (error: any) {
+    console.error('[PATCH payment] Unexpected error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
+  }
+});
+
 // ===== TASKS API =====
 
 // Get tasks for current user's team
@@ -3841,13 +5888,21 @@ app.get('/api/tasks', async (req, res) => {
       .order('created_at', { ascending: false });
 
     // Filter by "my tasks" (created by me OR assigned to me)
+    // This is the default behavior - always show only tasks created by or assigned to the current user
     if (showMyTasks) {
       query = query.or(`created_by.eq.${user.id},assignee_id.eq.${user.id}`);
+      // If also filtering for unassigned, add that condition
+      if (showUnassigned) {
+        query = query.is('assignee_id', null);
+      }
     } else if (showUnassigned) {
-      // Filter by assignee
+      // Filter by assignee (unassigned only)
       query = query.is('assignee_id', null);
     } else if (assigneeId) {
       query = query.eq('assignee_id', assigneeId);
+    } else {
+      // Default: show only my tasks if no filter specified
+      query = query.or(`created_by.eq.${user.id},assignee_id.eq.${user.id}`);
     }
 
     // Filter by completion status
@@ -4082,9 +6137,21 @@ app.post('/api/tasks', express.json(), async (req, res) => {
         console.warn('[POST /api/tasks] Failed to fetch assignee user:', err);
       }
 
-      // Send notification (email + in-app via trigger)
-      if (task.assignee_id !== user.id) {
-        await notifyTaskAssignment(supabase, task.assignee_id, task.title, task.id, false);
+      // Send notification (email + in-app)
+      if (task.assignee_id && task.assignee_id !== user.id) {
+        console.log('[POST /api/tasks] Creating notification for assignee:', {
+          assigneeId: task.assignee_id,
+          taskId: task.id,
+          taskTitle: task.title,
+          assignerId: user.id,
+        });
+        await notifyTaskAssignment(supabase, task.assignee_id, task.title, task.id, user.id, task.event_id, false);
+      } else {
+        console.log('[POST /api/tasks] Skipping notification:', {
+          assigneeId: task.assignee_id,
+          assignerId: user.id,
+          reason: task.assignee_id === user.id ? 'self-assignment' : 'no assignee',
+        });
       }
     }
 
@@ -4271,10 +6338,17 @@ app.patch('/api/tasks/:id', express.json(), async (req, res) => {
         console.warn('[PATCH /api/tasks/:id] Failed to fetch assignee user:', err);
       }
 
-      // Send notification if assignee changed (email + in-app via trigger)
+      // Send notification if assignee changed (email + in-app)
       if (updates.assignee_id !== undefined && task.assignee_id && task.assignee_id !== user.id) {
         const wasReassignment = existingTask.assignee_id !== null && existingTask.assignee_id !== task.assignee_id;
-        await notifyTaskAssignment(supabase, task.assignee_id, existingTask.title || task.title, task.id, wasReassignment);
+        console.log('[PATCH /api/tasks/:id] Creating notification for assignee:', {
+          assigneeId: task.assignee_id,
+          taskId: task.id,
+          taskTitle: existingTask.title || task.title,
+          assignerId: user.id,
+          wasReassignment,
+        });
+        await notifyTaskAssignment(supabase, task.assignee_id, existingTask.title || task.title, task.id, user.id, task.event_id, wasReassignment);
       }
     }
 
@@ -4543,6 +6617,88 @@ app.get('/api/notifications/unread-count', async (req, res) => {
   }
 });
 
+// Delete a notification
+app.delete('/api/notifications/:id', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const notificationId = req.params.id;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    // Verify notification belongs to user before deleting
+    const { data: existing, error: fetchError } = await supabase
+      .from('notifications')
+      .select('id, is_read')
+      .eq('id', notificationId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (fetchError || !existing) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+
+    const { error } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('id', notificationId)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('[DELETE /api/notifications/:id] Error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[DELETE /api/notifications/:id] Unexpected error:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
+// Mark notification as unread (optional per spec)
+app.patch('/api/notifications/:id/unread', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const notificationId = req.params.id;
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
+    const { data, error } = await supabase
+      .from('notifications')
+      .update({ is_read: false })
+      .eq('id', notificationId)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[PATCH /api/notifications/:id/unread] Error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+
+    res.json({ notification: data });
+  } catch (error: any) {
+    console.error('[PATCH /api/notifications/:id/unread] Unexpected error:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
 // Helper function to send email notification (placeholder - implement with your email service)
 async function sendEmailNotification(
   email: string,
@@ -4565,10 +6721,90 @@ async function notifyTaskAssignment(
   assigneeId: string,
   taskTitle: string,
   taskId: string,
+  assignerId: string,
+  projectId: string | null = null,
   isReassignment: boolean = false,
 ): Promise<void> {
   try {
-    // Get assignee email
+    // Get assigner name for notification title
+    let assignerName = 'Someone';
+    try {
+      const { data: assignerProfile } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', assignerId)
+        .maybeSingle();
+
+      if (assignerProfile?.full_name) {
+        assignerName = assignerProfile.full_name;
+      } else {
+        const { data: assignerUser } = await supabase.auth.admin.getUserById(assignerId);
+        assignerName = assignerUser?.user?.user_metadata?.full_name || assignerUser?.user?.email || 'Someone';
+      }
+    } catch (err) {
+      console.warn('[notifyTaskAssignment] Failed to fetch assigner name:', err);
+    }
+
+    // Get project name if available
+    let projectName: string | null = null;
+    if (projectId) {
+      try {
+        const { data: eventRow } = await supabase
+          .from('events')
+          .select('title')
+          .eq('id', projectId)
+          .maybeSingle();
+        if (eventRow?.title) {
+          projectName = eventRow.title;
+        }
+      } catch (err) {
+        console.warn('[notifyTaskAssignment] Failed to fetch project name:', err);
+      }
+    }
+
+    // Create notification title and message
+    const notificationType = isReassignment ? 'task_reassigned' : 'task_assigned';
+    const notificationTitle = `${assignerName} assigned you a task`;
+    let notificationMessage = `Task: ${taskTitle}`;
+    if (projectName) {
+      notificationMessage += `\nin ${projectName}`;
+    }
+
+    // Create in-app notification record
+    const { data: notificationData, error: notifError } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: assigneeId,
+        type: notificationType,
+        title: notificationTitle,
+        message: notificationMessage,
+        related_entity_type: 'task',
+        related_entity_id: taskId,
+        is_read: false,
+      })
+      .select()
+      .single();
+
+    if (notifError) {
+      console.error('[notifyTaskAssignment] Failed to create notification:', notifError);
+      console.error('[notifyTaskAssignment] Details:', {
+        assigneeId,
+        taskId,
+        assignerId,
+        notificationType,
+        errorCode: notifError.code,
+        errorMessage: notifError.message,
+      });
+    } else {
+      console.log('[notifyTaskAssignment] Notification created successfully:', {
+        notificationId: notificationData?.id,
+        assigneeId,
+        taskId,
+        type: notificationType,
+      });
+    }
+
+    // Get assignee email for email notification
     let assigneeEmail: string | null = null;
     try {
       const { data: profileRow } = await supabase
@@ -4598,11 +6834,121 @@ async function notifyTaskAssignment(
 
       await sendEmailNotification(assigneeEmail, subject, emailMessage);
     }
-
-    // Note: Database trigger will create the in-app notification automatically
-    // But we can also create it here if needed for consistency
   } catch (error) {
     console.error('[notifyTaskAssignment] Error:', error);
+    // Don't throw - notifications are non-critical
+  }
+}
+
+async function notifyTeamInvitation(
+  supabase: NonNullable<ReturnType<typeof getSupabaseServiceClient>>,
+  inviteeEmail: string,
+  teamId: string,
+  teamName: string | null,
+  inviterId: string,
+): Promise<void> {
+  try {
+    // Find user by email to get their user_id
+    let inviteeUserId: string | null = null;
+    try {
+      // Try to find user by email in auth.users
+      // Note: listUsers is paginated, but for small user bases this is fine
+      // For production with many users, consider implementing pagination or using a more efficient lookup
+      const { data: users, error: listError } = await supabase.auth.admin.listUsers();
+      if (listError) {
+        console.warn('[notifyTeamInvitation] Failed to list users:', listError);
+        return;
+      }
+      const user = users?.users?.find((u) => u.email?.toLowerCase() === inviteeEmail.toLowerCase());
+      if (user) {
+        inviteeUserId = user.id;
+      }
+    } catch (err) {
+      console.warn('[notifyTeamInvitation] Failed to find user by email:', err);
+      // If user doesn't exist, don't create notification (they'll get it when they sign up and see pending invites)
+      return;
+    }
+
+    // Only create notification if user exists
+    if (!inviteeUserId) {
+      console.log('[notifyTeamInvitation] User not found, skipping notification (they will see invite when they sign up)');
+      return;
+    }
+
+    // Get team name if not provided
+    let finalTeamName = teamName;
+    if (!finalTeamName) {
+      try {
+        const { data: teamRow } = await supabase
+          .from('teams')
+          .select('name')
+          .eq('id', teamId)
+          .maybeSingle();
+        finalTeamName = teamRow?.name || 'a team';
+      } catch (err) {
+        console.warn('[notifyTeamInvitation] Failed to fetch team name:', err);
+        finalTeamName = 'a team';
+      }
+    }
+
+    // Get inviter name for notification title
+    let inviterName = 'Someone';
+    try {
+      const { data: inviterProfile } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', inviterId)
+        .maybeSingle();
+
+      if (inviterProfile?.full_name) {
+        inviterName = inviterProfile.full_name;
+      } else {
+        const { data: inviterUser } = await supabase.auth.admin.getUserById(inviterId);
+        inviterName = inviterUser?.user?.user_metadata?.full_name || inviterUser?.user?.email || 'Someone';
+      }
+    } catch (err) {
+      console.warn('[notifyTeamInvitation] Failed to fetch inviter name:', err);
+    }
+
+    // Create notification title and message
+    const notificationTitle = `${inviterName} invited you to join a team`;
+    const notificationMessage = `Team: ${finalTeamName}`;
+
+    // Create in-app notification record
+    const { data: notificationData, error: notifError } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: inviteeUserId,
+        type: 'team_invitation',
+        title: notificationTitle,
+        message: notificationMessage,
+        related_entity_type: 'team',
+        related_entity_id: teamId,
+        is_read: false,
+      })
+      .select()
+      .single();
+
+    if (notifError) {
+      console.error('[notifyTeamInvitation] Failed to create notification:', notifError);
+      console.error('[notifyTeamInvitation] Details:', {
+        inviteeUserId,
+        inviteeEmail,
+        teamId,
+        inviterId,
+        errorCode: notifError.code,
+        errorMessage: notifError.message,
+      });
+    } else {
+      console.log('[notifyTeamInvitation] Notification created successfully:', {
+        notificationId: notificationData?.id,
+        inviteeUserId,
+        teamId,
+        type: 'team_invitation',
+      });
+    }
+  } catch (error) {
+    console.error('[notifyTeamInvitation] Error:', error);
     // Don't throw - notifications are non-critical
   }
 }
@@ -5624,6 +7970,609 @@ app.get('/api/electrical/projects/:projectId/export.pdf', async (req, res) => {
     }
   }
 });
+
+// ============================================================================
+// SUBSCRIPTION & PAYMENT ENDPOINTS (Stripe Integration)
+// ============================================================================
+
+// Helper: Get user's team for subscriptions
+async function getSubscriptionUserTeam(userId: string): Promise<{ team_id: string; role: string } | null> {
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) return null;
+  
+  const { data, error } = await supabase
+    .from('team_members')
+    .select('team_id, role')
+    .eq('user_id', userId)
+    .limit(1)
+    .single();
+  
+  if (error || !data) return null;
+  return { team_id: data.team_id, role: data.role };
+}
+
+// GET /api/subscriptions/plans - Get all available subscription plans
+app.get('/api/subscriptions/plans', async (req, res) => {
+  try {
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database unavailable' });
+    }
+
+    const { data: plans, error } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    if (error) {
+      console.error('[GET /api/subscriptions/plans] Error:', error);
+      return res.status(500).json({ error: 'Failed to fetch plans' });
+    }
+
+    // Format plans for frontend
+    const formattedPlans = (plans || []).map(plan => ({
+      id: plan.id,
+      name: plan.name,
+      displayName: plan.display_name,
+      description: plan.description,
+      monthlyPrice: plan.monthly_price_cents / 100,
+      annualPrice: plan.annual_price_cents / 100,
+      annualMonthlyEquivalent: Math.round(plan.annual_price_cents / 12) / 100,
+      annualSavingsPercent: Math.round((1 - (plan.annual_price_cents / 12) / plan.monthly_price_cents) * 100),
+      maxTeamMembers: plan.max_team_members,
+      maxEvents: plan.max_events,
+      maxStorageGb: plan.max_storage_gb,
+      additionalUserPrice: plan.additional_user_price_cents / 100,
+      features: plan.features || [],
+      hasAdvancedReports: plan.has_advanced_reports,
+      hasCustomBranding: plan.has_custom_branding,
+      hasApiAccess: plan.has_api_access,
+      hasPrioritySupport: plan.has_priority_support,
+      hasLayoutMaker: plan.has_layout_maker,
+      hasBudgetTools: plan.has_budget_tools,
+      hasGuestManagement: plan.has_guest_management,
+    }));
+
+    res.json({ plans: formattedPlans });
+  } catch (error: any) {
+    console.error('[GET /api/subscriptions/plans] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to fetch plans' });
+  }
+});
+
+// GET /api/subscriptions/my-subscription - Get current user's team subscription
+app.get('/api/subscriptions/my-subscription', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const userTeam = await getSubscriptionUserTeam(user.id);
+    if (!userTeam) {
+      return res.json({ 
+        subscription: null, 
+        status: 'no_team',
+        message: 'User is not part of any team' 
+      });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database unavailable' });
+    }
+
+    // Get team subscription with plan details
+    const { data: subscription, error } = await supabase
+      .from('team_subscriptions')
+      .select(`
+        *,
+        plan:subscription_plans(*)
+      `)
+      .eq('team_id', userTeam.team_id)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('[GET /api/subscriptions/my-subscription] Error:', error);
+      return res.status(500).json({ error: 'Failed to fetch subscription' });
+    }
+
+    if (!subscription) {
+      return res.json({ 
+        subscription: null, 
+        status: 'no_subscription',
+        teamId: userTeam.team_id,
+        message: 'No active subscription' 
+      });
+    }
+
+    // Get team member count
+    const { count: memberCount } = await supabase
+      .from('team_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('team_id', userTeam.team_id);
+
+    // Get add-ons
+    const { data: addons } = await supabase
+      .from('subscription_addons')
+      .select('*')
+      .eq('team_subscription_id', subscription.id);
+
+    res.json({
+      subscription: {
+        id: subscription.id,
+        status: subscription.status,
+        billingInterval: subscription.billing_interval,
+        currentPeriodStart: subscription.current_period_start,
+        currentPeriodEnd: subscription.current_period_end,
+        cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        trialEnd: subscription.trial_end,
+        plan: subscription.plan ? {
+          id: subscription.plan.id,
+          name: subscription.plan.name,
+          displayName: subscription.plan.display_name,
+          maxTeamMembers: subscription.plan.max_team_members,
+          maxEvents: subscription.plan.max_events,
+        } : null,
+      },
+      teamId: userTeam.team_id,
+      memberCount: memberCount || 0,
+      addons: addons || [],
+      status: subscription.status,
+    });
+  } catch (error: any) {
+    console.error('[GET /api/subscriptions/my-subscription] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to fetch subscription' });
+  }
+});
+
+// POST /api/subscriptions/create-checkout-session - Create Stripe Checkout session
+app.post('/api/subscriptions/create-checkout-session', express.json(), async (req, res) => {
+  try {
+    if (!stripeClient) {
+      return res.status(500).json({ error: 'Stripe not configured' });
+    }
+
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { planId, billingInterval = 'month' } = req.body;
+    
+    if (!planId) {
+      return res.status(400).json({ error: 'Plan ID is required' });
+    }
+
+    if (!['month', 'year'].includes(billingInterval)) {
+      return res.status(400).json({ error: 'Invalid billing interval' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database unavailable' });
+    }
+
+    // Get the plan
+    const { data: plan, error: planError } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('id', planId)
+      .eq('is_active', true)
+      .single();
+
+    if (planError || !plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+
+    // Get user's team
+    const userTeam = await getSubscriptionUserTeam(user.id);
+    if (!userTeam) {
+      return res.status(400).json({ error: 'User must be part of a team to subscribe' });
+    }
+
+    // Check if team already has a subscription
+    const { data: existingSubscription } = await supabase
+      .from('team_subscriptions')
+      .select('id, status, stripe_customer_id')
+      .eq('team_id', userTeam.team_id)
+      .single();
+
+    // Get or create Stripe customer
+    let stripeCustomerId: string;
+
+    if (existingSubscription?.stripe_customer_id) {
+      stripeCustomerId = existingSubscription.stripe_customer_id;
+    } else {
+      // Check if team has a customer ID stored
+      const { data: team } = await supabase
+        .from('teams')
+        .select('stripe_customer_id, name')
+        .eq('id', userTeam.team_id)
+        .single();
+
+      if (team?.stripe_customer_id) {
+        stripeCustomerId = team.stripe_customer_id;
+      } else {
+        // Create new Stripe customer
+        const customer = await stripeClient.customers.create({
+          email: user.email,
+          metadata: {
+            team_id: userTeam.team_id,
+            user_id: user.id,
+          },
+        });
+        stripeCustomerId = customer.id;
+
+        // Store customer ID on team
+        await supabase
+          .from('teams')
+          .update({ stripe_customer_id: customer.id })
+          .eq('id', userTeam.team_id);
+      }
+    }
+
+    // Determine the price ID based on billing interval
+    const priceId = billingInterval === 'year' 
+      ? plan.stripe_price_id_annual 
+      : plan.stripe_price_id_monthly;
+
+    if (!priceId) {
+      return res.status(400).json({ 
+        error: 'Stripe price not configured for this plan. Please configure Stripe Price IDs in the database.',
+        hint: 'Update subscription_plans table with stripe_price_id_monthly and stripe_price_id_annual'
+      });
+    }
+
+    // Create Checkout session
+    const baseUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.BASE_URL || 'http://localhost:5173';
+
+    const session = await stripeClient.checkout.sessions.create({
+      customer: stripeCustomerId,
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1,
+        },
+      ],
+      success_url: `${baseUrl}/dashboard?subscription=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/pricing?subscription=canceled`,
+      subscription_data: {
+        metadata: {
+          team_id: userTeam.team_id,
+          plan_id: planId,
+          plan_name: plan.name,
+        },
+        trial_period_days: 14, // 14-day free trial
+      },
+      metadata: {
+        team_id: userTeam.team_id,
+        plan_id: planId,
+        user_id: user.id,
+      },
+      allow_promotion_codes: true,
+      billing_address_collection: 'required',
+      customer_update: {
+        address: 'auto',
+        name: 'auto',
+      },
+    });
+
+    res.json({ 
+      sessionId: session.id, 
+      url: session.url 
+    });
+  } catch (error: any) {
+    console.error('[POST /api/subscriptions/create-checkout-session] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to create checkout session' });
+  }
+});
+
+// POST /api/subscriptions/create-portal-session - Create Stripe Customer Portal session
+app.post('/api/subscriptions/create-portal-session', express.json(), async (req, res) => {
+  try {
+    if (!stripeClient) {
+      return res.status(500).json({ error: 'Stripe not configured' });
+    }
+
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database unavailable' });
+    }
+
+    // Get user's team
+    const userTeam = await getSubscriptionUserTeam(user.id);
+    if (!userTeam) {
+      return res.status(400).json({ error: 'User must be part of a team' });
+    }
+
+    // Get team's Stripe customer ID
+    const { data: team } = await supabase
+      .from('teams')
+      .select('stripe_customer_id')
+      .eq('id', userTeam.team_id)
+      .single();
+
+    if (!team?.stripe_customer_id) {
+      return res.status(400).json({ error: 'No billing account found. Please subscribe first.' });
+    }
+
+    const baseUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.BASE_URL || 'http://localhost:5173';
+
+    // Create portal session
+    const session = await stripeClient.billingPortal.sessions.create({
+      customer: team.stripe_customer_id,
+      return_url: `${baseUrl}/dashboard`,
+    });
+
+    res.json({ url: session.url });
+  } catch (error: any) {
+    console.error('[POST /api/subscriptions/create-portal-session] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to create portal session' });
+  }
+});
+
+// GET /api/subscriptions/config - Get Stripe publishable key and config
+app.get('/api/subscriptions/config', (req, res) => {
+  res.json({
+    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || null,
+    stripeEnabled: !!stripeClient,
+  });
+});
+
+// POST /api/webhooks/stripe - Handle Stripe webhooks
+// IMPORTANT: This must use express.raw() for signature verification
+app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripeClient) {
+    console.warn('[Stripe Webhook] Stripe not configured, ignoring webhook');
+    return res.status(200).json({ received: true, processed: false });
+  }
+
+  const sig = req.headers['stripe-signature'] as string;
+  
+  let event: Stripe.Event;
+
+  try {
+    if (stripeWebhookSecret) {
+      // Verify webhook signature
+      event = stripeClient.webhooks.constructEvent(req.body, sig, stripeWebhookSecret);
+    } else {
+      // In development without webhook secret, parse directly (NOT RECOMMENDED for production)
+      console.warn('[Stripe Webhook] WARNING: No webhook secret configured, skipping signature verification');
+      event = JSON.parse(req.body.toString()) as Stripe.Event;
+    }
+  } catch (err: any) {
+    console.error('[Stripe Webhook] Signature verification failed:', err?.message);
+    return res.status(400).json({ error: `Webhook signature verification failed: ${err?.message}` });
+  }
+
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    console.error('[Stripe Webhook] Supabase unavailable');
+    return res.status(500).json({ error: 'Database unavailable' });
+  }
+
+  console.log(`[Stripe Webhook] Received event: ${event.type}`);
+
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        console.log('[Stripe Webhook] Checkout session completed:', session.id);
+        
+        // Get subscription details
+        if (session.subscription && typeof session.subscription === 'string') {
+          const subscription = await stripeClient.subscriptions.retrieve(session.subscription);
+          await handleSubscriptionUpdate(supabase, subscription, session.metadata);
+        }
+        break;
+      }
+
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object as Stripe.Subscription;
+        console.log(`[Stripe Webhook] Subscription ${event.type}:`, subscription.id);
+        await handleSubscriptionUpdate(supabase, subscription);
+        break;
+      }
+
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription;
+        console.log('[Stripe Webhook] Subscription deleted:', subscription.id);
+        await handleSubscriptionDeleted(supabase, subscription);
+        break;
+      }
+
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object as Stripe.Invoice;
+        console.log('[Stripe Webhook] Payment succeeded:', invoice.id);
+        await handlePaymentSucceeded(supabase, invoice);
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice;
+        console.log('[Stripe Webhook] Payment failed:', invoice.id);
+        await handlePaymentFailed(supabase, invoice);
+        break;
+      }
+
+      default:
+        console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`);
+    }
+
+    res.json({ received: true, processed: true });
+  } catch (error: any) {
+    console.error('[Stripe Webhook] Error processing event:', error);
+    res.status(500).json({ error: error?.message || 'Webhook processing failed' });
+  }
+});
+
+// Helper: Handle subscription update from Stripe
+async function handleSubscriptionUpdate(
+  supabase: any, 
+  subscription: Stripe.Subscription,
+  checkoutMetadata?: Record<string, string> | null
+) {
+  const metadata = subscription.metadata || checkoutMetadata || {};
+  const teamId = metadata.team_id;
+  const planId = metadata.plan_id;
+
+  if (!teamId) {
+    console.error('[handleSubscriptionUpdate] No team_id in subscription metadata');
+    return;
+  }
+
+  const customerId = typeof subscription.customer === 'string' 
+    ? subscription.customer 
+    : subscription.customer?.id;
+
+  // Determine billing interval from subscription
+  const priceData = subscription.items.data[0]?.price;
+  const billingInterval = priceData?.recurring?.interval === 'year' ? 'year' : 'month';
+
+  // Upsert subscription record
+  const { error } = await supabase
+    .from('team_subscriptions')
+    .upsert({
+      team_id: teamId,
+      plan_id: planId || null,
+      stripe_customer_id: customerId,
+      stripe_subscription_id: subscription.id,
+      status: subscription.status,
+      billing_interval: billingInterval,
+      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      cancel_at_period_end: subscription.cancel_at_period_end,
+      trial_start: subscription.trial_start 
+        ? new Date(subscription.trial_start * 1000).toISOString() 
+        : null,
+      trial_end: subscription.trial_end 
+        ? new Date(subscription.trial_end * 1000).toISOString() 
+        : null,
+      canceled_at: subscription.canceled_at 
+        ? new Date(subscription.canceled_at * 1000).toISOString() 
+        : null,
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'team_id',
+    });
+
+  if (error) {
+    console.error('[handleSubscriptionUpdate] Error upserting subscription:', error);
+    throw error;
+  }
+
+  console.log(`[handleSubscriptionUpdate] Updated subscription for team ${teamId}, status: ${subscription.status}`);
+}
+
+// Helper: Handle subscription deletion
+async function handleSubscriptionDeleted(supabase: any, subscription: Stripe.Subscription) {
+  const { error } = await supabase
+    .from('team_subscriptions')
+    .update({
+      status: 'canceled',
+      canceled_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('stripe_subscription_id', subscription.id);
+
+  if (error) {
+    console.error('[handleSubscriptionDeleted] Error:', error);
+    throw error;
+  }
+
+  console.log(`[handleSubscriptionDeleted] Marked subscription ${subscription.id} as canceled`);
+}
+
+// Helper: Handle successful payment
+async function handlePaymentSucceeded(supabase: any, invoice: Stripe.Invoice) {
+  const subscriptionId = typeof invoice.subscription === 'string' 
+    ? invoice.subscription 
+    : invoice.subscription?.id;
+
+  if (!subscriptionId) return;
+
+  // Get team_id from subscription
+  const { data: teamSub } = await supabase
+    .from('team_subscriptions')
+    .select('team_id')
+    .eq('stripe_subscription_id', subscriptionId)
+    .single();
+
+  // Record payment
+  await supabase
+    .from('subscription_payments')
+    .insert({
+      team_subscription_id: teamSub?.id,
+      team_id: teamSub?.team_id,
+      stripe_invoice_id: invoice.id,
+      stripe_payment_intent_id: typeof invoice.payment_intent === 'string' 
+        ? invoice.payment_intent 
+        : invoice.payment_intent?.id,
+      amount_cents: invoice.amount_paid,
+      currency: invoice.currency,
+      status: 'succeeded',
+      invoice_url: invoice.hosted_invoice_url,
+      invoice_pdf: invoice.invoice_pdf,
+      payment_date: new Date().toISOString(),
+    });
+
+  console.log(`[handlePaymentSucceeded] Recorded payment for invoice ${invoice.id}`);
+}
+
+// Helper: Handle failed payment
+async function handlePaymentFailed(supabase: any, invoice: Stripe.Invoice) {
+  const subscriptionId = typeof invoice.subscription === 'string' 
+    ? invoice.subscription 
+    : invoice.subscription?.id;
+
+  if (!subscriptionId) return;
+
+  // Get team_id from subscription
+  const { data: teamSub } = await supabase
+    .from('team_subscriptions')
+    .select('team_id')
+    .eq('stripe_subscription_id', subscriptionId)
+    .single();
+
+  // Record failed payment
+  await supabase
+    .from('subscription_payments')
+    .insert({
+      team_subscription_id: teamSub?.id,
+      team_id: teamSub?.team_id,
+      stripe_invoice_id: invoice.id,
+      amount_cents: invoice.amount_due,
+      currency: invoice.currency,
+      status: 'failed',
+      failure_message: 'Payment failed',
+      payment_date: new Date().toISOString(),
+    });
+
+  // Update subscription status
+  await supabase
+    .from('team_subscriptions')
+    .update({
+      status: 'past_due',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('stripe_subscription_id', subscriptionId);
+
+  console.log(`[handlePaymentFailed] Recorded failed payment for invoice ${invoice.id}`);
+}
 
 // Global error handler for unhandled errors (must be after all routes)
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

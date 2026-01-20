@@ -10,12 +10,19 @@ import {
   updateClient,
 } from '../../api/eventsPipelineApi';
 import ProjectFilesSection from './files/ProjectFilesSection';
+import VendorsTab from './vendors/VendorsTab';
+import VisionStyleTab from './vision/VisionStyleTab';
+import VenueDateTab from './venue/VenueDateTab';
+import GuestListTab from './guests/GuestListTab';
+import BudgetTab from './budget/BudgetTab';
+import DesignLayoutTab from './design/DesignLayoutTab';
+import { listContacts, createContact, updateContact, deleteContact, type TeamContact } from '../../api/contactsApi';
 
 interface EventProjectPageProps {
   eventId: string;
 }
 
-type ActiveTab = 'pipeline' | 'tasks' | 'vendors' | 'files' | 'notes' | 'contacts';
+type ActiveTab = 'pipeline' | 'tasks' | 'vendors' | 'budget' | 'files' | 'notes' | 'contacts';
 
 const formatDate = (iso: string | null | undefined) => {
   if (!iso) return 'No date';
@@ -42,6 +49,20 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
   const [newFileUrl, setNewFileUrl] = useState('');
   const [newFileCategory, setNewFileCategory] = useState<EventFile['category']>('other');
   const [isSavingClient, setIsSavingClient] = useState(false);
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [contacts, setContacts] = useState<TeamContact[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [showContactCreateForm, setShowContactCreateForm] = useState(false);
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
+  const [contactSearch, setContactSearch] = useState('');
+  const [newContact, setNewContact] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+    notes: '',
+    private: false,
+  });
   const [clientForm, setClientForm] = useState({
     bride_name: '',
     groom_name: '',
@@ -63,10 +84,26 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
     setLoading(false);
   };
 
+  const loadContacts = async () => {
+    setContactsLoading(true);
+    const { data, error: err } = await listContacts({ search: contactSearch || undefined });
+    if (!err && data) {
+      setContacts(data);
+    }
+    setContactsLoading(false);
+  };
+
   useEffect(() => {
     loadWorkspace();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
+
+  useEffect(() => {
+    if (activeTab === 'contacts') {
+      loadContacts();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, contactSearch]);
 
   // Populate client form when workspace loads
   useEffect(() => {
@@ -235,7 +272,18 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
                 </div>
                 {isExpanded && (
                   <div style={{ marginTop: 10, borderTop: '1px solid #f3f4f6', paddingTop: 10 }}>
-                    {stageTasks.length === 0 ? (
+                    {/* Special stages get custom components */}
+                    {stage.key === 'vision_style' ? (
+                      <VisionStyleTab eventId={eventId} />
+                    ) : stage.key === 'venue_date' ? (
+                      <VenueDateTab eventId={eventId} />
+                    ) : stage.key === 'guest_list' ? (
+                      <GuestListTab eventId={eventId} />
+                    ) : stage.key === 'budget' ? (
+                      <BudgetTab eventId={eventId} />
+                    ) : stage.key === 'design_layout' ? (
+                      <DesignLayoutTab eventId={eventId} />
+                    ) : stageTasks.length === 0 ? (
                       <div style={{ fontSize: 12, color: '#9ca3af' }}>No tasks yet for this stage.</div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -453,319 +501,390 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
   };
 
   const renderContactsTab = () => {
-    if (!workspace || !event) return null;
-    const client = workspace.client;
-
-    const handleSaveClient = async () => {
-      if (!clientForm.bride_name.trim() || !clientForm.groom_name.trim() || !clientForm.email.trim() || !clientForm.phone.trim()) {
+    const handleCreateContact = async () => {
+      if (!newContact.name.trim()) {
         // eslint-disable-next-line no-alert
-        alert('Please fill in all required fields (Bride name, Groom name, Email, Phone)');
+        alert('Please enter a name');
         return;
       }
-
-      setIsSavingClient(true);
-      try {
-        if (client) {
-          await updateClient(event.id, {
-            bride_name: clientForm.bride_name.trim(),
-            groom_name: clientForm.groom_name.trim(),
-            email: clientForm.email.trim(),
-            phone: clientForm.phone.trim(),
-            address: clientForm.address.trim() || null,
-            communication_notes: clientForm.communication_notes.trim() || null,
-          });
-        } else {
-          await createClient(event.id, {
-            bride_name: clientForm.bride_name.trim(),
-            groom_name: clientForm.groom_name.trim(),
-            email: clientForm.email.trim(),
-            phone: clientForm.phone.trim(),
-            address: clientForm.address.trim() || null,
-            communication_notes: clientForm.communication_notes.trim() || null,
-          });
-        }
-        await loadWorkspace();
-      } catch (err: any) {
+      const { data, error: err } = await createContact({
+        name: newContact.name.trim(),
+        email: newContact.email.trim() || null,
+        phone: newContact.phone.trim() || null,
+        company: newContact.company.trim() || null,
+        notes: newContact.notes.trim() || null,
+        private: newContact.private,
+      });
+      if (err) {
         // eslint-disable-next-line no-alert
-        alert(`Failed to save client: ${err.message || err}`);
-      } finally {
-        setIsSavingClient(false);
+        alert(`Failed to create contact: ${err}`);
+        return;
+      }
+      if (data) {
+        await loadContacts();
+        setShowContactCreateForm(false);
+        setNewContact({ name: '', email: '', phone: '', company: '', notes: '', private: false });
       }
     };
 
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div
-          style={{
-            borderRadius: 16,
-            border: '1px solid #e5e5e5',
-            padding: 20,
-            background: '#ffffff',
-          }}
-        >
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', marginBottom: 16 }}>
-            Client Contact Information
-          </div>
+    const handleUpdateContact = async (contactId: string) => {
+      const contact = contacts.find((c) => c.id === contactId);
+      if (!contact) return;
+      const { error: err } = await updateContact(contactId, {
+        name: newContact.name.trim(),
+        email: newContact.email.trim() || null,
+        phone: newContact.phone.trim() || null,
+        company: newContact.company.trim() || null,
+        notes: newContact.notes.trim() || null,
+      });
+      if (err) {
+        // eslint-disable-next-line no-alert
+        alert(`Failed to update contact: ${err}`);
+        return;
+      }
+      await loadContacts();
+      setEditingContactId(null);
+      setNewContact({ name: '', email: '', phone: '', company: '', notes: '', private: false });
+    };
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {/* Bride & Groom Names */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+    const handleDeleteContact = async (contactId: string) => {
+      if (!confirm('Are you sure you want to delete this contact?')) return;
+      const { error: err } = await deleteContact(contactId);
+      if (err) {
+        // eslint-disable-next-line no-alert
+        alert(`Failed to delete contact: ${err}`);
+        return;
+      }
+      await loadContacts();
+    };
+
+    // Show create/edit form
+    if (showContactCreateForm || editingContactId) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div
+            style={{
+              borderRadius: 16,
+              border: '1px solid #e5e5e5',
+              padding: 20,
+              background: '#ffffff',
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', marginBottom: 16 }}>
+              {editingContactId ? 'Edit Contact' : 'Add Contact'}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: '#374151',
-                    marginBottom: 6,
-                  }}
-                >
-                  Bride Name <span style={{ color: '#ef4444' }}>*</span>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 6 }}>
+                  Name *
                 </label>
                 <input
                   type="text"
-                  value={clientForm.bride_name}
-                  onChange={(e) => setClientForm((prev) => ({ ...prev, bride_name: e.target.value }))}
-                  placeholder="Bride's full name"
+                  value={newContact.name}
+                  onChange={(e) => setNewContact((prev) => ({ ...prev, name: e.target.value }))}
+                  required
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
+                    borderRadius: 999,
+                    border: '1px solid #e5e7eb',
+                    padding: '8px 14px',
                     fontSize: 13,
-                    border: '1px solid #e5e5e5',
-                    borderRadius: 10,
-                    background: '#fafafa',
-                    color: '#111827',
-                    outline: 'none',
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.border = '1px solid #0f172a';
-                    e.target.style.background = '#ffffff';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.border = '1px solid #e5e5e5';
-                    e.target.style.background = '#fafafa';
                   }}
                 />
               </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 6 }}>
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={newContact.email}
+                    onChange={(e) => setNewContact((prev) => ({ ...prev, email: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      borderRadius: 999,
+                      border: '1px solid #e5e7eb',
+                      padding: '8px 14px',
+                      fontSize: 13,
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 6 }}>
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={newContact.phone}
+                    onChange={(e) => setNewContact((prev) => ({ ...prev, phone: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      borderRadius: 999,
+                      border: '1px solid #e5e7eb',
+                      padding: '8px 14px',
+                      fontSize: 13,
+                    }}
+                  />
+                </div>
+              </div>
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: '#374151',
-                    marginBottom: 6,
-                  }}
-                >
-                  Groom Name <span style={{ color: '#ef4444' }}>*</span>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 6 }}>
+                  Company
                 </label>
                 <input
                   type="text"
-                  value={clientForm.groom_name}
-                  onChange={(e) => setClientForm((prev) => ({ ...prev, groom_name: e.target.value }))}
-                  placeholder="Groom's full name"
+                  value={newContact.company}
+                  onChange={(e) => setNewContact((prev) => ({ ...prev, company: e.target.value }))}
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
+                    borderRadius: 999,
+                    border: '1px solid #e5e7eb',
+                    padding: '8px 14px',
                     fontSize: 13,
-                    border: '1px solid #e5e5e5',
-                    borderRadius: 10,
-                    background: '#fafafa',
-                    color: '#111827',
-                    outline: 'none',
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.border = '1px solid #0f172a';
-                    e.target.style.background = '#ffffff';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.border = '1px solid #e5e5e5';
-                    e.target.style.background = '#fafafa';
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Email & Phone */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: '#374151',
-                    marginBottom: 6,
-                  }}
-                >
-                  Email <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <input
-                  type="email"
-                  value={clientForm.email}
-                  onChange={(e) => setClientForm((prev) => ({ ...prev, email: e.target.value }))}
-                  placeholder="client@example.com"
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    fontSize: 13,
-                    border: '1px solid #e5e5e5',
-                    borderRadius: 10,
-                    background: '#fafafa',
-                    color: '#111827',
-                    outline: 'none',
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.border = '1px solid #0f172a';
-                    e.target.style.background = '#ffffff';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.border = '1px solid #e5e5e5';
-                    e.target.style.background = '#fafafa';
                   }}
                 />
               </div>
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: '#374151',
-                    marginBottom: 6,
-                  }}
-                >
-                  Phone <span style={{ color: '#ef4444' }}>*</span>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 6 }}>
+                  Notes
                 </label>
-                <input
-                  type="tel"
-                  value={clientForm.phone}
-                  onChange={(e) => setClientForm((prev) => ({ ...prev, phone: e.target.value }))}
-                  placeholder="+1 234 567 8900"
+                <textarea
+                  value={newContact.notes}
+                  onChange={(e) => setNewContact((prev) => ({ ...prev, notes: e.target.value }))}
+                  rows={3}
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
+                    borderRadius: 12,
+                    border: '1px solid #e5e7eb',
+                    padding: '8px 14px',
                     fontSize: 13,
-                    border: '1px solid #e5e5e5',
-                    borderRadius: 10,
-                    background: '#fafafa',
-                    color: '#111827',
-                    outline: 'none',
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.border = '1px solid #0f172a';
-                    e.target.style.background = '#ffffff';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.border = '1px solid #e5e5e5';
-                    e.target.style.background = '#fafafa';
+                    resize: 'vertical',
                   }}
                 />
               </div>
-            </div>
-
-            {/* Address */}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: '#374151',
-                  marginBottom: 6,
-                }}
-              >
-                Address
-              </label>
-              <input
-                type="text"
-                value={clientForm.address}
-                onChange={(e) => setClientForm((prev) => ({ ...prev, address: e.target.value }))}
-                placeholder="Street address, city, state, zip"
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  fontSize: 13,
-                  border: '1px solid #e5e5e5',
-                  borderRadius: 10,
-                  background: '#fafafa',
-                  color: '#111827',
-                  outline: 'none',
-                }}
-                onFocus={(e) => {
-                  e.target.style.border = '1px solid #0f172a';
-                  e.target.style.background = '#ffffff';
-                }}
-                onBlur={(e) => {
-                  e.target.style.border = '1px solid #e5e5e5';
-                  e.target.style.background = '#fafafa';
-                }}
-              />
-            </div>
-
-            {/* Communication Notes */}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: '#374151',
-                  marginBottom: 6,
-                }}
-              >
-                Communication Notes
-              </label>
-              <textarea
-                value={clientForm.communication_notes}
-                onChange={(e) => setClientForm((prev) => ({ ...prev, communication_notes: e.target.value }))}
-                placeholder="Notes about preferred communication style, best times to contact, etc."
-                rows={4}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  fontSize: 13,
-                  border: '1px solid #e5e5e5',
-                  borderRadius: 10,
-                  background: '#fafafa',
-                  color: '#111827',
-                  outline: 'none',
-                  resize: 'vertical',
-                  fontFamily: 'inherit',
-                }}
-                onFocus={(e) => {
-                  e.target.style.border = '1px solid #0f172a';
-                  e.target.style.background = '#ffffff';
-                }}
-                onBlur={(e) => {
-                  e.target.style.border = '1px solid #e5e5e5';
-                  e.target.style.background = '#fafafa';
-                }}
-              />
-            </div>
-
-            {/* Save Button */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-              <button
-                type="button"
-                onClick={handleSaveClient}
-                disabled={isSavingClient}
-                style={{
-                  padding: '10px 20px',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  border: 'none',
-                  borderRadius: 999,
-                  background: isSavingClient ? '#d1d5db' : '#0f172a',
-                  color: '#ffffff',
-                  cursor: isSavingClient ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {isSavingClient ? 'Saving…' : client ? 'Update Contact' : 'Save Contact'}
-              </button>
+              {!editingContactId && (
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={newContact.private}
+                    onChange={(e) => setNewContact((prev) => ({ ...prev, private: e.target.checked }))}
+                    style={{ width: 16, height: 16, cursor: 'pointer' }}
+                  />
+                  <span style={{ color: '#6b7280' }}>Do not share with team</span>
+                </label>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowContactCreateForm(false);
+                    setEditingContactId(null);
+                    setNewContact({ name: '', email: '', phone: '', company: '', notes: '', private: false });
+                  }}
+                  style={{
+                    borderRadius: 999,
+                    border: '1px solid #e5e7eb',
+                    padding: '8px 16px',
+                    background: '#ffffff',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => editingContactId ? handleUpdateContact(editingContactId) : handleCreateContact()}
+                  style={{
+                    borderRadius: 999,
+                    border: 'none',
+                    padding: '8px 18px',
+                    background: '#0f172a',
+                    color: '#ffffff',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {editingContactId ? 'Save Changes' : 'Add Contact'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
+      );
+    }
+
+    // Show contacts list
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#0f172a' }}>Team Contacts</h3>
+          <button
+            type="button"
+            onClick={() => {
+              setShowContactCreateForm(true);
+              setEditingContactId(null);
+              setNewContact({ name: '', email: '', phone: '', company: '', notes: '', private: false });
+            }}
+            style={{
+              borderRadius: 999,
+              border: 'none',
+              padding: '8px 16px',
+              background: '#0f172a',
+              color: '#ffffff',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            + Add Contact
+          </button>
+        </div>
+
+        <input
+          type="text"
+          placeholder="Search contacts..."
+          value={contactSearch}
+          onChange={(e) => setContactSearch(e.target.value)}
+          style={{
+            borderRadius: 999,
+            border: '1px solid #e5e7eb',
+            padding: '8px 14px',
+            fontSize: 13,
+          }}
+        />
+
+        {contactsLoading ? (
+          <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>Loading contacts...</div>
+        ) : contacts.length === 0 ? (
+          <div
+            style={{
+              borderRadius: 16,
+              border: '1px dashed #e5e7eb',
+              padding: 60,
+              background: '#fafafa',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: 14, color: '#64748b' }}>No contacts yet</div>
+            <button
+              type="button"
+              onClick={() => setShowContactCreateForm(true)}
+              style={{
+                marginTop: 16,
+                padding: '10px 24px',
+                fontSize: 14,
+                fontWeight: 600,
+                border: 'none',
+                borderRadius: 999,
+                background: '#0f172a',
+                color: '#ffffff',
+                cursor: 'pointer',
+              }}
+            >
+              + Add Contact
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {contacts.map((contact) => (
+              <div
+                key={contact.id}
+                style={{
+                  borderRadius: 12,
+                  border: '1px solid #e5e7eb',
+                  padding: 16,
+                  background: '#ffffff',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', marginBottom: 4 }}>
+                      {contact.name}
+                      {contact.visibility === 'private' && (
+                        <span style={{ marginLeft: 8, fontSize: 11, color: '#6b7280' }}>(Private)</span>
+                      )}
+                    </div>
+                    {contact.company && (
+                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{contact.company}</div>
+                    )}
+                    {contact.email && (
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>
+                        <a href={`mailto:${contact.email}`} style={{ color: '#2563eb', textDecoration: 'none' }}>
+                          {contact.email}
+                        </a>
+                      </div>
+                    )}
+                    {contact.phone && (
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>
+                        <a href={`tel:${contact.phone}`} style={{ color: '#2563eb', textDecoration: 'none' }}>
+                          {contact.phone}
+                        </a>
+                      </div>
+                    )}
+                    {contact.notes && (
+                      <div style={{ fontSize: 12, color: '#475569', marginTop: 8 }}>{contact.notes}</div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingContactId(contact.id);
+                        setNewContact({
+                          name: contact.name,
+                          email: contact.email || '',
+                          phone: contact.phone || '',
+                          company: contact.company || '',
+                          notes: contact.notes || '',
+                          private: contact.visibility === 'private',
+                        });
+                      }}
+                      style={{
+                        borderRadius: 999,
+                        border: '1px solid #e5e7eb',
+                        padding: '6px 12px',
+                        background: '#ffffff',
+                        fontSize: 12,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteContact(contact.id)}
+                      style={{
+                        borderRadius: 999,
+                        border: '1px solid #e5e7eb',
+                        padding: '6px 12px',
+                        background: '#ffffff',
+                        fontSize: 12,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        color: '#dc2626',
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
@@ -839,7 +958,7 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
                       : '#1d4ed8',
                 }}
               >
-                {event.status.replace('_', ' ')}
+                {String(event.status ?? 'on_track').replace('_', ' ')}
               </div>
               <div style={{ fontSize: 12, color: '#6b7280' }}>
                 Current stage:{' '}
@@ -883,6 +1002,7 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
             { id: 'pipeline', label: 'Pipeline' },
             { id: 'tasks', label: 'Tasks' },
             { id: 'vendors', label: 'Vendors' },
+            { id: 'budget', label: 'Budget' },
             { id: 'files', label: 'Files' },
             { id: 'notes', label: 'Notes' },
             { id: 'contacts', label: 'Contacts' },
@@ -911,7 +1031,8 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
         <div style={{ paddingTop: 10 }}>
           {activeTab === 'pipeline' && renderPipelineTab()}
           {activeTab === 'tasks' && renderTasksTab()}
-          {activeTab === 'vendors' && renderVendorsTab()}
+          {activeTab === 'vendors' && <VendorsTab eventId={eventId} />}
+          {activeTab === 'budget' && <BudgetTab eventId={eventId} />}
           {activeTab === 'files' && renderFilesTab()}
           {activeTab === 'notes' && renderNotesTab()}
           {activeTab === 'contacts' && renderContactsTab()}
