@@ -1399,13 +1399,13 @@ const GridCanvas = forwardRef<{
 
   const drawCanvas = useCallback(() => {
     if (!svgRef.current) {
-      DEBUG_CANVAS && console.log(\x27drawCanvas: svgRef.current is null');
+      DEBUG_CANVAS && console.log('drawCanvas: svgRef.current is null');
       return;
     }
 
     const svg = svgRef.current;
-    DEBUG_CANVAS && console.log(\x27drawCanvas called. Current shapes count:', shapes.length);
-    DEBUG_CANVAS && console.log(\x27drawCanvas: Clearing SVG innerHTML');
+    DEBUG_CANVAS && console.log('drawCanvas called. Current shapes count:', shapes.length);
+    DEBUG_CANVAS && console.log('drawCanvas: Clearing SVG innerHTML');
     svg.innerHTML = '';
 
     const vb = viewBox;

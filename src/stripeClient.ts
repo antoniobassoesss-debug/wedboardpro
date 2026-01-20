@@ -21,8 +21,6 @@ if (!stripeSecretKey) {
 // Initialize Stripe client
 const stripe = stripeSecretKey 
   ? new Stripe(stripeSecretKey, {
-      apiVersion: '2024-12-18.acacia', // Use the latest API version
-      typescript: true,
       appInfo: {
         name: 'WedBoardPro',
         version: '1.0.0',
