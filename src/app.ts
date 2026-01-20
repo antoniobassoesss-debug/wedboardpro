@@ -25,7 +25,7 @@ console.log('[app.ts] Supabase service client:', getSupabaseServiceClient() ? 'i
 // Initialize Stripe client
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripeClient = stripeSecretKey 
-  ? new Stripe(stripeSecretKey, { apiVersion: '2024-12-18.acacia' })
+  ? new Stripe(stripeSecretKey)
   : null;
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 console.log('[app.ts] Stripe client:', stripeClient ? 'initialized' : 'NOT AVAILABLE (set STRIPE_SECRET_KEY)');
@@ -8197,7 +8197,7 @@ app.post('/api/subscriptions/create-checkout-session', express.json(), async (re
       } else {
         // Create new Stripe customer
         const customer = await stripeClient.customers.create({
-          email: user.email,
+          email: user.email || '',
           metadata: {
             team_id: userTeam.team_id,
             user_id: user.id,
@@ -8423,7 +8423,7 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
 // Helper: Handle subscription update from Stripe
 async function handleSubscriptionUpdate(
   supabase: any, 
-  subscription: Stripe.Subscription,
+  subscription: any, // Use any to handle different Stripe SDK versions
   checkoutMetadata?: Record<string, string> | null
 ) {
   const metadata = subscription.metadata || checkoutMetadata || {};
@@ -8498,7 +8498,7 @@ async function handleSubscriptionDeleted(supabase: any, subscription: Stripe.Sub
 }
 
 // Helper: Handle successful payment
-async function handlePaymentSucceeded(supabase: any, invoice: Stripe.Invoice) {
+async function handlePaymentSucceeded(supabase: any, invoice: any) {
   const subscriptionId = typeof invoice.subscription === 'string' 
     ? invoice.subscription 
     : invoice.subscription?.id;
@@ -8534,7 +8534,7 @@ async function handlePaymentSucceeded(supabase: any, invoice: Stripe.Invoice) {
 }
 
 // Helper: Handle failed payment
-async function handlePaymentFailed(supabase: any, invoice: Stripe.Invoice) {
+async function handlePaymentFailed(supabase: any, invoice: any) {
   const subscriptionId = typeof invoice.subscription === 'string' 
     ? invoice.subscription 
     : invoice.subscription?.id;
