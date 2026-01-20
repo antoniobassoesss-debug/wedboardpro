@@ -4,9 +4,12 @@ import {
   type Supplier,
   type SupplierCategory,
   createSupplier,
+  listCustomVendorCategories,
+  type CustomVendorCategory,
 } from '../api/suppliersApi';
+import CreateCategoryModal from '../dashboard/pipeline/vendors/CreateCategoryModal';
 
-const CATEGORIES: { value: SupplierCategory | 'all'; label: string }[] = [
+const PRESET_CATEGORIES: { value: SupplierCategory | 'all'; label: string }[] = [
   { value: 'all', label: 'All categories' },
   { value: 'flowers', label: 'Flowers' },
   { value: 'decor', label: 'Decor' },
@@ -26,20 +29,23 @@ interface SuppliersPageProps {
 
 const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [customCategories, setCustomCategories] = useState<CustomVendorCategory[]>([]);
+  const [categories, setCategories] = useState<{ value: string; label: string }[]>(PRESET_CATEGORIES);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState<SupplierCategory | 'all'>('all');
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [category, setCategory] = useState<string>('all');
   const [showCreate, setShowCreate] = useState(false);
+  const [showCreateCategory, setShowCreateCategory] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newSupplier, setNewSupplier] = useState<{
     name: string;
-    category: SupplierCategory;
+    category: string;
     company_name: string;
     email: string;
     phone: string;
     location: string;
+    private: boolean;
   }>({
     name: '',
     category: 'flowers',
@@ -47,6 +53,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
     email: '',
     phone: '',
     location: '',
+    private: false,
   });
 
   const loadSuppliers = async () => {
@@ -54,8 +61,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
     setError(null);
     const { data, error: err } = await listSuppliers({
       search: search.trim() || undefined,
-      category,
-      favoritesOnly,
+      category: category === 'all' ? undefined : (category as SupplierCategory),
     });
     if (err) {
       setError(err);
@@ -65,10 +71,24 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
     setLoading(false);
   };
 
+  const loadCustomCategories = async () => {
+    const { data } = await listCustomVendorCategories();
+    if (data) {
+      setCustomCategories(data);
+    }
+  };
+
   useEffect(() => {
     loadSuppliers();
+    loadCustomCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    // Merge preset and custom categories
+    const custom = customCategories.map(c => ({ value: c.category_id, label: c.label }));
+    setCategories([...PRESET_CATEGORIES, ...custom]);
+  }, [customCategories]);
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -76,7 +96,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
     }, 250);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, category, favoritesOnly]);
+  }, [search, category]);
 
   const filteredSuppliers = useMemo(() => suppliers, [suppliers]);
 
@@ -92,6 +112,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
       phone: newSupplier.phone || null,
       location: newSupplier.location || null,
       notes: null,
+      private: newSupplier.private,
     });
     setCreating(false);
     if (err) {
@@ -109,6 +130,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
         email: '',
         phone: '',
         location: '',
+        private: false,
       });
     }
   };
@@ -201,38 +223,72 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
           />
           <select
             value={category}
-            onChange={(e) => setCategory(e.target.value as SupplierCategory | 'all')}
+            onChange={(e) => setCategory(e.target.value)}
             style={{
               borderRadius: 999,
-              border: '1px solid rgba(148,163,184,0.6)',
-              padding: '8px 10px',
-              fontSize: 13,
+              border: '1px solid #e5e7eb',
+              padding: '9px 36px 9px 16px',
+              fontSize: 14,
+              fontWeight: 500,
               background: '#ffffff',
+              color: '#0f172a',
+              cursor: 'pointer',
+              outline: 'none',
+              transition: 'all 150ms ease',
+              appearance: 'none',
+              backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2394a3b8\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'%3E%3C/polyline%3E%3C/svg%3E")',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 12px center',
+              backgroundSize: '16px',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.04)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#e5e7eb';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = '#0f172a';
+              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.08)';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = '#e5e7eb';
+              e.currentTarget.style.boxShadow = 'none';
             }}
           >
-            {CATEGORIES.map((opt) => (
+            {categories.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
           </select>
-          <label
+          <button
+            type="button"
+            onClick={() => setShowCreateCategory(true)}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
+              borderRadius: 999,
+              border: '1px solid #e5e7eb',
+              padding: '8px 16px',
+              background: '#ffffff',
+              color: '#0f172a',
               fontSize: 13,
-              color: '#4b5563',
+              fontWeight: 600,
               cursor: 'pointer',
+              transition: 'all 150ms ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#f8fafc';
+              e.currentTarget.style.borderColor = '#cbd5e1';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#ffffff';
+              e.currentTarget.style.borderColor = '#e5e7eb';
             }}
           >
-            <input
-              type="checkbox"
-              checked={favoritesOnly}
-              onChange={(e) => setFavoritesOnly(e.target.checked)}
-            />
-            Favorites only
-          </label>
+            + Create category
+          </button>
         </div>
 
         {/* Table */}
@@ -413,7 +469,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
                   onChange={(e) =>
                     setNewSupplier((prev) => ({
                       ...prev,
-                      category: e.target.value as SupplierCategory,
+                      category: e.target.value,
                     }))
                   }
                   style={{
@@ -426,7 +482,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
                     background: '#ffffff',
                   }}
                 >
-                  {CATEGORIES.filter((c) => c.value !== 'all').map((opt) => (
+                  {categories.filter((c) => c.value !== 'all').map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
@@ -514,6 +570,31 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
                 />
               </label>
 
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  marginTop: 4,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={newSupplier.private}
+                  onChange={(e) =>
+                    setNewSupplier((prev) => ({ ...prev, private: e.target.checked }))
+                  }
+                  style={{
+                    width: 16,
+                    height: 16,
+                    cursor: 'pointer',
+                  }}
+                />
+                <span style={{ color: '#6b7280' }}>Do not share with team</span>
+              </label>
+
               <div
                 style={{
                   display: 'flex',
@@ -557,6 +638,14 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Create Category Modal */}
+      {showCreateCategory && (
+        <CreateCategoryModal
+          onClose={() => setShowCreateCategory(false)}
+          onCreated={loadCustomCategories}
+        />
       )}
     </div>
   );

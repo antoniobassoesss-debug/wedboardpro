@@ -166,6 +166,21 @@ const WeddingDashboard: React.FC = () => {
     checkVerificationStatus();
   }, []);
 
+  // Listen for navigation events from NotificationsBell
+  useEffect(() => {
+    const handleNavigate = (event: CustomEvent<{ tab: string }>) => {
+      const { tab } = event.detail;
+      if (tab === 'todo') {
+        setActive('todo');
+      }
+    };
+
+    window.addEventListener('wbp:navigate', handleNavigate as EventListener);
+    return () => {
+      window.removeEventListener('wbp:navigate', handleNavigate as EventListener);
+    };
+  }, []);
+
   return (
     <div className="wp-shell">
       {!checkingVerification && !emailVerified && <VerificationBanner />}
@@ -218,6 +233,7 @@ const WeddingDashboard: React.FC = () => {
           const { data, error } = await createEvent({
             title: payload.title || `New Wedding – ${new Date().toLocaleDateString()}`,
             wedding_date: dateForSave,
+            visibility: payload.visibility || 'team', // Default to team if not specified
           });
           setIsCreating(false);
           if (error) {

@@ -114,3 +114,50 @@ export async function getUnreadCount(): Promise<{ count: number; error: string |
   }
 }
 
+export async function deleteNotification(id: string): Promise<{ error: string | null }> {
+  try {
+    const token = await getValidAccessToken();
+    if (!token) {
+      return { error: 'Not authenticated' };
+    }
+
+    const res = await fetch(`/api/notifications/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { error: body.error || `Request failed (${res.status})` };
+    }
+
+    return { error: null };
+  } catch (err: any) {
+    return { error: err.message || 'Failed to delete notification' };
+  }
+}
+
+export async function markNotificationUnread(id: string): Promise<{ data: Notification | null; error: string | null }> {
+  try {
+    const token = await getValidAccessToken();
+    if (!token) {
+      return { data: null, error: 'Not authenticated' };
+    }
+
+    const res = await fetch(`/api/notifications/${id}/unread`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { data: null, error: body.error || `Request failed (${res.status})` };
+    }
+
+    const data = await res.json();
+    return { data: data.notification, error: null };
+  } catch (err: any) {
+    return { data: null, error: err.message || 'Failed to mark notification as unread' };
+  }
+}
+

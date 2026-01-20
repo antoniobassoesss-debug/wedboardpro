@@ -12,6 +12,8 @@ import { browserSupabaseClient } from "../browserSupabaseClient";
 import { AvatarUploadModal } from "./AvatarUploadModal";
 import { removeAvatar } from "../api/avatarApi";
 import { useToast } from "./ui/toast";
+import SubscriptionTab from "../dashboard/SubscriptionTab";
+import UsageTab from "../dashboard/UsageTab";
 
 interface AccountModalProps {
   open: boolean;
@@ -19,7 +21,7 @@ interface AccountModalProps {
 }
 
 export function AccountModal({ open, onOpenChange }: AccountModalProps) {
-  const [activeTab, setActiveTab] = useState<"profile" | "team" | "billing" | "preferences">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "team" | "billing" | "usage" | "preferences">("profile");
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState<{
     full_name?: string | null;
@@ -459,6 +461,7 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
             { id: "profile", label: "Profile" },
             { id: "team", label: "Team" },
             { id: "billing", label: "Billing" },
+            { id: "usage", label: "Usage" },
             { id: "preferences", label: "Preferences" },
           ].map((tab) => (
             <button
@@ -965,89 +968,11 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           )}
 
           {activeTab === "billing" && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              <div
-                style={{
-                  padding: 24,
-                  borderRadius: 16,
-                  border: '1px solid #e3e3e3',
-                  background: '#f5f5f5',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                  <div>
-                    <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px 0', color: '#0c0c0c' }}>Premium Plan</h3>
-                    <p style={{ fontSize: 14, color: '#7c7c7c', margin: '0 0 12px 0' }}>Unlimited projects and team</p>
-                    <p style={{ fontSize: 28, fontWeight: 700, margin: 0, color: '#0c0c0c' }}>$99/month</p>
-                  </div>
-                  <button
-                    style={{
-                      borderRadius: 999,
-                      padding: '8px 18px',
-                      border: '1px solid #e3e3e3',
-                      background: '#fff',
-                      color: '#0c0c0c',
-                      fontWeight: 600,
-                      fontSize: 14,
-                      cursor: 'pointer',
-                      fontFamily: "'Geist', 'Inter', sans-serif",
-                    }}
-                  >
-                    Change Plan
-                  </button>
-                </div>
-              </div>
+            <SubscriptionTab onClose={() => onOpenChange(false)} />
+          )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#0c0c0c' }}>Payment Method</h3>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: 16,
-                    borderRadius: 16,
-                    border: '1px solid #e3e3e3',
-                    background: '#fff',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 999,
-                        background: '#ebebeb',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      💳
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 14, fontWeight: 600, margin: '0 0 2px 0', color: '#0c0c0c' }}>•••• •••• •••• 4242</p>
-                      <p style={{ fontSize: 12, color: '#7c7c7c', margin: 0 }}>Expires 12/2025</p>
-                    </div>
-                  </div>
-                  <button
-                    style={{
-                      borderRadius: 999,
-                      padding: '8px 18px',
-                      border: '1px solid #e3e3e3',
-                      background: '#fff',
-                      color: '#0c0c0c',
-                      fontWeight: 600,
-                      fontSize: 14,
-                      cursor: 'pointer',
-                      fontFamily: "'Geist', 'Inter', sans-serif",
-                    }}
-                  >
-                    Update
-                  </button>
-                </div>
-              </div>
-            </div>
+          {activeTab === "usage" && (
+            <UsageTab />
           )}
 
           {activeTab === "preferences" && (

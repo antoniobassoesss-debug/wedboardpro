@@ -338,7 +338,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange, onAddSpace,
     // 'shapes' (aka Forms) uses the provided PNG but keeps the same id so functionality remains unchanged
     { id: 'shapes', label: 'Forms', icon: '/icons/forms.png', isImage: true },
     { id: 'text', label: 'Text', icon: '/icons/text.png', isImage: true },
-    { id: 'power-point', label: 'Power Point', icon: '⚡', isImage: false },
+    { id: 'power-point', label: 'Power Point', icon: 'power-point', isImage: false },
   ];
 
   const structureOptions = [
@@ -493,34 +493,6 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange, onAddSpace,
           WebkitBackfaceVisibility: 'hidden',
         }}
       >
-        {/* Always-visible Power Point button (ensures the ⚡ tool is accessible) */}
-        <button
-          key="power-point-fixed"
-          data-tool-id="power-point"
-          onClick={() => onToolChange('power-point')}
-          onMouseEnter={() => { if (!disableHover && !suppressHover) setHoveredTool('power-point'); }}
-          onMouseLeave={() => { if (!disableHover && !suppressHover) setHoveredTool(null); }}
-          style={{
-            width: `${buttonSize}px`,
-            height: `${buttonSize}px`,
-            borderRadius: '12px',
-            border: '2px solid transparent',
-            background: getButtonBackground('power-point'),
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '18px',
-            transition: 'all 0.18s ease',
-            color: getButtonColor('power-point'),
-            padding: '6px',
-            marginBottom: '8px',
-          }}
-          title="Power Point"
-        >
-          ⚡
-        </button>
-
         {tools.map((tool) => (
           <button
             key={tool.id}
@@ -580,6 +552,22 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange, onAddSpace,
                     : ((suppressHover ? 'hand' : activeTool) === tool.id ? 'brightness(0.2)' : 'brightness(0.6)'),
                 }}
               />
+            ) : tool.id === 'power-point' ? (
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 20 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                style={{
+                  stroke: getButtonColor(tool.id),
+                  strokeWidth: '1.5',
+                  strokeLinecap: 'round',
+                  strokeLinejoin: 'round',
+                }}
+              >
+                <path d="M7 4L13 10L9 10L13 16" />
+              </svg>
             ) : (
               tool.icon
             )}

@@ -655,15 +655,31 @@ const TestimonialsSection: React.FC = () => {
 
 /* ---------------------------- Pricing Teaser ----------------------------- */
 
-const PricingTeaser: React.FC = () => {
-  const inclusions = [
-    'Unlimited active events',
-    'Project Pipeline & Smart Calendar',
-    'Quote Maker & basic budgets',
-    'Team collaboration for small studios',
-    'Email support from real planners',
-  ];
+const PRICING_PLANS = [
+  {
+    name: 'Starter',
+    price: 29,
+    description: 'For solo planners getting started',
+    features: ['Up to 10 active events', '2 team members', 'Basic budget tracking'],
+    popular: false,
+  },
+  {
+    name: 'Professional',
+    price: 59,
+    description: 'For growing studios',
+    features: ['Unlimited events', '5 team members', 'Advanced reports & analytics'],
+    popular: true,
+  },
+  {
+    name: 'Enterprise',
+    price: 149,
+    description: 'For large agencies',
+    features: ['Unlimited everything', '15 team members', 'Custom branding & API'],
+    popular: false,
+  },
+];
 
+const PricingTeaser: React.FC = () => {
   return (
     <section id="pricing" className="landing-section">
       <div className="landing-section-header">
@@ -674,59 +690,76 @@ const PricingTeaser: React.FC = () => {
           </h2>
         </div>
         <p className="landing-section-subtitle">
-          Start with a free trial. Upgrade only when you are ready to run your whole studio on
+          Start with a 14-day free trial. Upgrade only when you are ready to run your whole studio on
           WedBoardPro.
         </p>
       </div>
 
-      <div className="landing-card landing-pricing-card">
-        <h3 className="landing-card-title">For Professional Planners</h3>
-        <p className="landing-card-text">
-          For solo planners and boutique agencies running multiple weddings each season.
-        </p>
-
-        <div style={{ marginTop: 12, display: 'flex', alignItems: 'baseline', gap: 4 }}>
-          <span style={{ fontSize: 24, fontWeight: 600 }}>From €XX</span>
-          <span style={{ fontSize: 12, color: '#64748b' }}>/month</span>
-        </div>
-
-        <ul
-          style={{
-            marginTop: 14,
-            fontSize: 12,
-            color: '#475569',
-            listStyle: 'none',
-            paddingLeft: 0,
-          }}
-        >
-          {inclusions.map((item) => (
-            <li key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
-              <span
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: '999px',
-                  background: '#38bdf8',
-                  marginTop: 3,
-                }}
-              />
-              <span>{item}</span>
-            </li>
-          ))}
-        </ul>
-
-        <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          <Link to={PRIMARY_CTA_HREF} className="landing-btn-primary" style={{ flex: 1 }}>
-            Start Free Trial
-          </Link>
-          <Link
-            to="/pricing"
-            className="landing-btn-ghost"
-            style={{ flex: 1, justifyContent: 'center' }}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', 
+        gap: 16, 
+        maxWidth: 900,
+        margin: '0 auto'
+      }}>
+        {PRICING_PLANS.map((plan) => (
+          <div 
+            key={plan.name}
+            className="landing-card"
+            style={{ 
+              textAlign: 'center',
+              padding: 24,
+              border: plan.popular ? '2px solid #0ea5e9' : '1px solid #e2e8f0',
+              position: 'relative',
+            }}
           >
-            View full pricing
-          </Link>
-        </div>
+            {plan.popular && (
+              <span style={{
+                position: 'absolute',
+                top: -12,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: '#0ea5e9',
+                color: 'white',
+                fontSize: 10,
+                fontWeight: 600,
+                padding: '4px 12px',
+                borderRadius: 999,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}>
+                Most Popular
+              </span>
+            )}
+            <h3 style={{ fontSize: 18, fontWeight: 600, margin: '8px 0 4px' }}>{plan.name}</h3>
+            <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>{plan.description}</p>
+            
+            <div style={{ margin: '16px 0', display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 2 }}>
+              <span style={{ fontSize: 32, fontWeight: 700 }}>€{plan.price}</span>
+              <span style={{ fontSize: 14, color: '#64748b' }}>/mo</span>
+            </div>
+            
+            <ul style={{ listStyle: 'none', padding: 0, margin: '16px 0', fontSize: 12, color: '#475569', textAlign: 'left' }}>
+              {plan.features.map((feature) => (
+                <li key={feature} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="#10b981">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  {feature}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ textAlign: 'center', marginTop: 24 }}>
+        <Link to={PRIMARY_CTA_HREF} className="landing-btn-primary" style={{ marginRight: 12 }}>
+          Start Free Trial
+        </Link>
+        <Link to="/pricing" className="landing-btn-ghost">
+          Compare all features
+        </Link>
       </div>
     </section>
   );

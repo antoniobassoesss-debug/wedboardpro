@@ -1,0 +1,174 @@
+/**
+ * UsageTab Styles
+ * 
+ * Matches the AccountModal design language.
+ */
+
+.usage-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Loading */
+.usage-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  gap: 12px;
+}
+
+.usage-loading p {
+  font-size: 14px;
+  color: #7c7c7c;
+  margin: 0;
+}
+
+.usage-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #e3e3e3;
+  border-top-color: #0c0c0c;
+  border-radius: 50%;
+  animation: usage-spin 0.8s linear infinite;
+}
+
+@keyframes usage-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Header */
+.usage-header {
+  margin-bottom: 8px;
+}
+
+.usage-header h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+  color: #0c0c0c;
+}
+
+.usage-header p {
+  font-size: 14px;
+  color: #7c7c7c;
+  margin: 0;
+}
+
+/* Grid */
+.usage-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Card */
+.usage-card {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  background: #f5f5f5;
+  border: 1px solid #e3e3e3;
+  border-radius: 16px;
+}
+
+.usage-card-icon {
+  width: 48px;
+  height: 48px;
+  background: #ffffff;
+  border: 1px solid #e3e3e3;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.usage-card-icon svg {
+  width: 24px;
+  height: 24px;
+  color: #0c0c0c;
+}
+
+.usage-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.usage-card-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7c7c7c;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.usage-card-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0c0c0c;
+}
+
+.usage-card-limit {
+  font-size: 16px;
+  font-weight: 500;
+  color: #ababab;
+  margin-left: 4px;
+}
+
+.usage-card-bar {
+  height: 8px;
+  background: #e3e3e3;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.usage-card-bar-fill {
+  height: 100%;
+  background: #0c0c0c;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.usage-card-hint {
+  font-size: 12px;
+  color: #7c7c7c;
+}
+
+/* No Plan */
+.usage-no-plan {
+  text-align: center;
+  padding: 24px;
+  background: #f5f5f5;
+  border: 1px solid #e3e3e3;
+  border-radius: 16px;
+}
+
+.usage-no-plan p {
+  font-size: 14px;
+  color: #7c7c7c;
+  margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .usage-card {
+    flex-direction: column;
+  }
+
+  .usage-card-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .usage-card-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+

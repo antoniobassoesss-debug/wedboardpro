@@ -9,6 +9,7 @@ import EmailConfirmationWaiting from './EmailConfirmationWaiting';
 import { AuthCallbackPage, AuthUrlHandler } from './auth/index.ts';
 import { WeddingDashboard } from './dashboard/index';
 import SuppliersPage from './suppliers/SuppliersPage';
+import PricingPage from './PricingPage';
 
 // Lazy load LayoutMakerPage to avoid circular dependency issues
 const LayoutMakerPage = lazy(() => import('./LayoutMakerPage'));
@@ -93,7 +94,7 @@ const App: React.FC = () => {
         />
         <Route path="/suppliers" element={<SuppliersPage />} />
         <Route path="/demo" element={<PlaceholderPage title="Book a Demo" />} />
-        <Route path="/pricing" element={<PlaceholderPage title="Pricing" />} />
+        <Route path="/pricing" element={<PricingPage />} />
         <Route path="/privacy" element={<PlaceholderPage title="Privacy Policy" />} />
         <Route path="/terms" element={<PlaceholderPage title="Terms of Service" />} />
         <Route path="/contact" element={<PlaceholderPage title="Contact Us" />} />

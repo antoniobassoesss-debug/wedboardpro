@@ -87,6 +87,7 @@ export const WorkSection: React.FC = () => {
     const { data, error: err } = await createEvent({
       title: title || `New Wedding – ${new Date().toLocaleDateString()}`,
       wedding_date: dateForSave,
+      visibility: payload.visibility || 'team', // Default to team if not specified
     });
 
     if (err) {

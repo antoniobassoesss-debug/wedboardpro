@@ -601,67 +601,119 @@ const WeekView: React.FC<WeekViewProps> = ({
           <div
             style={{
               display: 'flex',
-              alignItems: 'center',
-              gap: 12,
               justifyContent: 'space-between',
-              padding: '8px 4px',
+              alignItems: 'center',
+              padding: '14px 18px',
+              background: '#ffffff',
+              border: '1px solid #e5e7eb',
+              borderRadius: 14,
+              marginBottom: 16,
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <button
                 onClick={() => setCurrentDate(new Date())}
                 style={{
                   borderRadius: 999,
-                  border: '1px solid #e3e3e3',
-                  padding: '8px 14px',
-                  background: '#fff',
-                  cursor: 'pointer',
+                  border: 'none',
+                  padding: '8px 16px',
+                  background: '#0f172a',
+                  color: '#ffffff',
+                  fontSize: 13,
                   fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 150ms ease',
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#1e293b'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#0f172a'}
               >
                 Today
               </button>
-              <button
-                onClick={() =>
-                  setCurrentDate(view === 'month' ? addMonths(currentDate, -1) : addWeeks(currentDate, -1))
-                }
-                style={{
-                  borderRadius: 999,
-                  border: '1px solid #e3e3e3',
-                  padding: '8px 12px',
-                  background: '#fff',
-                  cursor: 'pointer',
-                }}
-              >
-                ←
-              </button>
-              <button
-                onClick={() => setCurrentDate(view === 'month' ? addMonths(currentDate, 1) : addWeeks(currentDate, 1))}
-                style={{
-                  borderRadius: 999,
-                  border: '1px solid #e3e3e3',
-                  padding: '8px 12px',
-                  background: '#fff',
-                  cursor: 'pointer',
-                }}
-              >
-                →
-              </button>
-              <div style={{ fontWeight: 700, fontSize: 18, marginLeft: 8 }}>
-                {view === 'month' ? formatMonthLabel(currentDate) : formatWeekLabel(weekStart)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  onClick={() =>
+                    setCurrentDate(view === 'month' ? addMonths(currentDate, -1) : addWeeks(currentDate, -1))
+                  }
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 999,
+                    border: '1px solid #e5e7eb',
+                    background: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 14,
+                    color: '#64748b',
+                    transition: 'all 150ms ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.color = '#0f172a';
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#ffffff';
+                    e.currentTarget.style.color = '#64748b';
+                    e.currentTarget.style.borderColor = '#e5e7eb';
+                  }}
+                >
+                  ←
+                </button>
+                <div style={{ 
+                  fontWeight: 600, 
+                  fontSize: 15, 
+                  color: '#0f172a',
+                  minWidth: 180,
+                  textAlign: 'center',
+                }}>
+                  {view === 'month' ? formatMonthLabel(currentDate) : formatWeekLabel(weekStart)}
+                </div>
+                <button
+                  onClick={() => setCurrentDate(view === 'month' ? addMonths(currentDate, 1) : addWeeks(currentDate, 1))}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 999,
+                    border: '1px solid #e5e7eb',
+                    background: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 14,
+                    color: '#64748b',
+                    transition: 'all 150ms ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.color = '#0f172a';
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#ffffff';
+                    e.currentTarget.style.color = '#64748b';
+                    e.currentTarget.style.borderColor = '#e5e7eb';
+                  }}
+                >
+                  →
+                </button>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 4, background: '#f8fafc', padding: 3, borderRadius: 999 }}>
               <button
                 onClick={() => setView('month')}
                 style={{
                   borderRadius: 999,
-                  padding: '8px 14px',
-                  border: view === 'month' ? '1px solid #0c0c0c' : '1px solid #e3e3e3',
-                  background: view === 'month' ? '#0c0c0c' : '#fff',
-                  color: view === 'month' ? '#fff' : '#0c0c0c',
+                  padding: '7px 16px',
+                  border: 'none',
+                  background: view === 'month' ? '#0f172a' : 'transparent',
+                  color: view === 'month' ? '#ffffff' : '#64748b',
+                  fontSize: 13,
                   fontWeight: 600,
                   cursor: 'pointer',
+                  transition: 'all 150ms ease',
                 }}
               >
                 Month
@@ -670,12 +722,14 @@ const WeekView: React.FC<WeekViewProps> = ({
                 onClick={() => setView('week')}
                 style={{
                   borderRadius: 999,
-                  padding: '8px 14px',
-                  border: view === 'week' ? '1px solid #0c0c0c' : '1px solid #e3e3e3',
-                  background: view === 'week' ? '#0c0c0c' : '#fff',
-                  color: view === 'week' ? '#fff' : '#0c0c0c',
+                  padding: '7px 16px',
+                  border: 'none',
+                  background: view === 'week' ? '#0f172a' : 'transparent',
+                  color: view === 'week' ? '#ffffff' : '#64748b',
+                  fontSize: 13,
                   fontWeight: 600,
                   cursor: 'pointer',
+                  transition: 'all 150ms ease',
                 }}
               >
                 Week
@@ -687,21 +741,38 @@ const WeekView: React.FC<WeekViewProps> = ({
           <div
             style={{
               display: 'flex',
-              gap: 12,
+              gap: 16,
               flexWrap: 'wrap',
-              background: '#fff',
-              border: '1px solid #e5e5e5',
-              borderRadius: 16,
-              padding: 12,
-              alignItems: 'center',
+              background: '#ffffff',
+              border: '1px solid #e5e7eb',
+              borderRadius: 14,
+              padding: '14px 18px',
+              alignItems: 'flex-start',
+              marginBottom: 16,
             }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 160 }}>
-              <span style={{ fontSize: 12, color: '#7c7c7c' }}>Project</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 200 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Project</span>
               <select
                 value={projectFilter}
                 onChange={(e) => setProjectFilter(e.target.value)}
-                style={{ borderRadius: 10, border: '1px solid #e3e3e3', padding: '8px 10px', fontSize: 13 }}
+                style={{ 
+                  borderRadius: 999, 
+                  border: '1px solid #e5e7eb', 
+                  padding: '7px 36px 7px 14px', 
+                  fontSize: 13,
+                  fontWeight: 500,
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  transition: 'all 150ms ease',
+                  appearance: 'none',
+                  backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2394a3b8\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'%3E%3C/polyline%3E%3C/svg%3E")',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 12px center',
+                  backgroundSize: '14px',
+                }}
               >
                 <option value="all">All projects</option>
                 <option value="project-1">Project 1</option>
@@ -709,8 +780,8 @@ const WeekView: React.FC<WeekViewProps> = ({
               </select>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: 12, color: '#7c7c7c' }}>Event type</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 250 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Event Types</span>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {['event', 'meeting', 'task', 'other'].map((t) => {
                   const active = typeFilter.has(t);
@@ -727,13 +798,27 @@ const WeekView: React.FC<WeekViewProps> = ({
                       }}
                       style={{
                         borderRadius: 999,
-                        padding: '6px 10px',
-                        border: active ? '1px solid #0c0c0c' : '1px solid #e3e3e3',
-                        background: active ? '#0c0c0c' : '#fff',
-                        color: active ? '#fff' : '#0c0c0c',
+                        padding: '6px 14px',
+                        border: 'none',
+                        background: active ? '#0f172a' : '#f1f5f9',
+                        color: active ? '#ffffff' : '#64748b',
                         cursor: 'pointer',
                         fontSize: 12,
                         fontWeight: 600,
+                        transition: 'all 150ms ease',
+                        textTransform: 'capitalize',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!active) {
+                          e.currentTarget.style.background = '#e2e8f0';
+                          e.currentTarget.style.color = '#0f172a';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!active) {
+                          e.currentTarget.style.background = '#f1f5f9';
+                          e.currentTarget.style.color = '#64748b';
+                        }
                       }}
                     >
                       {t}
@@ -743,8 +828,8 @@ const WeekView: React.FC<WeekViewProps> = ({
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: 12, color: '#7c7c7c' }}>Status</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 280 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</span>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {['planned', 'confirmed', 'done', 'cancelled'].map((s) => {
                   const active = statusFilter.has(s);
@@ -761,13 +846,27 @@ const WeekView: React.FC<WeekViewProps> = ({
                       }}
                       style={{
                         borderRadius: 999,
-                        padding: '6px 10px',
-                        border: active ? '1px solid #0c0c0c' : '1px solid #e3e3e3',
-                        background: active ? '#0c0c0c' : '#fff',
-                        color: active ? '#fff' : '#0c0c0c',
+                        padding: '6px 14px',
+                        border: 'none',
+                        background: active ? '#0f172a' : '#f1f5f9',
+                        color: active ? '#ffffff' : '#64748b',
                         cursor: 'pointer',
                         fontSize: 12,
                         fontWeight: 600,
+                        transition: 'all 150ms ease',
+                        textTransform: 'capitalize',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!active) {
+                          e.currentTarget.style.background = '#e2e8f0';
+                          e.currentTarget.style.color = '#0f172a';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!active) {
+                          e.currentTarget.style.background = '#f1f5f9';
+                          e.currentTarget.style.color = '#64748b';
+                        }
                       }}
                     >
                       {s}
@@ -777,20 +876,6 @@ const WeekView: React.FC<WeekViewProps> = ({
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
-              <label style={{ fontSize: 12, color: '#0c0c0c', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input
-                  type="checkbox"
-                  checked={weekStartSetting === 'sunday'}
-                  onChange={(e) => setWeekStartSetting(e.target.checked ? 'sunday' : 'monday')}
-                />
-                Week starts on Sunday
-              </label>
-              <label style={{ fontSize: 12, color: '#0c0c0c', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input type="checkbox" checked={showWeekends} onChange={(e) => setShowWeekends(e.target.checked)} />
-                Show weekends
-              </label>
-            </div>
           </div>
         </div>
 
@@ -1097,13 +1182,28 @@ const WeekView: React.FC<WeekViewProps> = ({
                 <input
                   type="datetime-local"
                   value={form.start_at ? form.start_at.slice(0, 16) : ''}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      start_at: e.target.value ? new Date(e.target.value).toISOString() : f.start_at,
-                    }))
-                  }
-                  style={{ borderRadius: 12, border: '1px solid #e3e3e3', padding: '10px 12px', fontSize: 14 }}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      const newStart = new Date(e.target.value).toISOString();
+                      setForm((f) => ({
+                        ...f,
+                        start_at: newStart,
+                        // Auto-adjust end time if it's before start
+                        end_at: new Date(f.end_at) < new Date(newStart) 
+                          ? new Date(new Date(newStart).getTime() + 60 * 60 * 1000).toISOString() 
+                          : f.end_at,
+                      }));
+                    }
+                  }}
+                  style={{ 
+                    borderRadius: 12, 
+                    border: '1px solid #e3e3e3', 
+                    padding: '10px 12px', 
+                    fontSize: 14,
+                    outline: 'none',
+                    cursor: 'pointer',
+                    minHeight: 42,
+                  }}
                 />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600 }}>
@@ -1111,13 +1211,23 @@ const WeekView: React.FC<WeekViewProps> = ({
                 <input
                   type="datetime-local"
                   value={form.end_at ? form.end_at.slice(0, 16) : ''}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      end_at: e.target.value ? new Date(e.target.value).toISOString() : f.end_at,
-                    }))
-                  }
-                  style={{ borderRadius: 12, border: '1px solid #e3e3e3', padding: '10px 12px', fontSize: 14 }}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setForm((f) => ({
+                        ...f,
+                        end_at: new Date(e.target.value).toISOString(),
+                      }));
+                    }
+                  }}
+                  style={{ 
+                    borderRadius: 12, 
+                    border: '1px solid #e3e3e3', 
+                    padding: '10px 12px', 
+                    fontSize: 14,
+                    outline: 'none',
+                    cursor: 'pointer',
+                    minHeight: 42,
+                  }}
                 />
               </label>
             </div>

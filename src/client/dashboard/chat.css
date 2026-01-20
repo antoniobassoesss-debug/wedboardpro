@@ -106,22 +106,21 @@
 .chat-filter-tabs {
   display: flex;
   gap: 4px;
-  background: #f1f5f9;
-  padding: 4px;
-  border-radius: 10px;
+  background: #f8fafc;
+  padding: 3px;
+  border-radius: 999px;
 }
 
 .chat-filter-tab {
-  flex: 1;
-  padding: 8px 12px;
+  border-radius: 999px;
+  padding: 7px 16px;
   border: none;
   background: transparent;
-  font-size: 13px;
-  font-weight: 500;
   color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  border-radius: 8px;
-  transition: all 0.15s ease;
+  transition: all 150ms ease;
 }
 
 .chat-filter-tab:hover {
@@ -129,9 +128,8 @@
 }
 
 .chat-filter-tab.active {
-  background: #ffffff;
-  color: #0f172a;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  background: #0f172a;
+  color: #ffffff;
 }
 
 /* Conversation List */

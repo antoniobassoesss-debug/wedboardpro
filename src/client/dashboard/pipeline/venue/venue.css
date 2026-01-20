@@ -1,0 +1,833 @@
+/* =========================================================
+   Venue & Date Tab
+   Wedding project pipeline - venue and date management
+   ========================================================= */
+
+/* ========================================
+   Main Container
+   ======================================== */
+
+.venue-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.venue-tab-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.venue-tab-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px;
+  text-align: center;
+}
+
+.venue-tab-error p {
+  color: #dc2626;
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ========================================
+   Section Styling
+   ======================================== */
+
+.venue-section {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.venue-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.venue-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.venue-section-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0 0 12px 0;
+}
+
+/* Saving indicator */
+.venue-saving-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.venue-saving-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #14b8a6;
+  border-radius: 50%;
+  animation: venue-spin 0.8s linear infinite;
+}
+
+@keyframes venue-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ========================================
+   Venue Details Card - Two Column Layout
+   ======================================== */
+
+.venue-details-layout {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: start;
+}
+
+.venue-details-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.venue-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.venue-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.venue-form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.venue-form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.venue-form-input {
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #0f172a;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.venue-form-input:focus {
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+}
+
+.venue-form-input::placeholder {
+  color: #94a3b8;
+}
+
+.venue-form-input-with-suffix {
+  display: flex;
+  align-items: stretch;
+}
+
+.venue-form-input-with-suffix input {
+  border-radius: 10px 0 0 10px;
+  border-right: none;
+  flex: 1;
+}
+
+.venue-form-suffix {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 0 10px 10px 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* Venue Type Radio Buttons */
+.venue-type-options {
+  display: flex;
+  gap: 12px;
+}
+
+.venue-type-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.venue-type-option:hover {
+  border-color: #14b8a6;
+  color: #14b8a6;
+}
+
+.venue-type-option.active {
+  background: #14b8a6;
+  border-color: #14b8a6;
+  color: #ffffff;
+}
+
+.venue-type-option input {
+  display: none;
+}
+
+/* Map Link Button */
+.venue-map-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  background: #f8fafc;
+  border-radius: 12px;
+  min-width: 180px;
+}
+
+.venue-map-icon {
+  font-size: 40px;
+}
+
+.venue-map-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  background: #0f172a;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+
+.venue-map-btn:hover {
+  background: #1e293b;
+}
+
+.venue-map-btn.disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* ========================================
+   Wedding Date Section
+   ======================================== */
+
+.wedding-date-display {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.wedding-date-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wedding-date-input {
+  padding: 12px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #0f172a;
+  outline: none;
+  transition: all 0.15s ease;
+  min-width: 180px;
+}
+
+.wedding-date-input:focus {
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+}
+
+.wedding-date-formatted {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.wedding-date-countdown {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.wedding-date-countdown.upcoming {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.wedding-date-countdown.past {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+/* ========================================
+   Contact Card
+   ======================================== */
+
+.venue-contact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+.venue-contact-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.venue-contact-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.venue-contact-input-row input {
+  flex: 1;
+}
+
+.venue-contact-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.venue-contact-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.venue-contact-btn.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ========================================
+   Site Visit Notes
+   ======================================== */
+
+.venue-notes-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 14px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  font-size: 14px;
+  color: #0f172a;
+  outline: none;
+  resize: vertical;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.venue-notes-textarea:focus {
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+}
+
+.venue-notes-textarea::placeholder {
+  color: #94a3b8;
+}
+
+/* ========================================
+   Contract Upload
+   ======================================== */
+
+.contract-upload-zone {
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.contract-upload-zone:hover,
+.contract-upload-zone.dragging {
+  border-color: #14b8a6;
+  background: rgba(20, 184, 166, 0.05);
+}
+
+.contract-upload-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.contract-upload-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.contract-upload-icon {
+  font-size: 32px;
+  color: #94a3b8;
+}
+
+.contract-upload-text {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.contract-upload-hint {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* Uploaded Contract Card */
+.contract-file-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.contract-file-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: #fee2e2;
+  border-radius: 10px;
+  color: #dc2626;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.contract-file-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.contract-file-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 4px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contract-file-meta {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+}
+
+.contract-file-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.contract-file-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+
+.contract-file-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.contract-file-btn.delete:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+/* Upload Progress */
+.contract-uploading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.contract-uploading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #14b8a6;
+  border-radius: 50%;
+  animation: venue-spin 0.8s linear infinite;
+}
+
+.contract-uploading-text {
+  font-size: 14px;
+  color: #64748b;
+}
+
+/* Contract Status Pills */
+.contract-status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.contract-status-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.contract-status-pills {
+  display: flex;
+  gap: 8px;
+}
+
+.contract-status-pill {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 2px solid #e5e7eb;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.contract-status-pill:hover {
+  border-color: #14b8a6;
+  color: #14b8a6;
+}
+
+.contract-status-pill.active {
+  background: #14b8a6;
+  border-color: #14b8a6;
+  color: #ffffff;
+}
+
+.contract-status-pill.not-uploaded.active {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+
+.contract-status-pill.pending.active {
+  background: #fef3c7;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.contract-status-pill.signed.active {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #16a34a;
+}
+
+/* ========================================
+   Deposit Tracker
+   ======================================== */
+
+.deposit-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 16px;
+  align-items: end;
+}
+
+.deposit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.deposit-input-wrapper {
+  display: flex;
+  align-items: stretch;
+}
+
+.deposit-currency-prefix {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px 0 0 10px;
+  border-right: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.deposit-input-wrapper input {
+  border-radius: 0 10px 10px 0;
+  flex: 1;
+}
+
+.deposit-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  height: 42px;
+}
+
+.deposit-status-badge.paid {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.deposit-status-badge.overdue {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.deposit-status-badge.due-soon {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.deposit-status-badge.not-scheduled {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+/* ========================================
+   Venue Restrictions (Tag Input)
+   ======================================== */
+
+.restrictions-input-wrapper {
+  margin-bottom: 12px;
+}
+
+.restrictions-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #0f172a;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.restrictions-input:focus {
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+}
+
+.restrictions-input:disabled {
+  background: #f8fafc;
+  cursor: not-allowed;
+}
+
+.restrictions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.restriction-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #fef3c7;
+  border-radius: 999px;
+  font-size: 13px;
+  color: #92400e;
+}
+
+.restriction-tag button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: #b45309;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.restriction-tag button:hover {
+  color: #dc2626;
+}
+
+.restrictions-empty {
+  font-size: 13px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* ========================================
+   AI Placeholder
+   ======================================== */
+
+.venue-ai-placeholder {
+  border: 2px dashed #d1d5db;
+  border-radius: 16px;
+  padding: 40px;
+  text-align: center;
+  background: #fafafa;
+}
+
+.venue-ai-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.venue-ai-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #64748b;
+  margin: 0 0 8px 0;
+}
+
+.venue-ai-desc {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+/* ========================================
+   Responsive Design
+   ======================================== */
+
+@media (max-width: 900px) {
+  .venue-details-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .venue-map-section {
+    flex-direction: row;
+    padding: 16px;
+  }
+
+  .venue-contact-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .deposit-layout {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .deposit-status-badge {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 600px) {
+  .venue-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .venue-type-options {
+    flex-direction: column;
+  }
+
+  .wedding-date-display {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .deposit-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .contract-file-card {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .contract-file-info {
+    width: 100%;
+  }
+}

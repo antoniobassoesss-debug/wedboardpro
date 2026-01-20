@@ -139,8 +139,6 @@ const LayoutMakerPage: React.FC = () => {
   
   // Electrical Dashboard state
   const [showElectricalDashboard, setShowElectricalDashboard] = useState<boolean>(false);
-  // Placeholder for electrical project ID - in production, this would come from props or context
-  const electricalProjectId = activeProject?.supabaseLayoutId || 'demo-electrical-project';
   
   // Save to Supabase state
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -201,6 +199,9 @@ const LayoutMakerPage: React.FC = () => {
     }
   };
   
+  // Placeholder for electrical project ID - in production, this would come from props or context
+  const electricalProjectId = activeProject?.supabaseLayoutId || 'demo-electrical-project';
+  
   // Helper function to create a deep copy of canvas data
   const deepCopyCanvasData = useCallback((data: Project['canvasData']): Project['canvasData'] => {
     return {
@@ -217,12 +218,11 @@ const LayoutMakerPage: React.FC = () => {
   // Save current layout to Supabase
   const handleSaveCurrentLayout = useCallback(async () => {
     if (isSaving) return;
-    
+
     setIsSaving(true);
     setSaveStatus('saving');
     setSaveError(null);
-    setShowSaveDropdown(false);
-    
+
     try {
       // Get the latest canvas data
       const latestData = currentCanvasDataRef.current || activeProject.canvasData;
@@ -285,12 +285,11 @@ const LayoutMakerPage: React.FC = () => {
   // Save all layouts to Supabase
   const handleSaveAllLayouts = useCallback(async () => {
     if (isSaving) return;
-    
+
     setIsSaving(true);
     setSaveStatus('saving');
     setSaveError(null);
-    setShowSaveDropdown(false);
-    
+
     try {
       // Prepare all projects for saving
       const inputs: SaveLayoutInput[] = projects.map(p => {
@@ -675,21 +674,6 @@ const LayoutMakerPage: React.FC = () => {
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: '#ffffff' }}>
-      {/* Test element - should always be visible to verify component is rendering */}
-      <div style={{
-        position: 'absolute',
-        top: '10px',
-        left: '10px',
-        zIndex: 99999,
-        background: 'red',
-        color: 'white',
-        padding: '4px 8px',
-        fontSize: '12px',
-        pointerEvents: 'none',
-      }}>
-        Layout Maker Loaded
-      </div>
-      
       {/* Layer 0: Infinite Grid Background (always visible, behind everything) */}
       <InfiniteGridBackground />
       

@@ -1,21 +1,134 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { listNotifications, markNotificationRead, markAllNotificationsRead, getUnreadCount, type Notification } from '../api/notificationsApi';
+import { listNotifications, markNotificationRead, markAllNotificationsRead, getUnreadCount, deleteNotification, markNotificationUnread, type Notification } from '../api/notificationsApi';
+import { browserSupabaseClient } from '../browserSupabaseClient';
+import { getStoredSession } from '../utils/sessionManager';
 
 interface NotificationsBellProps {
   className?: string;
 }
+
+// SVG Icons (monochrome line-based)
+const BellIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+  </svg>
+);
+
+const TaskIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <path d="M14 2v6h6" />
+    <path d="M16 13H8" />
+    <path d="M16 17H8" />
+    <path d="M10 9H8" />
+  </svg>
+);
+
+const UsersIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+    <circle cx="9" cy="7" r="4"></circle>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+  </svg>
+);
+
+const CheckIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M20 6L9 17l-5-5" />
+  </svg>
+);
+
+const XIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M18 6L6 18" />
+    <path d="M6 6l12 12" />
+  </svg>
+);
+
+const EmptyBellIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    width="48"
+    height="48"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    <path d="M9 8l6 6" />
+    <path d="M15 8l-6 6" />
+  </svg>
+);
 
 const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [hoveredNotificationId, setHoveredNotificationId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<ReturnType<NonNullable<typeof browserSupabaseClient>['channel']> | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await listNotifications({ unread: false, limit: 20 });
+      const { data, error } = await listNotifications({ unread: false, limit: 50 });
       if (error) {
         console.error('Failed to fetch notifications:', error);
         return;
@@ -37,11 +150,168 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
     }
   }, []);
 
+  // Set up Supabase session for realtime
+  const setSupabaseSession = useCallback(async () => {
+    if (!browserSupabaseClient) return;
+    const session = getStoredSession();
+    if (!session?.access_token || !session?.refresh_token) return;
+
+    try {
+      await browserSupabaseClient.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+    } catch (err) {
+      console.warn('[NotificationsBell] Failed to set Supabase session:', err);
+    }
+  }, []);
+
+  // Subscribe to realtime notifications
+  useEffect(() => {
+    const subscribeToRealtime = async () => {
+      if (!browserSupabaseClient) return;
+
+      const session = getStoredSession();
+      // Try to get user ID from session.user.id or from the user object stored separately
+      const userId = session?.user?.id || (session as any)?.user_id;
+      if (!userId) {
+        // Try to get from localStorage user object
+        const userStr = typeof window !== 'undefined' ? window.localStorage.getItem('wedboarpro_user') : null;
+        if (userStr) {
+          try {
+            const user = JSON.parse(userStr);
+            const extractedUserId = user?.id;
+            if (extractedUserId) {
+              // Use extracted user ID
+              const finalUserId = extractedUserId;
+              await setSupabaseSession();
+
+              // Remove existing channel if any
+              if (channelRef.current) {
+                await browserSupabaseClient.removeChannel(channelRef.current);
+                channelRef.current = null;
+              }
+
+              const channelName = `notifications:${finalUserId}:${Date.now()}`;
+              const channel = browserSupabaseClient.channel(channelName);
+
+              channel.on(
+                'postgres_changes',
+                {
+                  event: 'INSERT',
+                  schema: 'public',
+                  table: 'notifications',
+                  filter: `user_id=eq.${finalUserId}`,
+                },
+                (payload) => {
+                  console.log('[NotificationsBell] New notification received via realtime:', payload);
+                  const newNotification = payload.new as Notification;
+                  if (newNotification) {
+                    // Prepend to notifications list (even if read, to show it was received)
+                    setNotifications((prev) => {
+                      // Avoid duplicates
+                      if (prev.some((n) => n.id === newNotification.id)) {
+                        return prev;
+                      }
+                      return [newNotification, ...prev];
+                    });
+                    // Increment unread count only if unread
+                    if (!newNotification.is_read) {
+                      setUnreadCount((prev) => prev + 1);
+                    }
+                  }
+                }
+              );
+
+              channel.subscribe((status) => {
+                console.log('[NotificationsBell] Realtime subscription status:', status);
+                if (status === 'SUBSCRIBED') {
+                  console.log('[NotificationsBell] Successfully subscribed to notifications');
+                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                  console.warn('[NotificationsBell] Realtime subscription error:', status);
+                }
+              });
+
+              channelRef.current = channel;
+              return;
+            }
+          } catch (err) {
+            console.warn('[NotificationsBell] Failed to parse user from localStorage:', err);
+          }
+        }
+        console.log('[NotificationsBell] No user ID available for realtime subscription');
+        return;
+      }
+
+      const finalUserId = userId;
+
+      await setSupabaseSession();
+
+      // Remove existing channel if any
+      if (channelRef.current) {
+        await browserSupabaseClient.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+
+      const channelName = `notifications:${userId}:${Date.now()}`;
+      const channel = browserSupabaseClient.channel(channelName);
+
+      channel.on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log('[NotificationsBell] New notification received via realtime:', payload);
+          const newNotification = payload.new as Notification;
+          if (newNotification && !newNotification.is_read) {
+            // Prepend to notifications list
+            setNotifications((prev) => [newNotification, ...prev]);
+            // Increment unread count
+            setUnreadCount((prev) => prev + 1);
+            // Optional: gentle pulse animation could be added here
+          }
+        }
+      );
+
+      channel.subscribe((status) => {
+        console.log('[NotificationsBell] Realtime subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('[NotificationsBell] Successfully subscribed to notifications');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[NotificationsBell] Realtime subscription error:', status);
+        }
+      });
+
+      channelRef.current = channel;
+
+      return () => {
+        if (channelRef.current) {
+          browserSupabaseClient.removeChannel(channelRef.current);
+          channelRef.current = null;
+        }
+      };
+    };
+
+    subscribeToRealtime();
+
+    // Cleanup on unmount
+    return () => {
+      if (channelRef.current && browserSupabaseClient) {
+        browserSupabaseClient.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [setSupabaseSession]);
+
   useEffect(() => {
     fetchNotifications();
     fetchUnreadCount();
 
-    // Poll for new notifications every 30 seconds
+    // Poll for new notifications every 30 seconds as fallback (more frequent to catch missed realtime)
     const interval = setInterval(() => {
       fetchUnreadCount();
       if (isOpen) {
@@ -59,17 +329,28 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
       }
     };
 
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+      }
+    };
+
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
       fetchNotifications();
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
     };
   }, [isOpen, fetchNotifications]);
 
-  const handleMarkAsRead = async (id: string) => {
+  const handleMarkAsRead = async (id: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
     const { error } = await markNotificationRead(id);
     if (error) {
       console.error('Failed to mark notification as read:', error);
@@ -79,7 +360,38 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
     setUnreadCount((prev) => Math.max(0, prev - 1));
   };
 
-  const handleMarkAllAsRead = async () => {
+  const handleMarkAsUnread = async (id: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    const { error } = await markNotificationUnread(id);
+    if (error) {
+      console.error('Failed to mark notification as unread:', error);
+      return;
+    }
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: false } : n)));
+    setUnreadCount((prev) => prev + 1);
+  };
+
+  const handleDismiss = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const notification = notifications.find((n) => n.id === id);
+    const wasUnread = notification?.is_read === false;
+
+    const { error } = await deleteNotification(id);
+    if (error) {
+      console.error('Failed to delete notification:', error);
+      return;
+    }
+
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    if (wasUnread) {
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    }
+  };
+
+  const handleMarkAllAsRead = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     const { error } = await markAllNotificationsRead();
     if (error) {
       console.error('Failed to mark all as read:', error);
@@ -100,22 +412,9 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays}d ago`;
     return date.toLocaleDateString();
-  };
-
-  const getNotificationIcon = (type: Notification['type']) => {
-    switch (type) {
-      case 'task_assigned':
-      case 'task_reassigned':
-        return '📋';
-      case 'task_completed':
-        return '✅';
-      case 'team_invitation':
-        return '👥';
-      default:
-        return '🔔';
-    }
   };
 
   const handleNotificationClick = (notification: Notification) => {
@@ -123,14 +422,31 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
       handleMarkAsRead(notification.id);
     }
 
-    // Navigate to related entity if available
+    // Navigate based on notification type
     if (notification.related_entity_type === 'task' && notification.related_entity_id) {
-      // Could navigate to task detail or todo page
-      window.location.hash = '#todo';
+      window.dispatchEvent(new CustomEvent('wbp:navigate', { detail: { tab: 'todo' } }));
+    } else if (notification.type === 'team_invitation' || notification.related_entity_type === 'team') {
+      window.dispatchEvent(new CustomEvent('wbp:navigate', { detail: { tab: 'teams' } }));
     }
 
     setIsOpen(false);
   };
+
+  // Parse message to extract task title and project name, or team name
+  const parseNotificationMessage = (message: string, type?: string) => {
+    if (type === 'team_invitation') {
+      const lines = message.split('\n');
+      const teamLine = lines[0]?.replace(/^Team:\s*/, '') || '';
+      return { taskTitle: teamLine, projectName: null, isTeamInvitation: true };
+    }
+    const lines = message.split('\n');
+    const taskLine = lines[0]?.replace(/^Task:\s*/, '') || '';
+    const projectLine = lines[1]?.replace(/^in\s*/, '') || null;
+    return { taskTitle: taskLine, projectName: projectLine, isTeamInvitation: false };
+  };
+
+  const hasUnread = unreadCount > 0;
+  const bellColor = isOpen || hasUnread ? '#14B8A6' : '#6B7280';
 
   return (
     <div className={className} style={{ position: 'relative' }} ref={dropdownRef}>
@@ -139,20 +455,21 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
         onClick={() => setIsOpen(!isOpen)}
         className="wp-floating-notifications"
         title="Notifications"
+        style={{
+          color: bellColor,
+        }}
+        onMouseEnter={(e) => {
+          if (!isOpen && !hasUnread) {
+            e.currentTarget.style.color = '#14B8A6';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isOpen && !hasUnread) {
+            e.currentTarget.style.color = '#6B7280';
+          }
+        }}
       >
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-        </svg>
+        <BellIcon />
         {unreadCount > 0 && (
           <span className="wp-floating-notifications-badge">
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -167,28 +484,32 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
             top: '100%',
             right: 0,
             marginTop: '8px',
-            width: '360px',
-            maxHeight: '500px',
-            background: 'white',
-            border: '1px solid #e5e5e5',
+            width: '380px',
+            maxHeight: '600px',
+            background: '#FFFFFF',
+            border: '1px solid #E5E7EB',
             borderRadius: '12px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.12)',
             zIndex: 1000,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
           }}
         >
+          {/* Header */}
           <div
             style={{
-              padding: '16px',
-              borderBottom: '1px solid #e5e5e5',
+              padding: '16px 20px',
+              borderBottom: '1px solid #E5E7EB',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
+              flexShrink: 0,
             }}
           >
-            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Notifications</h3>
+            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#1F2937' }}>
+              Notifications
+            </h3>
             {unreadCount > 0 && (
               <button
                 type="button"
@@ -196,82 +517,256 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: '#2563eb',
+                  color: '#14B8A6',
                   cursor: 'pointer',
                   fontSize: '13px',
                   fontWeight: 500,
                   padding: '4px 8px',
+                  borderRadius: '4px',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = '#0f766e';
+                  e.currentTarget.style.textDecoration = 'underline';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = '#14B8A6';
+                  e.currentTarget.style.textDecoration = 'none';
                 }}
               >
-                Mark all read
+                Mark all as read
               </button>
             )}
           </div>
 
+          {/* Body */}
           <div
             style={{
               overflowY: 'auto',
-              maxHeight: '400px',
+              maxHeight: '500px',
+              minHeight: '200px',
             }}
           >
             {loading ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#7c7c7c' }}>Loading...</div>
+              <div style={{ padding: '40px', textAlign: 'center', color: '#9CA3AF', fontSize: '14px' }}>
+                Loading...
+              </div>
             ) : notifications.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#7c7c7c' }}>No notifications</div>
+              <div
+                style={{
+                  padding: '40px 20px',
+                  textAlign: 'center',
+                  color: '#9CA3AF',
+                }}
+              >
+                <EmptyBellIcon style={{ color: '#D1D5DB', margin: '0 auto 16px' }} />
+                <div style={{ fontSize: '14px', fontWeight: 500, color: '#6B7280', marginBottom: '4px' }}>
+                  No notifications yet
+                </div>
+                <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
+                  You'll be notified when someone assigns you a task
+                </div>
+              </div>
             ) : (
-              notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  onClick={() => handleNotificationClick(notification)}
-                  style={{
-                    padding: '12px 16px',
-                    borderBottom: '1px solid #f0f0f0',
-                    cursor: 'pointer',
-                    background: notification.is_read ? 'white' : '#f0f9ff',
-                    transition: 'background 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (notification.is_read) {
-                      e.currentTarget.style.background = '#f9f9f9';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (notification.is_read) {
-                      e.currentTarget.style.background = 'white';
-                    }
-                  }}
-                >
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: '20px', flexShrink: 0 }}>{getNotificationIcon(notification.type)}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
+              notifications.map((notification, index) => {
+                const { taskTitle, projectName, isTeamInvitation } = parseNotificationMessage(notification.message, notification.type);
+                const isUnread = !notification.is_read;
+                const isHovered = hoveredNotificationId === notification.id;
+                const bgColor = isUnread
+                  ? 'rgba(20, 184, 166, 0.04)'
+                  : isHovered
+                    ? 'rgba(20, 184, 166, 0.08)'
+                    : '#FFFFFF';
+
+                return (
+                  <div
+                    key={notification.id}
+                    onClick={() => handleNotificationClick(notification)}
+                    onMouseEnter={() => setHoveredNotificationId(notification.id)}
+                    onMouseLeave={() => setHoveredNotificationId(null)}
+                    style={{
+                      padding: '14px 16px',
+                      borderBottom: index < notifications.length - 1 ? '1px solid #E5E7EB' : 'none',
+                      cursor: 'pointer',
+                      background: bgColor,
+                      transition: 'background 0.15s ease',
+                      position: 'relative',
+                      borderLeft: isUnread ? '3px solid #14B8A6' : '3px solid transparent',
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                      {/* Icon */}
                       <div
                         style={{
-                          fontWeight: notification.is_read ? 500 : 700,
-                          fontSize: '14px',
-                          marginBottom: '4px',
-                          color: '#0c0c0c',
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          background: '#F3F4F6',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          border: '1px solid #E5E7EB',
                         }}
                       >
-                        {notification.title}
+                        {isTeamInvitation || notification.type === 'team_invitation' ? (
+                          <UsersIcon style={{ color: '#6B7280' }} />
+                        ) : (
+                          <TaskIcon style={{ color: '#6B7280' }} />
+                        )}
                       </div>
-                      <div style={{ fontSize: '13px', color: '#666', marginBottom: '4px' }}>{notification.message}</div>
-                      <div style={{ fontSize: '11px', color: '#999' }}>{formatTimeAgo(notification.created_at)}</div>
+
+                      {/* Content */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontWeight: isUnread ? 600 : 500,
+                            fontSize: '14px',
+                            marginBottom: '4px',
+                            color: '#1F2937',
+                            lineHeight: '1.4',
+                          }}
+                        >
+                          {notification.title}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: '14px',
+                            color: '#374151',
+                            marginBottom: '2px',
+                            fontWeight: 500,
+                            lineHeight: '1.4',
+                          }}
+                        >
+                          {isTeamInvitation ? `Team: ${taskTitle}` : taskTitle}
+                        </div>
+                        {projectName && !isTeamInvitation && (
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              color: '#6B7280',
+                              marginBottom: '4px',
+                              lineHeight: '1.4',
+                            }}
+                          >
+                            in {projectName}
+                          </div>
+                        )}
+                        <div
+                          style={{
+                            fontSize: '11px',
+                            color: '#9CA3AF',
+                            marginTop: '4px',
+                          }}
+                        >
+                          {formatTimeAgo(notification.created_at)}
+                        </div>
+                      </div>
+
+                      {/* Hover Actions */}
+                      {isHovered && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '4px',
+                            alignItems: 'center',
+                            flexShrink: 0,
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {notification.is_read ? (
+                            <button
+                              type="button"
+                              onClick={(e) => handleMarkAsUnread(notification.id, e)}
+                              title="Mark as unread"
+                              style={{
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '4px',
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#6B7280',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(20, 184, 166, 0.1)';
+                                e.currentTarget.style.color = '#14B8A6';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.color = '#6B7280';
+                              }}
+                            >
+                              <CheckIcon />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => handleMarkAsRead(notification.id, e)}
+                              title="Mark as read"
+                              style={{
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '4px',
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#6B7280',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(20, 184, 166, 0.1)';
+                                e.currentTarget.style.color = '#14B8A6';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.color = '#6B7280';
+                              }}
+                            >
+                              <CheckIcon />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => handleDismiss(notification.id, e)}
+                            title="Dismiss"
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '4px',
+                              border: 'none',
+                              background: 'transparent',
+                              color: '#6B7280',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                              e.currentTarget.style.color = '#EF4444';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent';
+                              e.currentTarget.style.color = '#6B7280';
+                            }}
+                          >
+                            <XIcon />
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    {!notification.is_read && (
-                      <div
-                        style={{
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          background: '#2563eb',
-                          flexShrink: 0,
-                          marginTop: '4px',
-                        }}
-                      />
-                    )}
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -281,4 +776,3 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
 };
 
 export default NotificationsBell;
-

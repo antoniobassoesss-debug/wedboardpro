@@ -1,0 +1,812 @@
+/* =========================================================
+   Vision & Style Tab
+   Wedding project pipeline - aesthetic vision capture
+   ========================================================= */
+
+/* ========================================
+   Main Container
+   ======================================== */
+
+.vision-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.vision-tab-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.vision-tab-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px;
+  text-align: center;
+}
+
+.vision-tab-error p {
+  color: #dc2626;
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ========================================
+   Section Styling
+   ======================================== */
+
+.vision-section {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.vision-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.vision-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.vision-section-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0 0 12px 0;
+}
+
+/* Saving indicator */
+.vision-saving-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.vision-saving-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #14b8a6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ========================================
+   Style Quiz Pills
+   ======================================== */
+
+.style-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.style-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 2px solid #e5e7eb;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.style-pill:hover {
+  border-color: #14b8a6;
+  color: #14b8a6;
+}
+
+.style-pill.active {
+  background: #14b8a6;
+  border-color: #14b8a6;
+  color: #ffffff;
+}
+
+.style-pill-icon {
+  font-size: 16px;
+}
+
+/* ========================================
+   Color Palette
+   ======================================== */
+
+.color-palette-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.color-swatch-wrapper {
+  position: relative;
+}
+
+.color-swatch {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 2px solid #e5e7eb;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.color-swatch:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+}
+
+.color-swatch.add {
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: #64748b;
+  border-style: dashed;
+}
+
+.color-swatch.add:hover {
+  border-color: #14b8a6;
+  color: #14b8a6;
+}
+
+.color-hex {
+  font-size: 10px;
+  color: #64748b;
+  text-align: center;
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+
+/* Color Popover */
+.color-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 140px;
+}
+
+.color-popover input[type="color"] {
+  width: 100%;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.color-popover input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-popover input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 8px;
+}
+
+.color-popover-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.color-popover-btn {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.color-popover-btn.remove {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.color-popover-btn.remove:hover {
+  background: #fecaca;
+}
+
+.color-popover-btn.done {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.color-popover-btn.done:hover {
+  background: #1e293b;
+}
+
+/* ========================================
+   Keywords / Tags
+   ======================================== */
+
+.keywords-input-wrapper {
+  margin-bottom: 12px;
+}
+
+.keywords-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #0f172a;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.keywords-input:focus {
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+}
+
+.keywords-input:disabled {
+  background: #f8fafc;
+  cursor: not-allowed;
+}
+
+.keywords-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.keyword-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.keyword-tag button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.keyword-tag button:hover {
+  color: #dc2626;
+}
+
+/* ========================================
+   Must-Haves List
+   ======================================== */
+
+.must-haves-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.must-have-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.must-have-bullet {
+  color: #14b8a6;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.must-have-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #0f172a;
+  background: transparent;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.must-have-input:hover {
+  background: #f8fafc;
+}
+
+.must-have-input:focus {
+  border-color: #e5e7eb;
+  background: #ffffff;
+}
+
+.must-have-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  opacity: 0;
+}
+
+.must-have-item:hover .must-have-delete {
+  opacity: 1;
+}
+
+.must-have-delete:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.add-item-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.add-item-btn:hover {
+  border-color: #14b8a6;
+  color: #14b8a6;
+}
+
+/* ========================================
+   Inspiration Links
+   ======================================== */
+
+.link-input-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.link-input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #0f172a;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.link-input:focus {
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+}
+
+.link-add-btn {
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  background: #0f172a;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.link-add-btn:hover:not(:disabled) {
+  background: #1e293b;
+}
+
+.link-add-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.inspiration-links-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.link-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  transition: all 0.15s ease;
+}
+
+.link-card:hover {
+  border-color: #cbd5e1;
+}
+
+.link-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #e2e8f0;
+  border-radius: 8px;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.link-url {
+  flex: 1;
+  font-size: 13px;
+  color: #0f172a;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link-url:hover {
+  color: #14b8a6;
+}
+
+.link-external {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.link-external:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.link-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.link-delete:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.links-empty {
+  text-align: center;
+  padding: 24px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+/* ========================================
+   Mood Board Grid
+   ======================================== */
+
+.mood-board-upload-zone {
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.mood-board-upload-zone:hover,
+.mood-board-upload-zone.dragging {
+  border-color: #14b8a6;
+  background: rgba(20, 184, 166, 0.05);
+}
+
+.mood-board-upload-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.upload-zone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.upload-zone-icon {
+  font-size: 32px;
+  color: #94a3b8;
+}
+
+.upload-zone-text {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.upload-zone-hint {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* Mood Board Grid - Pinterest style */
+.mood-board-grid {
+  column-count: 3;
+  column-gap: 12px;
+}
+
+.mood-board-item {
+  break-inside: avoid;
+  margin-bottom: 12px;
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #f1f5f9;
+}
+
+.mood-board-item img {
+  width: 100%;
+  display: block;
+  border-radius: 12px;
+  transition: transform 0.2s ease;
+}
+
+.mood-board-item:hover img {
+  transform: scale(1.02);
+}
+
+.mood-board-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 8px;
+}
+
+.mood-board-item:hover .mood-board-overlay {
+  opacity: 1;
+}
+
+.mood-board-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  color: #dc2626;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.mood-board-delete:hover {
+  background: #ffffff;
+  transform: scale(1.1);
+}
+
+.mood-board-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+/* Upload progress */
+.mood-board-uploading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  gap: 12px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+
+.mood-board-uploading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #14b8a6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.mood-board-uploading-text {
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* Lightbox */
+.lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  cursor: pointer;
+}
+
+.lightbox-backdrop img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.lightbox-close {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  cursor: pointer;
+  border-radius: 8px;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ========================================
+   AI Placeholder
+   ======================================== */
+
+.ai-placeholder-box {
+  border: 2px dashed #d1d5db;
+  border-radius: 16px;
+  padding: 40px;
+  text-align: center;
+  background: #fafafa;
+}
+
+.ai-placeholder-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.ai-placeholder-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #64748b;
+  margin: 0 0 8px 0;
+}
+
+.ai-placeholder-desc {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+/* ========================================
+   Responsive Design
+   ======================================== */
+
+@media (max-width: 900px) {
+  .mood-board-grid {
+    column-count: 2;
+  }
+}
+
+@media (max-width: 600px) {
+  .mood-board-grid {
+    column-count: 1;
+  }
+
+  .style-pills {
+    gap: 8px;
+  }
+
+  .style-pill {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+
+  .color-palette-row {
+    gap: 12px;
+  }
+
+  .color-swatch {
+    width: 40px;
+    height: 40px;
+  }
+
+  .link-input-row {
+    flex-direction: column;
+  }
+
+  .link-add-btn {
+    width: 100%;
+  }
+}
