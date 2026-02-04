@@ -192,10 +192,6 @@ const HeroSection: React.FC = () => {
           <h1 className="landing-hero-title">
             The all‑in‑one platform for modern wedding planners
           </h1>
-          <p className="landing-hero-subtitle">
-            WedBoardPro centralizes your timelines, tasks, quotes, vendors and team so every event
-            feels calm and every client feels taken care of.
-          </p>
 
           <div className="landing-hero-buttons">
             <Link to={PRIMARY_CTA_HREF} className="landing-btn-primary">
@@ -205,21 +201,6 @@ const HeroSection: React.FC = () => {
               <span className="play">▶</span>
               <span>Watch 2‑min tour</span>
             </Link>
-          </div>
-
-          <div className="landing-hero-microgrid">
-            <MicroBenefit
-              title="See every event at a glance"
-              description="One pipeline for all weddings with stages, budgets and due dates."
-            />
-            <MicroBenefit
-              title="Send polished quotes in minutes"
-              description="Use reusable templates instead of rebuilding proposals from scratch."
-            />
-            <MicroBenefit
-              title="Keep team & vendors in sync"
-              description="Share timelines, tasks and notes so everyone knows what’s next."
-            />
           </div>
         </div>
 

@@ -67,6 +67,7 @@ export interface SubscriptionResponse {
   subscription: Subscription | null;
   teamId: string | null;
   memberCount: number;
+  eventCount: number;
   addons: any[];
   status: string;
   message?: string;

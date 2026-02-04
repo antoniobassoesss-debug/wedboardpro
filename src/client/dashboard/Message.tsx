@@ -80,6 +80,7 @@ const Message: React.FC<MessageProps> = ({
       <div
         className={`instagram-bubble ${isOwnMessage ? 'me' : 'them'}`}
         style={{ borderRadius: getBorderRadius() }}
+        onClick={() => setShowTime(!showTime)}
         onMouseEnter={() => setShowTime(true)}
         onMouseLeave={() => setShowTime(false)}
       >

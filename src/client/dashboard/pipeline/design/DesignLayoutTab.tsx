@@ -143,7 +143,7 @@ const DesignLayoutTab: React.FC<DesignLayoutTabProps> = ({ eventId }) => {
 
   const handleOpenLayout = (layoutId: string) => {
     localStorage.setItem('layout-maker-active-project-id', layoutId);
-    navigate('/layout-maker');
+    navigate(`/layout-maker?eventId=${eventId}`);
   };
 
   const handleAttachLayout = async (layoutId: string) => {
@@ -296,7 +296,7 @@ const DesignLayoutTab: React.FC<DesignLayoutTabProps> = ({ eventId }) => {
           <button
             type="button"
             className="design-btn-primary"
-            onClick={() => navigate('/layout-maker')}
+            onClick={() => navigate(`/layout-maker?eventId=${eventId}`)}
           >
             + New Layout
           </button>
@@ -313,7 +313,7 @@ const DesignLayoutTab: React.FC<DesignLayoutTabProps> = ({ eventId }) => {
           <button
             type="button"
             className="design-btn-primary"
-            onClick={() => navigate('/layout-maker')}
+            onClick={() => navigate(`/layout-maker?eventId=${eventId}`)}
           >
             Create First Layout
           </button>

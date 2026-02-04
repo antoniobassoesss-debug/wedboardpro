@@ -309,4 +309,225 @@
   margin-top: 8px;
 }
 
+/* ===================== */
+/* Mobile Responsive     */
+/* ===================== */
+
+@media (max-width: 767px) {
+  .todo-container {
+    padding: 0;
+    border-radius: 0;
+    border: none;
+    min-height: calc(100vh - 80px);
+  }
+
+  .todo-header {
+    padding: 16px;
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 10;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .todo-header-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .todo-title {
+    font-size: 20px;
+  }
+
+  .todo-toolbar {
+    padding: 12px 16px;
+    background: #fafafa;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 8px;
+  }
+
+  .todo-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .td-filter {
+    flex-shrink: 0;
+  }
+
+  .todo-filters > *:not(.td-filter) {
+    display: none;
+  }
+
+  .todo-list {
+    padding: 12px;
+  }
+
+  .todo-group-title {
+    font-size: 13px;
+    padding: 8px 12px;
+    margin: 8px 0 4px;
+  }
+
+  .todo-item {
+    padding: 12px;
+    border-radius: 12px;
+    margin-bottom: 4px;
+  }
+
+  .todo-item-left {
+    gap: 10px;
+  }
+
+  .todo-checkbox {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+
+  .todo-item-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .todo-item-title {
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+
+  .todo-item-meta {
+    font-size: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .todo-item-priority {
+    font-size: 10px;
+    padding: 2px 8px;
+  }
+
+  .todo-item-date {
+    font-size: 11px;
+  }
+
+  .todo-item-assignee {
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
+  }
+
+  .todo-item-right {
+    gap: 8px;
+  }
+
+  .todo-item-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+  }
+
+  .todo-empty {
+    padding: 40px 24px;
+  }
+
+  .todo-empty-icon {
+    font-size: 56px;
+    margin-bottom: 16px;
+  }
+
+  .todo-empty-title {
+    font-size: 18px;
+  }
+
+  .todo-empty-desc {
+    font-size: 14px;
+  }
+
+  .todo-modal {
+    margin: 0;
+    max-height: 90vh;
+    border-radius: 20px 20px 0 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    animation: todo-modal-slide-up 300ms ease;
+  }
+
+  @keyframes todo-modal-slide-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  .todo-modal-header {
+    padding: 16px 20px;
+    border-radius: 20px 20px 0 0;
+  }
+
+  .todo-modal-body {
+    padding: 16px 20px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    max-height: calc(90vh - 80px);
+    overflow-y: auto;
+  }
+
+  .todo-modal input,
+  .todo-modal select,
+  .todo-modal textarea {
+    padding: 14px;
+    font-size: 16px;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+    gap: 8px;
+    padding: 0 20px 20px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+
+  .modal-actions button {
+    width: 100%;
+    padding: 14px;
+    font-size: 14px;
+  }
+
+  /* FAB for mobile */
+  .todo-fab {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #0c0c0c;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    z-index: 100;
+    transition: transform 0.15s ease;
+  }
+
+  .todo-fab:active {
+    transform: scale(0.95);
+  }
+
+  .todo-fab svg {
+    width: 24px;
+    height: 24px;
+    color: #fff;
+  }
+}
+
 

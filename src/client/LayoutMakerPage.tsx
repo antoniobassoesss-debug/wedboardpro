@@ -1,13 +1,28 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import GridCanvas from './GridCanvas';
 import HeaderBar from './HeaderBar';
 import Toolbar from './Toolbar';
 import ProjectTabs from './ProjectTabs';
 import InfiniteGridBackground from './InfiniteGridBackground';
+import WorkflowCanvas from './components/WorkflowCanvas';
 import AssistantChat from './AssistantChat';
 import AssociateProjectModal from './AssociateProjectModal';
 import ElectricalDashboard from './components/ElectricalDashboard';
-import { saveLayout, saveMultipleLayouts, type SaveLayoutInput, type LayoutRecord } from './api/layoutsApi';
+import ErrorBoundary from './components/ErrorBoundary';
+import A4Canvas, { type A4Dimensions, getInitialA4Dimensions } from './components/A4Canvas';
+import ZoomControls from './components/ZoomControls';
+import {
+  saveLayout,
+  saveMultipleLayouts,
+  getOrCreateLayoutForEvent,
+  isLayoutFileData,
+  type SaveLayoutInput,
+  type LayoutRecord,
+  type LayoutFileData,
+  type LayoutTab,
+} from './api/layoutsApi';
+import { getEvent, type Event } from './api/eventsPipelineApi';
 import type { Wall, Door } from './types/wall.js';
 import type { PowerPoint } from './types/powerPoint';
 
@@ -23,9 +38,9 @@ export interface Project {
     powerPoints?: PowerPoint[];
     viewBox: { x: number; y: number; width: number; height: number };
   };
-  // Supabase linkage
-  supabaseLayoutId?: string;  // UUID from Supabase layouts table
-  eventId?: string;           // Optional link to WedBoardPro event
+  a4Dimensions?: A4Dimensions;
+  supabaseLayoutId?: string;
+  eventId?: string;
   category?: string;
   tags?: string[];
   description?: string;
@@ -34,39 +49,6 @@ export interface Project {
 const STORAGE_KEY = 'layout-maker-projects';
 const STORAGE_ACTIVE_PROJECT_KEY = 'layout-maker-active-project-id';
 
-// Load projects from localStorage
-const loadProjectsFromStorage = (): Project[] => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      // Validate the structure
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch (error) {
-    console.error('Error loading projects from localStorage:', error);
-  }
-  // Return default project if nothing stored
-  return [
-    {
-      id: '1',
-      name: 'Project 1',
-      canvasData: {
-        drawings: [],
-        shapes: [],
-        textElements: [],
-        walls: [],
-        doors: [],
-        powerPoints: [],
-        viewBox: { x: 0, y: 0, width: 0, height: 0 },
-      },
-    },
-  ];
-};
-
-// Save projects to localStorage
 const saveProjectsToStorage = (projects: Project[]) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
@@ -75,40 +57,54 @@ const saveProjectsToStorage = (projects: Project[]) => {
   }
 };
 
+const loadProjectsFromStorage = (): Project[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (error) {
+    console.error('Error loading projects from localStorage:', error);
+  }
+
+  const defaultA4 = getInitialA4Dimensions();
+  return [{
+    id: '1',
+    name: 'Project 1',
+    canvasData: {
+      drawings: [],
+      shapes: [],
+      textElements: [],
+      walls: [],
+      doors: [],
+      powerPoints: [],
+      viewBox: { x: 0, y: 0, width: 0, height: 0 },
+    },
+    a4Dimensions: defaultA4,
+  }];
+};
+
 const LayoutMakerPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const eventIdFromUrl = searchParams.get('eventId');
+
   const [activeTool, setActiveTool] = useState<string>('hand');
   const [brushSize, setBrushSize] = useState<number>(2);
   const [brushColor, setBrushColor] = useState<string>('#000000');
-  
-  // Load projects from localStorage on mount with error handling
-  const [projects, setProjects] = useState<Project[]>(() => {
-    try {
-      return loadProjectsFromStorage();
-    } catch (error) {
-      console.error('Error loading projects from localStorage:', error);
-      // Return default project if loading fails
-      return [{
-        id: '1',
-        name: 'Project 1',
-        canvasData: {
-          drawings: [],
-          shapes: [],
-          textElements: [],
-          walls: [],
-          doors: [],
-          powerPoints: [],
-          viewBox: { x: 0, y: 0, width: 0, height: 0 },
-        },
-      }];
-    }
-  });
-  
-  // Load active project ID from localStorage, or default to '1'
+
+  // Event info state (when opened for a specific event)
+  const [eventInfo, setEventInfo] = useState<{ title: string; weddingDate?: string } | null>(null);
+  const [currentLayoutId, setCurrentLayoutId] = useState<string | null>(null);
+
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
+  const [projects, setProjects] = useState<Project[]>(() => loadProjectsFromStorage());
   const [activeProjectId, setActiveProjectId] = useState<string>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_ACTIVE_PROJECT_KEY);
       if (stored) {
-        // Verify the project exists
         const loadedProjects = loadProjectsFromStorage();
         if (loadedProjects.find(p => p.id === stored)) {
           return stored;
@@ -119,71 +115,64 @@ const LayoutMakerPage: React.FC = () => {
     }
     return '1';
   });
-
-  // Track newly created project ID for edit mode
   const [newlyCreatedProjectId, setNewlyCreatedProjectId] = useState<string | null>(null);
   
-  // Ref to store the latest canvas data for the current project
   const currentCanvasDataRef = useRef<Project['canvasData'] | null>(null);
-  // Ref to track which project the ref data belongs to
   const refProjectIdRef = useRef<string>('1');
-  // Ref to access GridCanvas methods
-  const gridCanvasRef = useRef<{ 
+  const gridCanvasRef = useRef<{
     addSpace: (width: number, height: number) => void;
     addTable: (type: string, size: string, seats: number, imageUrl: string, targetSpaceId?: string) => void;
     addWalls: (walls: Wall[], doors?: Door[]) => void;
     zoomToPoints: (points: { x: number; y: number }[]) => void;
     getPowerPoints: () => PowerPoint[];
+    getZoomLevel: () => number;
+    zoomIn: () => void;
+    zoomOut: () => void;
+    resetZoom: () => void;
+    fitToCanvas: () => void;
   } | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  
-  // Electrical Dashboard state
+
+  const [zoomLevel, setZoomLevel] = useState<number>(100);
+
   const [showElectricalDashboard, setShowElectricalDashboard] = useState<boolean>(false);
-  
-  // Save to Supabase state
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
-  
-  // Associate with project modal state
   const [showAssociateModal, setShowAssociateModal] = useState<boolean>(false);
   const [recentlySavedLayoutIds, setRecentlySavedLayoutIds] = useState<string[]>([]);
-
-  // Always show the loading logo briefly on initial mount (covers refresh navigation)
-  useEffect(() => {
-    console.log('[LayoutMakerPage] Component mounted');
-    const minDisplayMs = 600;
-    const t = setTimeout(() => {
-      setIsLoading(false);
-      console.log('[LayoutMakerPage] Loading complete');
-    }, minDisplayMs);
-    return () => clearTimeout(t);
-  }, []);
-  
-  // Error boundary effect
-  useEffect(() => {
-    const handleError = (event: ErrorEvent) => {
-      console.error('[LayoutMakerPage] Global error caught:', event.error);
-      // Force hide loading on error so user can see what's wrong
-      setIsLoading(false);
-    };
-    window.addEventListener('error', handleError);
-    return () => window.removeEventListener('error', handleError);
-  }, []);
-  
-  // Fallback: Force hide loading after max time (safety net)
-  useEffect(() => {
-    const maxLoadingTime = 3000; // 3 seconds max
-    const timeout = setTimeout(() => {
-      if (isLoading) {
-        console.warn('[LayoutMakerPage] Loading timeout - forcing display');
-        setIsLoading(false);
+  const [isWorkflowOpen, setIsWorkflowOpen] = useState<boolean>(false);
+  const [workflowPositions, setWorkflowPositions] = useState<Record<string, { x: number; y: number }>>(() => {
+    try {
+      const stored = localStorage.getItem('workflow-positions');
+      if (stored) {
+        return JSON.parse(stored);
       }
-    }, maxLoadingTime);
-    return () => clearTimeout(timeout);
-  }, [isLoading]);
-  
-  // We'll render a non-blocking overlay in the main return so the Layout Maker mounts beneath it.
+    } catch {
+      console.error('Error loading workflow positions');
+    }
+    return {};
+  });
+
+  const handleWorkflowPositionsChange = useCallback((positions: Record<string, { x: number; y: number }>) => {
+    setWorkflowPositions(positions);
+    localStorage.setItem('workflow-positions', JSON.stringify(positions));
+  }, []);
+
+  const handleReorderProjects = useCallback((fromIndex: number, toIndex: number) => {
+    setProjects(prevProjects => {
+      const updated = [...prevProjects];
+      const [removed] = updated.splice(fromIndex, 1);
+      if (removed) {
+        updated.splice(toIndex, 0, removed);
+      }
+      saveProjectsToStorage(updated);
+      return updated;
+    });
+  }, []);
+
+  const handleOpenWorkflow = useCallback(() => {
+    setIsWorkflowOpen(true);
+  }, []);
 
   const activeProject = projects.find(p => p.id === activeProjectId) || projects[0] || {
     id: '1',
@@ -199,10 +188,8 @@ const LayoutMakerPage: React.FC = () => {
     }
   };
   
-  // Placeholder for electrical project ID - in production, this would come from props or context
   const electricalProjectId = activeProject?.supabaseLayoutId || 'demo-electrical-project';
   
-  // Helper function to create a deep copy of canvas data
   const deepCopyCanvasData = useCallback((data: Project['canvasData']): Project['canvasData'] => {
     return {
       drawings: JSON.parse(JSON.stringify(data.drawings || [])),
@@ -215,207 +202,139 @@ const LayoutMakerPage: React.FC = () => {
     };
   }, []);
 
-  // Save current layout to Supabase
   const handleSaveCurrentLayout = useCallback(async () => {
     if (isSaving) return;
-
     setIsSaving(true);
     setSaveStatus('saving');
     setSaveError(null);
-
     try {
-      // Get the latest canvas data
-      const latestData = currentCanvasDataRef.current || activeProject.canvasData;
-      
-      const input: SaveLayoutInput = {
-        layoutId: activeProject.supabaseLayoutId,
+      const currentData = currentCanvasDataRef.current;
+      const layoutToSave = currentData || activeProject.canvasData;
+      const saveInput: SaveLayoutInput = {
         name: activeProject.name,
-        description: activeProject.description,
-        category: activeProject.category,
-        tags: activeProject.tags,
-        canvasData: deepCopyCanvasData(latestData),
-        eventId: activeProject.eventId,
+        tags: activeProject.tags || [],
+        canvasData: layoutToSave,
       };
-      
-      const result = await saveLayout(input);
-      
-      if (result.error) {
-        console.error('[LayoutMakerPage] Save error:', result.error);
-        setSaveStatus('error');
-        setSaveError(result.error);
-        setTimeout(() => setSaveStatus('idle'), 3000);
-      } else if (result.data) {
-        const savedId = result.data.id;
-        
-        // Update the project with the Supabase ID
-        setProjects(prev => {
-          const updated = prev.map(p =>
-            p.id === activeProjectId
-              ? { ...p, supabaseLayoutId: savedId }
-              : p
-          );
-          saveProjectsToStorage(updated);
-          return updated;
-        });
-        
-        setSaveStatus('saved');
-        console.log('[LayoutMakerPage] Layout saved to Supabase:', savedId);
-        
-        // Check if this layout already has an event linked
-        const hasEventLinked = !!activeProject.eventId;
-        
-        if (!hasEventLinked) {
-          // Trigger the associate project modal
-          setRecentlySavedLayoutIds([savedId]);
-          setShowAssociateModal(true);
-        }
-        
-        setTimeout(() => setSaveStatus('idle'), 2000);
+      if (activeProject.description) saveInput.description = activeProject.description;
+      if (activeProject.category) saveInput.category = activeProject.category;
+      if (activeProject.eventId) saveInput.eventId = activeProject.eventId;
+
+      const result = await saveLayout(saveInput);
+      if (result.error || !result.data) {
+        throw new Error(result.error || 'Failed to save layout');
       }
-    } catch (err: any) {
-      console.error('[LayoutMakerPage] Save exception:', err);
+      const savedData = result.data;
+      setProjects(prev => prev.map(p =>
+        p.id === activeProjectId
+          ? { ...p, supabaseLayoutId: savedData.id }
+          : p
+      ));
+      setSaveStatus('saved');
+      console.log('[LayoutMakerPage] Layout saved to Supabase:', savedData.id);
+      if (!activeProject.eventId && savedData.id) {
+        setRecentlySavedLayoutIds([savedData.id]);
+      }
+    } catch (error) {
+      console.error('[LayoutMakerPage] Error saving layout:', error);
       setSaveStatus('error');
-      setSaveError(err.message || 'Failed to save');
-      setTimeout(() => setSaveStatus('idle'), 3000);
+      setSaveError(error instanceof Error ? error.message : 'Failed to save layout');
     } finally {
       setIsSaving(false);
     }
-  }, [isSaving, activeProject, activeProjectId, deepCopyCanvasData]);
-  
-  // Save all layouts to Supabase
+  }, [isSaving, activeProject, activeProjectId]);
+
   const handleSaveAllLayouts = useCallback(async () => {
     if (isSaving) return;
-
     setIsSaving(true);
     setSaveStatus('saving');
     setSaveError(null);
-
     try {
-      // Prepare all projects for saving
-      const inputs: SaveLayoutInput[] = projects.map(p => {
-        // Use current canvas data for active project
-        const canvasData = p.id === activeProjectId && currentCanvasDataRef.current
-          ? currentCanvasDataRef.current
-          : p.canvasData;
-        
-        return {
-          layoutId: p.supabaseLayoutId,
+      const layoutsToSave: SaveLayoutInput[] = projects.map(p => {
+        const input: SaveLayoutInput = {
           name: p.name,
-          description: p.description,
-          category: p.category,
-          tags: p.tags,
-          canvasData: deepCopyCanvasData(canvasData),
-          eventId: p.eventId,
+          tags: p.tags || [],
+          canvasData: deepCopyCanvasData(p.canvasData),
         };
+        if (p.description) input.description = p.description;
+        if (p.category) input.category = p.category;
+        if (p.eventId) input.eventId = p.eventId;
+        return input;
       });
-      
-      const result = await saveMultipleLayouts(inputs);
-      
-      if (result.error && !result.data) {
-        console.error('[LayoutMakerPage] Save all error:', result.error);
-        setSaveStatus('error');
-        setSaveError(result.error);
-        setTimeout(() => setSaveStatus('idle'), 3000);
-      } else if (result.data) {
-        // Collect all saved layout IDs
-        const savedIds = result.data.map((saved: LayoutRecord) => saved.id);
-        
-        // Update projects with Supabase IDs
-        setProjects(prev => {
-          const updated = prev.map((p, i) => {
-            const supabaseId = result.data![i]?.id;
-            return supabaseId ? { ...p, supabaseLayoutId: supabaseId } : p;
-          });
-          saveProjectsToStorage(updated);
-          return updated;
-        });
-        
-        setSaveStatus('saved');
-        console.log('[LayoutMakerPage] All layouts saved to Supabase:', result.data.length);
-        
-        if (result.error) {
-          // Partial success
-          setSaveError(result.error);
-        }
-        
-        // Check if any layout doesn't have an event linked
-        const anyWithoutEvent = projects.some(p => !p.eventId);
-        
-        if (anyWithoutEvent && savedIds.length > 0) {
-          // Trigger the associate project modal
-          setRecentlySavedLayoutIds(savedIds);
-          setShowAssociateModal(true);
-        }
-        
-        setTimeout(() => setSaveStatus('idle'), 2000);
+      const result = await saveMultipleLayouts(layoutsToSave);
+      if (result.error || !result.data) {
+        throw new Error(result.error || 'Failed to save layouts');
       }
-    } catch (err: any) {
-      console.error('[LayoutMakerPage] Save all exception:', err);
+      const savedIds = result.data.map((saved: LayoutRecord) => saved.id);
+      setSaveStatus('saved');
+      console.log('[LayoutMakerPage] All layouts saved to Supabase:', result.data.length);
+      const anyWithoutEvent = projects.some(p => !p.eventId);
+      if (anyWithoutEvent && savedIds.length > 0) {
+        setRecentlySavedLayoutIds(savedIds);
+        setShowAssociateModal(true);
+      }
+    } catch (error) {
+      console.error('[LayoutMakerPage] Error saving all layouts:', error);
       setSaveStatus('error');
-      setSaveError(err.message || 'Failed to save');
-      setTimeout(() => setSaveStatus('idle'), 3000);
+      setSaveError(error instanceof Error ? error.message : 'Failed to save layouts');
     } finally {
       setIsSaving(false);
     }
-  }, [isSaving, projects, activeProjectId, deepCopyCanvasData]);
+  }, [isSaving, projects, deepCopyCanvasData]);
 
-  // Handle when layouts are associated with a project
-  const handleLayoutsAssociated = useCallback((eventId: string) => {
-    // Update local project state with the event ID
-    setProjects(prev => {
-      const updated = prev.map(p =>
-        recentlySavedLayoutIds.includes(p.supabaseLayoutId || '')
-          ? { ...p, eventId }
-          : p
-      );
-      saveProjectsToStorage(updated);
-      return updated;
-    });
-    
-    setShowAssociateModal(false);
-    setRecentlySavedLayoutIds([]);
-    console.log('[LayoutMakerPage] Layouts associated with event:', eventId);
-  }, [recentlySavedLayoutIds]);
-  
-  const handleCloseAssociateModal = useCallback(() => {
-    setShowAssociateModal(false);
-    setRecentlySavedLayoutIds([]);
+  useEffect(() => {
+    if (saveStatus === 'saved') {
+      const timer = setTimeout(() => {
+        setSaveStatus('idle');
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [saveStatus]);
+
+  useEffect(() => {
+    if (saveStatus === 'saved') {
+      const timer = setTimeout(() => {
+        setSaveStatus('idle');
+        setRecentlySavedLayoutIds([]);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [saveStatus, recentlySavedLayoutIds]);
+
+  const handleCanvasDataChange = useCallback((newData: Project['canvasData'], projectId: string) => {
+    currentCanvasDataRef.current = newData;
+    refProjectIdRef.current = projectId;
   }, []);
 
-  const handleAIPlanner = () => {
-    console.log('AI Planner clicked');
-    // TODO: Implement AI Planner functionality
-  };
-
   const handleProjectSelect = useCallback((projectId: string) => {
-    // CRITICAL: Save current project's state BEFORE switching
-    // Only save if we have data AND it belongs to the current project
+    if (isWorkflowOpen) {
+      setIsWorkflowOpen(false);
+    }
     if (currentCanvasDataRef.current && 
         refProjectIdRef.current === activeProjectId && 
         activeProjectId !== projectId) {
-      
-      // Deep copy the canvas data to ensure complete isolation
       const canvasDataToSave = deepCopyCanvasData(currentCanvasDataRef.current);
-      
-      // Save to the correct project in the array
       setProjects(prevProjects => {
         const updated = prevProjects.map(project =>
           project.id === activeProjectId
             ? { ...project, canvasData: canvasDataToSave }
             : project
         );
-        saveProjectsToStorage(updated); // Save to localStorage immediately
+        saveProjectsToStorage(updated);
         return updated;
       });
     }
-    // Now switch to the new project
     setActiveProjectId(projectId);
     localStorage.setItem(STORAGE_ACTIVE_PROJECT_KEY, projectId);
-  }, [activeProjectId, deepCopyCanvasData]);
+  }, [activeProjectId, deepCopyCanvasData, isWorkflowOpen]);
+
+  const handleProjectHighlight = useCallback((projectId: string) => {
+    setActiveProjectId(projectId);
+    localStorage.setItem(STORAGE_ACTIVE_PROJECT_KEY, projectId);
+  }, []);
 
   const handleNewProject = useCallback(() => {
-    // Calculate the next project number based on existing projects
     const nextProjectNumber = projects.length + 1;
+    const defaultA4 = getInitialA4Dimensions();
     const newProject: Project = {
       id: Date.now().toString(),
       name: `Project ${nextProjectNumber}`,
@@ -428,206 +347,234 @@ const LayoutMakerPage: React.FC = () => {
         powerPoints: [],
         viewBox: { x: 0, y: 0, width: 0, height: 0 },
       },
+      a4Dimensions: defaultA4,
     };
     const updatedProjects = [...projects, newProject];
     setProjects(updatedProjects);
-    saveProjectsToStorage(updatedProjects); // Save immediately
+    saveProjectsToStorage(updatedProjects);
     setActiveProjectId(newProject.id);
     localStorage.setItem(STORAGE_ACTIVE_PROJECT_KEY, newProject.id);
-    // Set the newly created project ID to trigger edit mode
     setNewlyCreatedProjectId(newProject.id);
   }, [projects]);
 
-  const handleRenameProject = (projectId: string, newName: string) => {
-    setProjects(prevProjects => {
-      const updated = prevProjects.map(project =>
-        project.id === projectId
-          ? { ...project, name: newName }
-          : project
-      );
-      saveProjectsToStorage(updated);
-      return updated;
-    });
-    // Clear the newly created flag after renaming
-    setNewlyCreatedProjectId(null);
-  };
-
-  const handleDeleteProject = (projectId: string) => {
-    // Don't allow deleting if it's the only project
-    if (projects.length <= 1) {
-      alert('Cannot delete the last project. Please create another project first.');
-      return;
+  const handleDeleteProject = useCallback((projectId: string) => {
+    if (projects.length <= 1) return;
+    const updated = projects.filter(p => p.id !== projectId);
+    setProjects(updated);
+    saveProjectsToStorage(updated);
+    if (activeProjectId === projectId && updated[0]) {
+      setActiveProjectId(updated[0].id);
+      localStorage.setItem(STORAGE_ACTIVE_PROJECT_KEY, updated[0].id);
     }
+  }, [projects, activeProjectId]);
 
-    // If deleting the active project, switch to another project first
-    if (projectId === activeProjectId) {
-      // Find another project to switch to
-      const otherProject = projects.find(p => p.id !== projectId);
-      if (otherProject) {
-        setActiveProjectId(otherProject.id);
-        localStorage.setItem(STORAGE_ACTIVE_PROJECT_KEY, otherProject.id);
-      }
-    }
-
-    // Remove the project from the array
-    const updatedProjects = projects.filter(p => p.id !== projectId);
-    setProjects(updatedProjects);
-    saveProjectsToStorage(updatedProjects); // Save to localStorage
-  };
-
-  const handleAddSpace = useCallback((widthMeters: number, heightMeters: number) => {
-    if (gridCanvasRef.current) {
-      gridCanvasRef.current.addSpace(widthMeters, heightMeters);
-    }
+  const handleRenameProject = useCallback((projectId: string, newName: string) => {
+    setProjects(prev => prev.map(p => 
+      p.id === projectId ? { ...p, name: newName } : p
+    ));
+    saveProjectsToStorage;
   }, []);
 
-  const handleAddTable = useCallback((type: string, size: string, seats: number, imageUrl: string, spaceId?: string) => {
-    if (gridCanvasRef.current) {
-      gridCanvasRef.current.addTable(type, size, seats, imageUrl, spaceId);
-    }
+  const handleCloseAssociateModal = useCallback(() => {
+    setShowAssociateModal(false);
+    setRecentlySavedLayoutIds([]);
   }, []);
 
-  const handleAddWalls = useCallback((walls: Wall[], doors?: Door[]) => {
-    if (gridCanvasRef.current) {
-      gridCanvasRef.current.addWalls(walls, doors);
-    }
+  const handleLayoutsAssociated = useCallback(() => {
+    setShowAssociateModal(false);
+    setRecentlySavedLayoutIds([]);
   }, []);
 
   const spaceOptions = useMemo(() => {
-    const shapes = activeProject.canvasData?.shapes || [];
-    if (!Array.isArray(shapes)) return [];
+    const shapes = activeProject?.canvasData?.shapes || [];
     return shapes
-      .filter((shape: any) =>
-        shape &&
-        shape.type === 'rectangle' &&
-        typeof shape.spaceMetersWidth === 'number' &&
-        shape.spaceMetersWidth > 0 &&
-        typeof shape.spaceMetersHeight === 'number' &&
-        shape.spaceMetersHeight > 0 &&
-        typeof shape.pixelsPerMeter === 'number' &&
-        shape.pixelsPerMeter > 0
-      )
-      .map((shape: any, index: number) => ({
-        id: shape.id || `space-${index}`,
-        label: shape.name ? String(shape.name) : `Space ${index + 1}`,
-        widthMeters: Number(shape.spaceMetersWidth),
-        heightMeters: Number(shape.spaceMetersHeight),
-        pixelsPerMeter: Number(shape.pixelsPerMeter),
+      .filter((s: any) => s.type === 'rectangle' && s.spaceMetersWidth)
+      .map((s: any) => ({
+        id: s.id,
+        name: s.name || `${s.spaceMetersWidth}m × ${s.spaceMetersHeight}m`,
+        width: s.spaceMetersWidth,
+        height: s.spaceMetersHeight,
       }));
-  }, [activeProject.canvasData?.shapes]);
+  }, [activeProject]);
 
-  const handleCanvasDataChange = useCallback((data: Project['canvasData'], projectIdForData: string) => {
-    // CRITICAL: Use the projectId passed from GridCanvas, not the activeProjectId from closure
-    // This ensures we save to the correct project even if the project switched during the save
-    
-    // Create a deep copy to ensure isolation
-    const dataCopy = deepCopyCanvasData(data);
-    
-    // Always update the ref with the latest data (deep copied)
-    currentCanvasDataRef.current = dataCopy;
-    refProjectIdRef.current = projectIdForData; // Track which project this data belongs to
-    
-    // Also update the projects array with deep copy to ensure isolation
-    // Use the projectId passed in, not activeProjectId from closure
-    setProjects(prevProjects => {
-      const updated = prevProjects.map(project =>
-        project.id === projectIdForData
-          ? { ...project, canvasData: deepCopyCanvasData(dataCopy) }
-          : project
-      );
-      saveProjectsToStorage(updated); // Save to localStorage on every change
-      return updated;
-    });
-  }, [deepCopyCanvasData]);
-
-  // Sync the ref when switching projects - always use deep copy
-  React.useEffect(() => {
-    // When project changes, update the ref with the new project's data (deep copied)
-    const projectDataCopy = deepCopyCanvasData(activeProject.canvasData);
-    currentCanvasDataRef.current = projectDataCopy;
-    refProjectIdRef.current = activeProjectId;
-  }, [activeProjectId, activeProject.canvasData, deepCopyCanvasData]);
-
-  // Force save current project data before page unload (refresh, close, navigate away)
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      // Save current project's canvas data immediately before unload
-      if (currentCanvasDataRef.current && refProjectIdRef.current) {
-        const dataCopy = deepCopyCanvasData(currentCanvasDataRef.current);
-        const projectId = refProjectIdRef.current;
-        
-        // Get current projects from state
-        const currentProjects = projects;
-        const updated = currentProjects.map(project =>
-          project.id === projectId
-            ? { ...project, canvasData: dataCopy }
-            : project
-        );
-        
-        // Force synchronous save to localStorage
-        saveProjectsToStorage(updated);
-        console.log('Emergency save before unload completed for project:', projectId);
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [projects, deepCopyCanvasData]);
-
-  // Keyboard shortcuts: Cmd/Ctrl + Left/Right to navigate between projects, Cmd/Ctrl + + to create new project
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Check if Cmd (Mac) or Ctrl (Windows/Linux) is pressed
-      if (e.metaKey || e.ctrlKey) {
-        const currentIndex = projects.findIndex(p => p.id === activeProjectId);
-        
-        if (e.key === 'ArrowLeft' && currentIndex > 0) {
-          // Go to previous project
-          e.preventDefault();
-          const prevProject = projects[currentIndex - 1];
-          if (prevProject) {
-            handleProjectSelect(prevProject.id);
-          }
-        } else if (e.key === 'ArrowRight' && currentIndex < projects.length - 1) {
-          // Go to next project
-          e.preventDefault();
-          const nextProject = projects[currentIndex + 1];
-          if (nextProject) {
-            handleProjectSelect(nextProject.id);
-          }
-        } else if (e.key === '+' || e.key === '=') {
-          // Create new project (both '+' and '=' work since '+' is often '=' with shift)
-          e.preventDefault();
-          e.stopPropagation();
-          handleNewProject();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [projects, activeProjectId, handleProjectSelect, handleNewProject]);
-
-  // Handle zoom to points from electrical dashboard
-  const handleZoomToPoints = useCallback((points: { x: number; y: number }[]) => {
-    if (gridCanvasRef.current?.zoomToPoints) {
-      gridCanvasRef.current.zoomToPoints(points);
-      setShowElectricalDashboard(false);
+  const currentPowerPoints = useMemo(() => {
+    if (refProjectIdRef.current === activeProjectId) {
+      return currentCanvasDataRef.current?.powerPoints || [];
     }
+    return activeProject?.canvasData?.powerPoints || [];
+  }, [activeProject, activeProjectId]);
+
+  const handleZoomToPoints = useCallback((points: { x: number; y: number }[]) => {
+    gridCanvasRef.current?.zoomToPoints(points);
   }, []);
 
-  // Get current power points for dashboard
-  const currentPowerPoints = useMemo(() => {
-    return activeProject?.canvasData?.powerPoints || [];
-  }, [activeProject?.canvasData?.powerPoints]);
+  // Zoom control handlers
+  const handleZoomIn = useCallback(() => {
+    gridCanvasRef.current?.zoomIn();
+  }, []);
 
-  // Safety check: ensure we have at least one project
-  if (!projects || projects.length === 0) {
-    console.error('[LayoutMakerPage] No projects available');
+  const handleZoomOut = useCallback(() => {
+    gridCanvasRef.current?.zoomOut();
+  }, []);
+
+  const handleResetZoom = useCallback(() => {
+    gridCanvasRef.current?.resetZoom();
+  }, []);
+
+  const handleFitToCanvas = useCallback(() => {
+    gridCanvasRef.current?.fitToCanvas();
+  }, []);
+
+  // Update zoom level from canvas
+  useEffect(() => {
+    const updateZoomLevel = () => {
+      if (gridCanvasRef.current?.getZoomLevel) {
+        const level = gridCanvasRef.current.getZoomLevel();
+        setZoomLevel(level);
+      }
+    };
+
+    // Update on initial render
+    updateZoomLevel();
+
+    // Update on wheel events (zoom changes)
+    const handleWheel = () => {
+      requestAnimationFrame(updateZoomLevel);
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, [activeProjectId]);
+
+  useEffect(() => {
+    saveProjectsToStorage(projects);
+  }, [projects]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialLoading(false);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Load event info and layout when eventId is in URL
+  useEffect(() => {
+    if (!eventIdFromUrl) {
+      setEventInfo(null);
+      setCurrentLayoutId(null);
+      return;
+    }
+
+    const loadEventData = async () => {
+      try {
+        // Load event info
+        const eventResult = await getEvent(eventIdFromUrl);
+        if (eventResult.data) {
+          setEventInfo({
+            title: eventResult.data.title,
+            weddingDate: eventResult.data.wedding_date,
+          });
+        }
+
+        // Load or create layout for this event
+        const layoutResult = await getOrCreateLayoutForEvent(
+          eventIdFromUrl,
+          eventResult.data?.title || 'Event Layout'
+        );
+
+        if (layoutResult.data) {
+          setCurrentLayoutId(layoutResult.data.id);
+
+          // Convert layout data to projects format
+          const canvasData = layoutResult.data.canvas_data;
+          if (isLayoutFileData(canvasData)) {
+            // New format with tabs
+            const fileData = canvasData as LayoutFileData;
+            const loadedProjects: Project[] = fileData.tabs.map((tab: LayoutTab) => {
+              const project: Project = {
+                id: tab.id,
+                name: tab.name,
+                canvasData: {
+                  drawings: tab.canvas.drawings || [],
+                  shapes: tab.canvas.shapes || [],
+                  textElements: tab.canvas.textElements || [],
+                  walls: tab.canvas.walls || [],
+                  doors: tab.canvas.doors || [],
+                  powerPoints: tab.canvas.powerPoints || [],
+                  viewBox: tab.canvas.viewBox || { x: 0, y: 0, width: 0, height: 0 },
+                },
+                a4Dimensions: tab.a4Dimensions || getInitialA4Dimensions(),
+                supabaseLayoutId: layoutResult.data!.id,
+                eventId: eventIdFromUrl,
+              };
+              if (tab.category) {
+                project.category = tab.category;
+              }
+              return project;
+            });
+
+            if (loadedProjects.length > 0) {
+              setProjects(loadedProjects);
+              const firstProject = loadedProjects[0];
+              if (firstProject) {
+                setActiveProjectId(fileData.activeTabId || firstProject.id);
+              }
+              if (fileData.workflowPositions) {
+                setWorkflowPositions(fileData.workflowPositions);
+              }
+            }
+          } else {
+            // Legacy single canvas format - convert to tab
+            const legacyData = canvasData;
+            const projectId = `tab-${Date.now()}`;
+            const project: Project = {
+              id: projectId,
+              name: 'Main Layout',
+              canvasData: {
+                drawings: legacyData.drawings || [],
+                shapes: legacyData.shapes || [],
+                textElements: legacyData.textElements || [],
+                walls: legacyData.walls || [],
+                doors: legacyData.doors || [],
+                powerPoints: [],
+                viewBox: legacyData.viewBox || { x: 0, y: 0, width: 0, height: 0 },
+              },
+              a4Dimensions: getInitialA4Dimensions(),
+              supabaseLayoutId: layoutResult.data!.id,
+              eventId: eventIdFromUrl,
+            };
+            setProjects([project]);
+            setActiveProjectId(projectId);
+          }
+        }
+      } catch (err) {
+        console.error('[LayoutMakerPage] Error loading event data:', err);
+      }
+    };
+
+    loadEventData();
+  }, [eventIdFromUrl]);
+
+  if (isInitialLoading) {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        background: '#ffffff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 99999,
+      }}>
+        <img src="/loadinglogo.png" alt="Loading" style={{ width: '160px', height: 'auto' }} />
+      </div>
+    );
+  }
+
+  if (projects.length === 0) {
     return (
       <div style={{ 
         display: 'flex', 
@@ -673,59 +620,34 @@ const LayoutMakerPage: React.FC = () => {
   }
 
   return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: '#ffffff' }}>
-      {/* Layer 0: Infinite Grid Background (always visible, behind everything) */}
+    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: 'transparent' }}>
+      
       <InfiniteGridBackground />
+
+      {!isWorkflowOpen && (
+        <ErrorBoundary>
+          <GridCanvas 
+            ref={gridCanvasRef}
+            activeTool={activeTool} 
+            onToolChange={setActiveTool}
+            projectId={activeProjectId}
+            projectData={{
+              drawings: activeProject.canvasData.drawings || [],
+              shapes: activeProject.canvasData.shapes || [],
+              textElements: activeProject.canvasData.textElements || [],
+              walls: activeProject.canvasData.walls || [],
+              doors: activeProject.canvasData.doors || [],
+              powerPoints: activeProject.canvasData.powerPoints || [],
+              viewBox: activeProject.canvasData.viewBox || { x: 0, y: 0, width: 1000, height: 1000 },
+            }}
+            a4Dimensions={activeProject.a4Dimensions || getInitialA4Dimensions()}
+            onDataChange={handleCanvasDataChange}
+            brushSize={brushSize}
+            brushColor={brushColor}
+          />
+        </ErrorBoundary>
+      )}
       
-      {/* Layer 1: Canvas (back layer - can zoom/pan) */}
-      <GridCanvas 
-        ref={gridCanvasRef}
-        activeTool={activeTool} 
-        onToolChange={setActiveTool}
-        projectId={activeProjectId}
-        projectData={deepCopyCanvasData(activeProject.canvasData)}
-        onDataChange={handleCanvasDataChange}
-        brushSize={brushSize}
-        brushColor={brushColor}
-      />
-      
-      {/* Quick floating button to select Power Point tool (guaranteed visible) */}
-      <button
-        onClick={() => {
-          // Try programmatic addition first (center of current view), fallback to selecting tool
-          const ref = gridCanvasRef.current as any;
-          const vb = activeProject?.canvasData?.viewBox;
-          const cx = vb ? (vb.x + vb.width / 2) : 0;
-          const cy = vb ? (vb.y + vb.height / 2) : 0;
-          if (ref && typeof ref.addPowerPoint === 'function') {
-            ref.addPowerPoint(cx, cy);
-            // Also open electrical drawer by selecting the tool state briefly
-            setActiveTool('power-point');
-            return;
-          }
-          setActiveTool('power-point');
-        }}
-        id="floating-add-power-point"
-        style={{
-          position: 'fixed',
-          top: 96,
-          left: 24,
-          zIndex: 20000,
-          padding: '10px 12px',
-          borderRadius: '12px',
-          border: 'none',
-          background: 'linear-gradient(135deg,#f59e0b 0%,#d97706 100%)',
-          color: 'white',
-          fontSize: '14px',
-          fontWeight: 700,
-          cursor: 'pointer',
-          boxShadow: '0 6px 20px rgba(0,0,0,0.25)',
-        }}
-      >
-        ⚡ Place power point
-      </button>
-      
-      {/* Layer 2: UI Elements (front layer - fixed screen position) */}
       <div style={{ 
         position: 'fixed', 
         top: 0, 
@@ -740,22 +662,24 @@ const LayoutMakerPage: React.FC = () => {
           onSaveCurrentLayout={handleSaveCurrentLayout}
           onSaveAllLayouts={handleSaveAllLayouts}
           isSaving={isSaving}
-          saveStatus={saveStatus}
           projectCount={projects.length}
+          {...(eventInfo ? { eventInfo } : {})}
         />
         
-        <Toolbar
-          activeTool={activeTool}
-          onToolChange={setActiveTool}
-          onAddSpace={handleAddSpace}
-          onAddTable={handleAddTable}
-          onAddWalls={handleAddWalls}
-          brushSize={brushSize}
-          brushColor={brushColor}
-          onBrushSizeChange={setBrushSize}
-          onBrushColorChange={setBrushColor}
-          availableSpaces={spaceOptions}
-        />
+        {!isWorkflowOpen && (
+          <Toolbar
+            activeTool={activeTool}
+            onToolChange={setActiveTool}
+            onAddSpace={() => gridCanvasRef.current?.addSpace(12, 8)}
+            onAddTable={(type, size, seats, imageUrl) => gridCanvasRef.current?.addTable(type, size, seats, imageUrl)}
+            onAddWalls={(walls, doors) => gridCanvasRef.current?.addWalls(walls, doors)}
+            brushSize={brushSize}
+            brushColor={brushColor}
+            onBrushSizeChange={setBrushSize}
+            onBrushColorChange={setBrushColor}
+            availableSpaces={spaceOptions}
+          />
+        )}
         <ProjectTabs
           projects={projects}
           activeProjectId={activeProjectId}
@@ -764,11 +688,23 @@ const LayoutMakerPage: React.FC = () => {
           onDeleteProject={handleDeleteProject}
           onRenameProject={handleRenameProject}
           newlyCreatedProjectId={newlyCreatedProjectId}
+          onOpenWorkflow={handleOpenWorkflow}
+          isWorkflowOpen={isWorkflowOpen}
         />
       </div>
-      {!isLoading && <AssistantChat />}
-      
-      {/* Associate with Project Modal */}
+      <AssistantChat />
+
+      {/* Zoom Controls - only show when not in workflow mode */}
+      {!isWorkflowOpen && (
+        <ZoomControls
+          zoomLevel={zoomLevel}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onZoomReset={handleResetZoom}
+          onFitToCanvas={handleFitToCanvas}
+        />
+      )}
+
       <AssociateProjectModal
         isOpen={showAssociateModal}
         onClose={handleCloseAssociateModal}
@@ -776,7 +712,6 @@ const LayoutMakerPage: React.FC = () => {
         onAssociated={handleLayoutsAssociated}
       />
       
-      {/* Electrical Dashboard */}
       {showElectricalDashboard && (
         <ElectricalDashboard
           electricalProjectId={electricalProjectId}
@@ -786,8 +721,7 @@ const LayoutMakerPage: React.FC = () => {
         />
       )}
       
-      {/* Electrical Dashboard Button (floating) */}
-      {!showElectricalDashboard && currentPowerPoints.length > 0 && (
+      {!showElectricalDashboard && !isWorkflowOpen && currentPowerPoints.length > 0 && (
         <button
           onClick={() => setShowElectricalDashboard(true)}
           style={{
@@ -814,52 +748,19 @@ const LayoutMakerPage: React.FC = () => {
         </button>
       )}
       
-      {/* Loading overlay */}
-      {isLoading && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: '#ffffff',
-            zIndex: 20000,
-            pointerEvents: 'auto',
-          }}
-        >
-          <img src="/loadinglogo.png" alt="Loading" style={{ width: '160px', height: 'auto', objectFit: 'contain' }} />
-        </div>
-      )}
-      
-      {/* Debug overlay - shows component state (remove in production) */}
-      {process.env.NODE_ENV === 'development' && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '10px',
-            right: '10px',
-            background: 'rgba(0,0,0,0.8)',
-            color: 'white',
-            padding: '8px 12px',
-            borderRadius: '6px',
-            fontSize: '11px',
-            zIndex: 30000,
-            fontFamily: 'monospace',
-            pointerEvents: 'none',
-          }}
-        >
-          <div>Loading: {isLoading ? 'YES' : 'NO'}</div>
-          <div>Projects: {projects?.length || 0}</div>
-          <div>Active: {activeProjectId}</div>
-        </div>
+      {isWorkflowOpen && (
+        <WorkflowCanvas
+          projects={projects}
+          onProjectSelect={handleProjectSelect}
+          onHighlight={handleProjectHighlight}
+          onReorder={handleReorderProjects}
+          activeProjectId={activeProjectId}
+          positions={workflowPositions}
+          onPositionsChange={handleWorkflowPositionsChange}
+        />
       )}
     </div>
   );
 };
 
 export default LayoutMakerPage;
-

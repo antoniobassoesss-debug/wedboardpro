@@ -12,12 +12,11 @@ type ChatMessage = {
 const INITIAL_MESSAGE: ChatMessage = {
   id: 'welcome',
   role: 'assistant',
-  text: 'Hi! I can help you design and optimize this layout – ask about spaces, seating, or flow.',
+  text: 'Hi! I can help you design and optimize this layout. Ask me about spaces, seating, or guest flow.',
   createdAt: new Date(),
 };
 
 interface AssistantChatProps {
-  // Optional external control in the future – for now internal toggle is used
   initialOpen?: boolean;
 }
 
@@ -29,7 +28,6 @@ const AssistantChat: React.FC<AssistantChatProps> = ({ initialOpen = false }) =>
   const messagesRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    console.log('[AssistantChat] mounted');
     if (messagesRef.current) {
       messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
     }
@@ -64,7 +62,7 @@ const AssistantChat: React.FC<AssistantChatProps> = ({ initialOpen = false }) =>
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Something went wrong while contacting the assistant.';
+        error instanceof Error ? error.message : 'Something went wrong.';
       setMessages((prev) => [
         ...prev,
         {
@@ -86,14 +84,9 @@ const AssistantChat: React.FC<AssistantChatProps> = ({ initialOpen = false }) =>
     }
   };
 
-  // Empty state friendly text
-  const isEmpty = messages.length === 1 && messages[0].id === INITIAL_MESSAGE.id;
-
-  // Simple formatter for timestamps (optional)
   const formatTime = (date: Date) =>
     date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
-  // Collapsed launcher button
   if (!isOpen) {
     return (
       <div
@@ -139,13 +132,12 @@ const AssistantChat: React.FC<AssistantChatProps> = ({ initialOpen = false }) =>
           >
             AI
           </span>
-          Ask Layout AI
+          AI Assistant
         </button>
       </div>
     );
   }
 
-  // Docked panel on the right side
   return (
     <div
       style={{
@@ -155,10 +147,10 @@ const AssistantChat: React.FC<AssistantChatProps> = ({ initialOpen = false }) =>
         bottom: 24,
         width: 360,
         maxWidth: '90vw',
-        borderRadius: 24,
+        borderRadius: 20,
         border: '1px solid rgba(15,23,42,0.08)',
-        background: '#fbfbfb',
-        boxShadow: '0 24px 60px rgba(15,23,42,0.25)',
+        background: '#ffffff',
+        boxShadow: '0 20px 50px rgba(15,23,42,0.2)',
         pointerEvents: 'auto',
         zIndex: 15000,
         display: 'flex',
@@ -169,12 +161,11 @@ const AssistantChat: React.FC<AssistantChatProps> = ({ initialOpen = false }) =>
       {/* Header */}
       <div
         style={{
-          padding: '14px 16px 10px',
-          borderBottom: '1px solid rgba(148,163,184,0.18)',
+          padding: '16px 20px',
+          borderBottom: '1px solid #f1f5f9',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 12,
           background: '#ffffff',
         }}
       >
@@ -189,32 +180,35 @@ const AssistantChat: React.FC<AssistantChatProps> = ({ initialOpen = false }) =>
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: 700,
             }}
           >
             AI
           </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>Layout AI Assistant</div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-              Ask about tables, spaces, and guest flow for this layout.
-            </div>
-          </div>
+          <span style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>
+            AI Assistant
+          </span>
         </div>
         <button
           type="button"
           onClick={() => setIsOpen(false)}
-          aria-label="Close assistant"
+          aria-label="Minimize assistant"
           style={{
             border: 'none',
             background: 'transparent',
             cursor: 'pointer',
-            padding: 4,
-            borderRadius: 999,
+            padding: 6,
+            borderRadius: 8,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease',
           }}
         >
-          <span style={{ fontSize: 18, lineHeight: 1, color: '#6b7280' }}>×</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 9l7 7H5l7-7" />
+          </svg>
         </button>
       </div>
 
@@ -223,49 +217,15 @@ const AssistantChat: React.FC<AssistantChatProps> = ({ initialOpen = false }) =>
         ref={messagesRef}
         style={{
           flex: 1,
-          padding: '12px 14px 8px',
+          padding: '16px 20px',
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: 10,
+          gap: 12,
+          background: '#fafafa',
         }}
       >
-        {isEmpty && (
-          <div
-            style={{
-              padding: '10px 12px',
-              borderRadius: 16,
-              background: '#e5e7eb',
-              color: '#111827',
-              fontSize: 13,
-              maxWidth: '100%',
-            }}
-          >
-            I’m here to help with this specific layout. Try asking:
-            <ul style={{ margin: '6px 0 0 18px', padding: 0, fontSize: 12 }}>
-              <li>“Suggest a layout for 120 guests with a dance floor.”</li>
-              <li>“How can I improve the flow between ceremony and dinner?”</li>
-            </ul>
-          </div>
-        )}
-
         {messages.map((message) => {
-          if (message.role === 'system') {
-            return (
-              <div
-                key={message.id}
-                style={{
-                  alignSelf: 'center',
-                  fontSize: 11,
-                  color: '#6b7280',
-                  padding: '4px 8px',
-                }}
-              >
-                {message.text}
-              </div>
-            );
-          }
-
           const isUser = message.role === 'user';
           const isError = message.role === 'error';
 
@@ -274,7 +234,7 @@ const AssistantChat: React.FC<AssistantChatProps> = ({ initialOpen = false }) =>
               key={message.id}
               style={{
                 alignSelf: isUser ? 'flex-end' : 'flex-start',
-                maxWidth: '92%',
+                maxWidth: '88%',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 4,
@@ -282,26 +242,17 @@ const AssistantChat: React.FC<AssistantChatProps> = ({ initialOpen = false }) =>
             >
               <div
                 style={{
-                  padding: '9px 12px',
+                  padding: '10px 14px',
                   borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                  background: isUser ? '#111827' : isError ? '#fee2e2' : '#f3f4f6',
-                  color: isUser ? '#ffffff' : '#111827',
+                  background: isUser ? '#111111' : isError ? '#fef2f2' : '#f1f5f9',
+                  color: isUser ? '#ffffff' : '#0f172a',
                   fontSize: 13,
                   lineHeight: 1.5,
-                  border: isError ? '1px solid #f97373' : 'none',
+                  border: isError ? '1px solid #fecaca' : 'none',
                   whiteSpace: 'pre-wrap',
                 }}
               >
                 {message.text}
-              </div>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: '#9ca3af',
-                  alignSelf: isUser ? 'flex-end' : 'flex-start',
-                }}
-              >
-                {formatTime(message.createdAt)}
               </div>
             </div>
           );
@@ -311,155 +262,81 @@ const AssistantChat: React.FC<AssistantChatProps> = ({ initialOpen = false }) =>
           <div
             style={{
               alignSelf: 'flex-start',
-              padding: '8px 11px',
+              padding: '10px 14px',
               borderRadius: '16px 16px 16px 4px',
-              background: '#f3f4f6',
-              color: '#111827',
+              background: '#f1f5f9',
+              color: '#64748b',
               fontSize: 13,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              opacity: 0.9,
             }}
           >
-            <span
-              style={{
-                width: 16,
-                height: 4,
-                borderRadius: 999,
-                background:
-                  'radial-gradient(circle at 0% 50%, #9ca3af 0, #9ca3af 15%, transparent 16%), radial-gradient(circle at 50% 50%, #9ca3af 0, #9ca3af 15%, transparent 16%), radial-gradient(circle at 100% 50%, #9ca3af 0, #9ca3af 15%, transparent 16%)',
-                backgroundSize: '4px 4px',
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: '0 0, 50% 0, 100% 0',
-              }}
-            />
-            Assistant is thinking…
+            Thinking...
           </div>
         )}
-      </div>
-
-      {/* Quick prompt chips */}
-      <div
-        style={{
-          padding: '6px 14px 4px',
-          borderTop: '1px solid rgba(148,163,184,0.18)',
-          background: '#f9fafb',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 6,
-        }}
-      >
-        {[
-          'Suggest a layout structure',
-          'Improve table arrangement',
-          'Check flow between areas',
-        ].map((label) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => {
-              setInputValue(label);
-            }}
-            style={{
-              border: 'none',
-              borderRadius: 999,
-              padding: '4px 10px',
-              fontSize: 11,
-              background: '#ffffff',
-              color: '#374151',
-              cursor: 'pointer',
-            }}
-          >
-            {label}
-          </button>
-        ))}
       </div>
 
       {/* Input area */}
       <form
         onSubmit={handleSend}
         style={{
-          padding: '8px 12px 10px',
+          padding: '16px 20px',
           background: '#ffffff',
-          borderTop: '1px solid rgba(148,163,184,0.18)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 6,
+          borderTop: '1px solid #f1f5f9',
         }}
       >
         <div
           style={{
             display: 'flex',
             alignItems: 'flex-end',
-            gap: 8,
-            borderRadius: 16,
-            border: '1px solid rgba(148,163,184,0.5)',
-            padding: '6px 8px 6px 10px',
-            background: '#f9fafb',
+            gap: 10,
+            borderRadius: 24,
+            border: '1px solid #e2e8f0',
+            padding: '6px 6px 6px 16px',
+            background: '#f8fafc',
           }}
         >
           <textarea
             value={inputValue}
             onChange={(event) => setInputValue(event.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask the AI about this layout…"
-            rows={2}
+            placeholder="Ask something..."
+            rows={1}
             style={{
               flex: 1,
               border: 'none',
               background: 'transparent',
               fontSize: 13,
               resize: 'none',
-              fontFamily:
-                'Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial',
+              fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
               outline: 'none',
-              color: '#111827',
+              color: '#0f172a',
+              padding: '8px 0',
+              lineHeight: 1.4,
             }}
           />
           <button
             type="submit"
             disabled={isSending || !inputValue.trim()}
             style={{
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
               border: 'none',
-              borderRadius: 999,
-              padding: '6px 12px',
-              background: isSending || !inputValue.trim() ? '#e5e7eb' : '#111827',
+              background: !isSending && inputValue.trim() ? '#111111' : '#e2e8f0',
               color: '#ffffff',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: isSending || !inputValue.trim() ? 'not-allowed' : 'pointer',
-              display: 'inline-flex',
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: !isSending && inputValue.trim() ? 'pointer' : 'not-allowed',
+              display: 'flex',
               alignItems: 'center',
-              gap: 6,
+              justifyContent: 'center',
+              transition: 'all 0.2s ease',
             }}
             aria-label="Send message"
           >
-            <span>Send</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" />
+            </svg>
           </button>
-        </div>
-
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setMessages([INITIAL_MESSAGE])}
-            style={{
-              border: 'none',
-              background: 'transparent',
-              color: '#6b7280',
-              fontSize: 11,
-              cursor: 'pointer',
-            }}
-          >
-            Clear conversation
-          </button>
-          <span style={{ fontSize: 10, color: '#9ca3af' }}>Enter to send · Shift+Enter for new line</span>
         </div>
       </form>
     </div>
@@ -467,5 +344,3 @@ const AssistantChat: React.FC<AssistantChatProps> = ({ initialOpen = false }) =>
 };
 
 export default AssistantChat;
-
-

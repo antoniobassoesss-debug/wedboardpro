@@ -86,7 +86,7 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
 
   const loadContacts = async () => {
     setContactsLoading(true);
-    const { data, error: err } = await listContacts({ search: contactSearch || undefined });
+    const { data, error: err } = await listContacts({ search: contactSearch || '' });
     if (!err && data) {
       setContacts(data);
     }
@@ -246,28 +246,6 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
                     {stage.due_date && (
                       <div style={{ fontSize: 12, color: '#6b7280' }}>Due {formatDate(stage.due_date)}</div>
                     )}
-                    <div style={{ minWidth: 120 }}>
-                      <div
-                        style={{
-                          height: 6,
-                          borderRadius: 999,
-                          background: '#e5e7eb',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: `${stage.progress_percent}%`,
-                            height: '100%',
-                            background:
-                              stage.progress_percent === 100 ? '#22c55e' : stage.progress_percent > 0 ? '#0ea5e9' : '#e5e7eb',
-                          }}
-                        />
-                      </div>
-                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-                        {stage.progress_percent}% · {done}/{total} tasks
-                      </div>
-                    </div>
                   </div>
                 </div>
                 {isExpanded && (
@@ -390,8 +368,9 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
       return <div style={{ fontSize: 13, color: '#6b7280' }}>No vendors added yet.</div>;
     }
     const byCategory = workspace.vendors.reduce<Record<string, Vendor[]>>((acc, v) => {
-      if (!acc[v.category]) acc[v.category] = [];
-      acc[v.category].push(v);
+      const category = v.category || 'Uncategorized';
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(v);
       return acc;
     }, {});
     return (
@@ -908,8 +887,8 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
   return (
     <div
       style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1.8fr) minmax(0, 1fr)',
+        display: 'flex',
+        flexDirection: 'column',
         gap: 16,
       }}
     >
@@ -968,26 +947,6 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
               </div>
             </div>
           </div>
-          <div style={{ minWidth: 160, alignSelf: 'center' }}>
-            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Overall progress</div>
-            <div
-              style={{
-                height: 8,
-                borderRadius: 999,
-                background: '#e5e7eb',
-                overflow: 'hidden',
-              }}
-            >
-              <div
-                style={{
-                  width: `${overallProgress}%`,
-                  height: '100%',
-                  background: overallProgress === 100 ? '#22c55e' : '#0ea5e9',
-                }}
-              />
-            </div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{overallProgress}% complete</div>
-          </div>
         </div>
 
         {/* Tabs */}
@@ -1036,88 +995,6 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
           {activeTab === 'files' && renderFilesTab()}
           {activeTab === 'notes' && renderNotesTab()}
           {activeTab === 'contacts' && renderContactsTab()}
-        </div>
-      </div>
-
-      {/* Right side: Risk & Status */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12,
-        }}
-      >
-        <div
-          style={{
-            borderRadius: 20,
-            border: '1px solid #e5e5e5',
-            padding: 14,
-            background: '#ffffff',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 10,
-          }}
-        >
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>Risk & Status</div>
-          <div style={{ fontSize: 12, color: '#6b7280' }}>
-            Quick snapshot of budget, stages, vendors, and upcoming deadlines.
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-              <span>Budget</span>
-              <span
-                style={{
-                  color: riskIndicators.overBudget ? '#b91c1c' : '#16a34a',
-                  fontWeight: 500,
-                }}
-              >
-                {riskIndicators.overBudget ? 'Over planned' : 'On track'}
-              </span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-              <span>Overdue stages</span>
-              <span style={{ fontWeight: 500 }}>{riskIndicators.overdueStages}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-              <span>Critical vendors missing</span>
-              <span style={{ fontWeight: 500 }}>{riskIndicators.missingVendors}</span>
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            borderRadius: 20,
-            border: '1px solid #e5e5e5',
-            padding: 14,
-            background: '#ffffff',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-          }}
-        >
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>Upcoming deadlines</div>
-          {riskIndicators.upcomingTasks.length === 0 ? (
-            <div style={{ fontSize: 12, color: '#6b7280' }}>No tasks due in the next 7 days.</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {riskIndicators.upcomingTasks.map((task) => {
-                const stage = workspace.stages.find((s) => s.id === task.stage_id);
-                return (
-                  <div
-                    key={task.id}
-                    style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, gap: 8 }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 500 }}>{task.title}</div>
-                      <div style={{ color: '#6b7280' }}>{stage ? stage.title : 'No stage'}</div>
-                    </div>
-                    <div style={{ color: '#6b7280' }}>{formatDate(task.due_date)}</div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       </div>
     </div>

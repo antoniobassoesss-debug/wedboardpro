@@ -10,12 +10,14 @@ import {
   type SubscriptionPlan,
   type SubscriptionResponse,
 } from '../api/subscriptionsApi';
+import { useSubscription, type PlanLimits } from '../hooks/useSubscription';
 import './usage-tab.css';
 
 const UsageTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionResponse | null>(null);
   const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan | null>(null);
+  const { limits, planName } = useSubscription();
 
   useEffect(() => {
     async function loadData() {
@@ -51,14 +53,23 @@ const UsageTab: React.FC = () => {
   }
 
   const memberCount = subscription?.memberCount || 0;
-  const maxMembers = currentPlan?.maxTeamMembers || 0;
+  const maxMembers = limits.team?.maxMembers || 1;
   const memberPercentage = maxMembers > 0 ? Math.min(100, (memberCount / maxMembers) * 100) : 0;
+
+  const eventCount = subscription?.eventCount || 0;
+  const maxEvents = limits.events?.maxActive === -1 ? null : (limits.events?.maxActive || 8);
+  const eventPercentage = maxEvents ? Math.min(100, (eventCount / maxEvents) * 100) : 0;
+
+  const formatPlanName = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
 
   return (
     <div className="usage-tab">
       <div className="usage-header">
         <h3>Usage & Limits</h3>
-        <p>Monitor your current resource usage</p>
+        <p>
+          Monitor your current resource usage on the{' '}
+          <strong>{formatPlanName(planName)}</strong> plan
+        </p>
       </div>
 
       <div className="usage-grid">
@@ -76,18 +87,18 @@ const UsageTab: React.FC = () => {
             <div className="usage-card-label">Team Members</div>
             <div className="usage-card-value">
               {memberCount}
-              <span className="usage-card-limit">/ {maxMembers || '—'}</span>
+              <span className="usage-card-limit">/ {maxMembers}</span>
             </div>
             <div className="usage-card-bar">
               <div 
-                className="usage-card-bar-fill"
+                className={`usage-card-bar-fill ${memberPercentage >= 100 ? 'full' : memberPercentage >= 75 ? 'warning' : ''}`}
                 style={{ width: `${memberPercentage}%` }}
               />
             </div>
             <div className="usage-card-hint">
               {maxMembers - memberCount > 0 
                 ? `${maxMembers - memberCount} slots available`
-                : maxMembers > 0 ? 'Limit reached' : 'Upgrade for more'
+                : 'Limit reached - upgrade to add more'
               }
             </div>
           </div>
@@ -106,13 +117,23 @@ const UsageTab: React.FC = () => {
           <div className="usage-card-content">
             <div className="usage-card-label">Active Events</div>
             <div className="usage-card-value">
-              —
-              <span className="usage-card-limit">/ {currentPlan?.maxEvents || 'Unlimited'}</span>
+              {eventCount}
+              <span className="usage-card-limit">/ {maxEvents || 'Unlimited'}</span>
             </div>
             <div className="usage-card-bar">
-              <div className="usage-card-bar-fill" style={{ width: '0%' }} />
+              <div 
+                className={`usage-card-bar-fill ${maxEvents && eventPercentage >= 100 ? 'full' : maxEvents && eventPercentage >= 75 ? 'warning' : ''}`}
+                style={{ width: maxEvents ? `${eventPercentage}%` : '0%' }}
+              />
             </div>
-            <div className="usage-card-hint">Coming soon</div>
+            <div className="usage-card-hint">
+              {maxEvents === null
+                ? 'Unlimited events'
+                : maxEvents - eventCount > 0
+                  ? `${maxEvents - eventCount} events available`
+                  : 'Limit reached - upgrade for more'
+              }
+            </div>
           </div>
         </div>
 
@@ -127,12 +148,38 @@ const UsageTab: React.FC = () => {
             <div className="usage-card-label">Storage</div>
             <div className="usage-card-value">
               —
-              <span className="usage-card-limit">/ {currentPlan?.maxStorageGb || '—'} GB</span>
+              <span className="usage-card-limit">/ {limits.storage?.maxGb || currentPlan?.maxStorageGb || 5} GB</span>
             </div>
             <div className="usage-card-bar">
               <div className="usage-card-bar-fill" style={{ width: '0%' }} />
             </div>
-            <div className="usage-card-hint">Coming soon</div>
+            <div className="usage-card-hint">Storage tracking coming soon</div>
+          </div>
+        </div>
+
+        {/* Features Status */}
+        <div className="usage-card usage-card-features">
+          <div className="usage-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="usage-card-content">
+            <div className="usage-card-label">Plan Features</div>
+            <div className="usage-features-list">
+              <div className={`usage-feature ${limits.chat?.enabled ? 'enabled' : 'disabled'}`}>
+                <span className="usage-feature-icon">{limits.chat?.enabled ? '✓' : '✗'}</span>
+                Team Chat
+              </div>
+              <div className={`usage-feature ${limits.tasks?.assignment ? 'enabled' : 'disabled'}`}>
+                <span className="usage-feature-icon">{limits.tasks?.assignment ? '✓' : '✗'}</span>
+                Task Assignment
+              </div>
+              <div className={`usage-feature ${limits.contacts?.teamShared ? 'enabled' : 'disabled'}`}>
+                <span className="usage-feature-icon">{limits.contacts?.teamShared ? '✓' : '✗'}</span>
+                Shared Contacts
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -147,4 +194,3 @@ const UsageTab: React.FC = () => {
 };
 
 export default UsageTab;
-

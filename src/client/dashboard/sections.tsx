@@ -4,9 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import TodoPage from '../todo/TodoPage';
 import Calendar from '../components/Calendar';
 import EventProjectPage from './pipeline/EventProjectPage';
-import { listEvents, createEvent, deleteEvent, type Event } from '../api/eventsPipelineApi';
+import { listEvents, createEvent, deleteEvent, type Event, type LimitErrorResponse } from '../api/eventsPipelineApi';
 import SuppliersPage from '../suppliers/SuppliersPage';
 import { NewProjectModal, type NewProjectPayload } from '../components/NewProjectModal';
+import { UpgradePromptModal } from '../components/UpgradePromptModal';
 
 const EmptyState: React.FC<{ message: string }> = ({ message }) => (
   <div
@@ -24,7 +25,25 @@ const EmptyState: React.FC<{ message: string }> = ({ message }) => (
   </div>
 );
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return isMobile;
+}
+
+const PlusIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
+  <svg className={className} style={style} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+  </svg>
+);
+
 export const WorkSection: React.FC = () => {
+  const isMobile = useIsMobile();
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -32,6 +51,10 @@ export const WorkSection: React.FC = () => {
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ eventId: string; x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  
+  // Upgrade prompt state
+  const [upgradePromptOpen, setUpgradePromptOpen] = useState(false);
+  const [upgradePromptData, setUpgradePromptData] = useState<LimitErrorResponse | null>(null);
 
   const loadEvents = async () => {
     setLoading(true);
@@ -77,18 +100,26 @@ export const WorkSection: React.FC = () => {
   }, []);
 
   const handleCreateProjectFromModal = async (payload: NewProjectPayload) => {
-    // Use the modal’s data to create a new wedding event in the pipeline.
+    // Use the modal's data to create a new wedding event in the pipeline.
     const { title, eventDate } = payload;
     const dateForSave =
       eventDate && eventDate.trim().length > 0
         ? eventDate
         : new Date().toISOString().slice(0, 10);
 
-    const { data, error: err } = await createEvent({
+    const { data, error: err, limitError } = await createEvent({
       title: title || `New Wedding – ${new Date().toLocaleDateString()}`,
       wedding_date: dateForSave,
       visibility: payload.visibility || 'team', // Default to team if not specified
     });
+
+    // Handle limit error - show upgrade modal
+    if (limitError) {
+      setIsNewProjectOpen(false);
+      setUpgradePromptData(limitError);
+      setUpgradePromptOpen(true);
+      return;
+    }
 
     if (err) {
       // eslint-disable-next-line no-alert
@@ -110,43 +141,77 @@ export const WorkSection: React.FC = () => {
     <SectionCard title="Project Pipeline">
       <div
         ref={containerRef}
-        style={{ display: 'grid', gridTemplateColumns: '260px minmax(0, 1fr)', gap: 16, position: 'relative' }}
+        className="work-section-grid"
+        style={{
+          display: isMobile ? 'flex' : 'grid',
+          flexDirection: isMobile ? 'column' : undefined,
+          gridTemplateColumns: isMobile ? undefined : '260px minmax(0, 1fr)',
+          gap: isMobile ? 12 : 16,
+          position: 'relative',
+        }}
       >
-        {/* Events list */}
-        <div
-          style={{
-            borderRadius: 16,
-            border: '1px solid #e5e5e5',
-            padding: 12,
-            background: '#ffffff',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 10,
-            height: '100%',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>Events</div>
+        {isMobile && (
+          <div className="work-mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>Events ({events.length})</div>
             <button
-              id="new-event-btn"
               type="button"
               onClick={() => setIsNewProjectOpen(true)}
               style={{
                 borderRadius: 999,
-                padding: '6px 10px',
+                padding: '8px 14px',
                 border: 'none',
                 background: '#0f172a',
                 color: '#ffffff',
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: 500,
                 cursor: 'pointer',
-                position: 'relative',
-                zIndex: 10,
               }}
             >
-              + New event
+              + New
             </button>
           </div>
+        )}
+
+        {/* Events list */}
+        <div
+          className="work-events-list"
+          style={{
+            borderRadius: isMobile ? 16 : 16,
+            border: '1px solid #e5e5e5',
+            padding: isMobile ? 12 : 12,
+            background: '#ffffff',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+            height: isMobile ? 'auto' : '100%',
+            maxHeight: isMobile ? '200px' : undefined,
+            overflowY: isMobile ? 'auto' : undefined,
+          }}
+        >
+          {!isMobile && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Events</div>
+              <button
+                id="new-event-btn"
+                type="button"
+                onClick={() => setIsNewProjectOpen(true)}
+                style={{
+                  borderRadius: 999,
+                  padding: '6px 10px',
+                  border: 'none',
+                  background: '#0f172a',
+                  color: '#ffffff',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  position: 'relative',
+                  zIndex: 10,
+                }}
+              >
+                + New event
+              </button>
+            </div>
+          )}
           {loading && events.length === 0 && (
             <div style={{ fontSize: 12, color: '#6b7280' }}>Loading events…</div>
           )}
@@ -160,7 +225,7 @@ export const WorkSection: React.FC = () => {
               No events yet. Create your first wedding project to get started.
             </div>
           )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: isMobile ? 8 : 6, marginTop: 4, overflowX: isMobile ? 'auto' : undefined, paddingBottom: isMobile ? 4 : 0 }}>
             {events.map((ev) => (
               <button
                 key={ev.id}
@@ -172,18 +237,20 @@ export const WorkSection: React.FC = () => {
                 }}
                 style={{
                   textAlign: 'left',
-                  borderRadius: 10,
+                  borderRadius: isMobile ? 12 : 10,
                   border: '1px solid',
                   borderColor: selectedEventId === ev.id ? '#0f172a' : '#e5e5e5',
                   background: selectedEventId === ev.id ? '#0f172a' : '#ffffff',
                   color: selectedEventId === ev.id ? '#ffffff' : '#111827',
-                  padding: 8,
-                  fontSize: 13,
+                  padding: isMobile ? 12 : 8,
+                  fontSize: isMobile ? 14 : 13,
                   cursor: 'pointer',
+                  flexShrink: isMobile ? 0 : undefined,
+                  minWidth: isMobile ? '140px' : undefined,
                 }}
               >
                 <div style={{ fontWeight: 500 }}>{ev.title}</div>
-                <div style={{ fontSize: 11, color: selectedEventId === ev.id ? '#e5e7eb' : '#6b7280' }}>
+                <div style={{ fontSize: isMobile ? 12 : 11, color: selectedEventId === ev.id ? '#e5e7eb' : '#6b7280' }}>
                   {ev.wedding_date ? new Date(ev.wedding_date).toLocaleDateString() : 'No date'} ·{' '}
                   {ev.status.replace('_', ' ')}
                 </div>
@@ -193,16 +260,41 @@ export const WorkSection: React.FC = () => {
         </div>
 
         {/* Event workspace */}
-        <div>
+        <div className="work-workspace" style={{ minHeight: isMobile ? 'calc(100vh - 300px)' : undefined }}>
           {selectedEvent ? (
             <EventProjectPage eventId={selectedEvent.id} />
           ) : (
             <div style={{ padding: 24, color: '#6b7280', fontSize: 14 }}>
-              Select or create an event on the left to open its project workspace.
+              {isMobile ? 'Select an event above to open its project workspace.' : 'Select or create an event on the left to open its project workspace.'}
             </div>
           )}
         </div>
       </div>
+      {isMobile && selectedEvent && (
+        <button
+          type="button"
+          className="work-fab"
+          onClick={() => setIsNewProjectOpen(true)}
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            background: '#0c0c0c',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+            zIndex: 100,
+          }}
+        >
+          <PlusIcon />
+        </button>
+      )}
       {contextMenu && (
         <div
           style={{
@@ -256,6 +348,21 @@ export const WorkSection: React.FC = () => {
         onClose={() => setIsNewProjectOpen(false)}
         handleCreateProject={handleCreateProjectFromModal}
         key={isNewProjectOpen ? 'open' : 'closed'}
+      />
+      
+      {/* Upgrade Prompt Modal */}
+      <UpgradePromptModal
+        isOpen={upgradePromptOpen}
+        onClose={() => {
+          setUpgradePromptOpen(false);
+          setUpgradePromptData(null);
+        }}
+        feature="active events"
+        currentPlan={upgradePromptData?.planName || 'starter'}
+        requiredPlan={upgradePromptData?.requiredPlan || 'professional'}
+        currentUsage={upgradePromptData?.current}
+        limit={upgradePromptData?.limit}
+        message={upgradePromptData?.message}
       />
     </SectionCard>
   );

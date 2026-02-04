@@ -65,8 +65,15 @@ const openaiClient = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
 // Log whether the key was loaded (masked) to help diagnose env issues.
 console.log('OPENAI_API_KEY present:', Boolean(openaiApiKey), openaiApiKey ? `${String(openaiApiKey).slice(0,8)}...` : '');
 
-// Parse JSON bodies for API routes
-app.use(express.json({ limit: '10mb' }));
+// Parse JSON bodies for API routes (except Stripe webhook which needs raw body)
+app.use((req, res, next) => {
+  if (req.originalUrl === '/api/webhooks/stripe') {
+    // Skip JSON parsing for Stripe webhook - it needs raw body for signature verification
+    next();
+  } else {
+    express.json({ limit: '10mb' })(req, res, next);
+  }
+});
 
 // In production, serve built files
 if (process.env.NODE_ENV === 'production') {
@@ -788,6 +795,22 @@ async function canAccessEvent(
   }
 }
 
+interface TeamMembership {
+  id: string;
+  team_id: string;
+  user_id: string;
+  role: 'owner' | 'admin' | 'member';
+  is_owner: boolean;
+  can_view_billing: boolean;
+  can_manage_billing: boolean;
+  can_view_usage: boolean;
+  can_manage_team: boolean;
+  can_manage_settings: boolean;
+  can_create_events: boolean;
+  can_view_all_events: boolean;
+  can_delete_events: boolean;
+}
+
 async function getUserTeam(
   supabase: NonNullable<ReturnType<typeof getSupabaseServiceClient>>,
   userId: string,
@@ -796,8 +819,19 @@ async function getUserTeam(
     .from('team_members')
     .select(
       `
+        id,
         team_id,
+        user_id,
         role,
+        is_owner,
+        can_view_billing,
+        can_manage_billing,
+        can_view_usage,
+        can_manage_team,
+        can_manage_settings,
+        can_create_events,
+        can_view_all_events,
+        can_delete_events,
         teams:team_id (
           id,
           name,
@@ -814,9 +848,25 @@ async function getUserTeam(
   }
 
   if (membershipRow?.teams) {
+    const membership: TeamMembership = {
+      id: membershipRow.id,
+      team_id: membershipRow.team_id,
+      user_id: membershipRow.user_id,
+      role: (membershipRow.role as 'owner' | 'admin' | 'member') ?? 'member',
+      is_owner: membershipRow.is_owner ?? (membershipRow.role === 'owner'),
+      can_view_billing: membershipRow.can_view_billing ?? false,
+      can_manage_billing: membershipRow.can_manage_billing ?? false,
+      can_view_usage: membershipRow.can_view_usage ?? false,
+      can_manage_team: membershipRow.can_manage_team ?? false,
+      can_manage_settings: membershipRow.can_manage_settings ?? false,
+      can_create_events: membershipRow.can_create_events ?? true,
+      can_view_all_events: membershipRow.can_view_all_events ?? true,
+      can_delete_events: membershipRow.can_delete_events ?? false,
+    };
     return {
       team: membershipRow.teams,
-      membershipRole: (membershipRow.role as 'owner' | 'admin' | 'member') ?? 'member',
+      membershipRole: membership.role,
+      membership,
     };
   }
 
@@ -831,7 +881,23 @@ async function getUserTeam(
   }
 
   if (ownerTeam) {
-    return { team: ownerTeam, membershipRole: 'owner' as const };
+    // Owner has all permissions
+    const ownerMembership: TeamMembership = {
+      id: '',
+      team_id: ownerTeam.id,
+      user_id: userId,
+      role: 'owner',
+      is_owner: true,
+      can_view_billing: true,
+      can_manage_billing: true,
+      can_view_usage: true,
+      can_manage_team: true,
+      can_manage_settings: true,
+      can_create_events: true,
+      can_view_all_events: true,
+      can_delete_events: true,
+    };
+    return { team: ownerTeam, membershipRole: 'owner' as const, membership: ownerMembership };
   }
 
   // If the user has no team yet, auto-provision a default one.
@@ -839,7 +905,23 @@ async function getUserTeam(
   // (e.g. "Database error saving new user" during OAuth signup).
   try {
     const created = await createTeamForUser(supabase, userId);
-    return { team: created, membershipRole: 'owner' as const };
+    // New team owner has all permissions
+    const newOwnerMembership: TeamMembership = {
+      id: '',
+      team_id: created.id,
+      user_id: userId,
+      role: 'owner',
+      is_owner: true,
+      can_view_billing: true,
+      can_manage_billing: true,
+      can_view_usage: true,
+      can_manage_team: true,
+      can_manage_settings: true,
+      can_create_events: true,
+      can_view_all_events: true,
+      can_delete_events: true,
+    };
+    return { team: created, membershipRole: 'owner' as const, membership: newOwnerMembership };
   } catch (e: any) {
     console.warn('[teams] auto-provision team failed (non-fatal):', e?.message ?? e);
     return null;
@@ -856,6 +938,310 @@ async function ensureUserTeamMembership(
   }
   return teamResult;
 }
+
+// ============================================================================
+// PLAN LIMITS HELPERS
+// These functions check subscription limits before allowing actions
+// ============================================================================
+
+interface PlanLimits {
+  events?: { maxActive?: number };
+  team?: { maxMembers?: number; canInvite?: boolean };
+  contacts?: { teamShared?: boolean };
+  suppliers?: { teamShared?: boolean };
+  tasks?: { maxPerEvent?: number; assignment?: boolean };
+  chat?: { enabled?: boolean };
+  crm?: { maxDeals?: number };
+}
+
+interface LimitCheckResult {
+  allowed: boolean;
+  current: number;
+  limit: number | null;
+  planName: string;
+  requiredPlan?: string;
+}
+
+/**
+ * Get the subscription plan limits for a team
+ */
+async function getTeamPlanLimits(
+  supabase: NonNullable<ReturnType<typeof getSupabaseServiceClient>>,
+  teamId: string
+): Promise<{ limits: PlanLimits; planName: string } | null> {
+  const { data: subscription, error } = await supabase
+    .from('team_subscriptions')
+    .select(`
+      status,
+      plan:plan_id (
+        name,
+        limits,
+        max_team_members,
+        max_events
+      )
+    `)
+    .eq('team_id', teamId)
+    .in('status', ['active', 'trialing'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('[getTeamPlanLimits] Error fetching subscription:', error.message);
+    return null;
+  }
+
+  if (!subscription?.plan) {
+    // No active subscription - return starter defaults
+    return {
+      limits: {
+        events: { maxActive: 8 },
+        team: { maxMembers: 1, canInvite: true },
+        contacts: { teamShared: false },
+        suppliers: { teamShared: false },
+        tasks: { maxPerEvent: 30, assignment: false },
+        chat: { enabled: false },
+        crm: { maxDeals: 150 },
+      },
+      planName: 'starter',
+    };
+  }
+
+  const plan = subscription.plan as any;
+  return {
+    limits: (plan.limits || {}) as PlanLimits,
+    planName: plan.name || 'starter',
+  };
+}
+
+/**
+ * Check if team can create a new event
+ */
+async function checkEventLimit(
+  supabase: NonNullable<ReturnType<typeof getSupabaseServiceClient>>,
+  teamId: string
+): Promise<LimitCheckResult> {
+  const planData = await getTeamPlanLimits(supabase, teamId);
+  const planName = planData?.planName || 'starter';
+  const maxActive = planData?.limits?.events?.maxActive ?? 8;
+
+  // -1 means unlimited
+  if (maxActive === -1) {
+    return { allowed: true, current: 0, limit: null, planName };
+  }
+
+  // Count active events for this team
+  const { count, error } = await supabase
+    .from('events')
+    .select('id', { count: 'exact', head: true })
+    .eq('team_id', teamId)
+    .not('status', 'eq', 'archived');
+
+  if (error) {
+    console.warn('[checkEventLimit] Error counting events:', error.message);
+    return { allowed: true, current: 0, limit: maxActive, planName };
+  }
+
+  const current = count || 0;
+  const allowed = current < maxActive;
+
+  return {
+    allowed,
+    current,
+    limit: maxActive,
+    planName,
+    requiredPlan: allowed ? undefined : (planName === 'starter' ? 'professional' : 'enterprise'),
+  };
+}
+
+/**
+ * Check if team can add another member
+ */
+async function checkTeamMemberLimit(
+  supabase: NonNullable<ReturnType<typeof getSupabaseServiceClient>>,
+  teamId: string
+): Promise<LimitCheckResult> {
+  const planData = await getTeamPlanLimits(supabase, teamId);
+  const planName = planData?.planName || 'starter';
+  const maxMembers = planData?.limits?.team?.maxMembers ?? 1;
+
+  // Count current team members
+  const { count, error } = await supabase
+    .from('team_members')
+    .select('id', { count: 'exact', head: true })
+    .eq('team_id', teamId);
+
+  if (error) {
+    console.warn('[checkTeamMemberLimit] Error counting members:', error.message);
+    return { allowed: true, current: 0, limit: maxMembers, planName };
+  }
+
+  const current = count || 0;
+  const allowed = current < maxMembers;
+
+  return {
+    allowed,
+    current,
+    limit: maxMembers,
+    planName,
+    requiredPlan: allowed ? undefined : (planName === 'starter' ? 'professional' : 'enterprise'),
+  };
+}
+
+/**
+ * Check if plan allows team sharing for contacts/suppliers
+ */
+async function checkTeamSharingAllowed(
+  supabase: NonNullable<ReturnType<typeof getSupabaseServiceClient>>,
+  teamId: string,
+  type: 'contacts' | 'suppliers'
+): Promise<{ allowed: boolean; planName: string; requiredPlan?: string }> {
+  const planData = await getTeamPlanLimits(supabase, teamId);
+  const planName = planData?.planName || 'starter';
+  const allowed = type === 'contacts' 
+    ? (planData?.limits?.contacts?.teamShared ?? false)
+    : (planData?.limits?.suppliers?.teamShared ?? false);
+
+  return {
+    allowed,
+    planName,
+    requiredPlan: allowed ? undefined : 'professional',
+  };
+}
+
+/**
+ * Check if team can create more tasks for an event
+ */
+async function checkTaskLimit(
+  supabase: NonNullable<ReturnType<typeof getSupabaseServiceClient>>,
+  teamId: string,
+  eventId: string
+): Promise<LimitCheckResult> {
+  const planData = await getTeamPlanLimits(supabase, teamId);
+  const planName = planData?.planName || 'starter';
+  const maxPerEvent = planData?.limits?.tasks?.maxPerEvent ?? 30;
+
+  // -1 means unlimited
+  if (maxPerEvent === -1) {
+    return { allowed: true, current: 0, limit: null, planName };
+  }
+
+  // Count tasks for this event
+  const { count, error } = await supabase
+    .from('tasks')
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', eventId);
+
+  if (error) {
+    console.warn('[checkTaskLimit] Error counting tasks:', error.message);
+    return { allowed: true, current: 0, limit: maxPerEvent, planName };
+  }
+
+  const current = count || 0;
+  const allowed = current < maxPerEvent;
+
+  return {
+    allowed,
+    current,
+    limit: maxPerEvent,
+    planName,
+    requiredPlan: allowed ? undefined : (planName === 'starter' ? 'professional' : 'enterprise'),
+  };
+}
+
+/**
+ * Check if plan allows task assignment
+ */
+async function checkTaskAssignmentAllowed(
+  supabase: NonNullable<ReturnType<typeof getSupabaseServiceClient>>,
+  teamId: string
+): Promise<{ allowed: boolean; planName: string; requiredPlan?: string }> {
+  const planData = await getTeamPlanLimits(supabase, teamId);
+  const planName = planData?.planName || 'starter';
+  const allowed = planData?.limits?.tasks?.assignment ?? false;
+
+  return {
+    allowed,
+    planName,
+    requiredPlan: allowed ? undefined : 'professional',
+  };
+}
+
+/**
+ * Check if team can create more CRM deals
+ * Note: crm_deals uses account_id (user), so we count based on team members' deals
+ */
+async function checkDealLimit(
+  supabase: NonNullable<ReturnType<typeof getSupabaseServiceClient>>,
+  teamId: string
+): Promise<LimitCheckResult> {
+  const planData = await getTeamPlanLimits(supabase, teamId);
+  const planName = planData?.planName || 'starter';
+  const maxDeals = planData?.limits?.crm?.maxDeals ?? 150;
+
+  // -1 means unlimited
+  if (maxDeals === -1) {
+    return { allowed: true, current: 0, limit: null, planName };
+  }
+
+  // Get all team member user IDs
+  const { data: members, error: membersError } = await supabase
+    .from('team_members')
+    .select('user_id')
+    .eq('team_id', teamId);
+
+  if (membersError || !members?.length) {
+    console.warn('[checkDealLimit] Error getting team members:', membersError?.message);
+    return { allowed: true, current: 0, limit: maxDeals, planName };
+  }
+
+  const memberUserIds = members.map(m => m.user_id);
+
+  // Count deals for all team members (crm_deals uses account_id)
+  const { count, error } = await supabase
+    .from('crm_deals')
+    .select('id', { count: 'exact', head: true })
+    .in('account_id', memberUserIds)
+    .not('status', 'eq', 'lost');
+
+  if (error) {
+    console.warn('[checkDealLimit] Error counting deals:', error.message);
+    return { allowed: true, current: 0, limit: maxDeals, planName };
+  }
+
+  const current = count || 0;
+  const allowed = current < maxDeals;
+
+  return {
+    allowed,
+    current,
+    limit: maxDeals,
+    planName,
+    requiredPlan: allowed ? undefined : (planName === 'starter' ? 'professional' : 'enterprise'),
+  };
+}
+
+/**
+ * Check if chat is enabled for the plan
+ */
+async function checkChatEnabled(
+  supabase: NonNullable<ReturnType<typeof getSupabaseServiceClient>>,
+  teamId: string
+): Promise<{ allowed: boolean; planName: string; requiredPlan?: string }> {
+  const planData = await getTeamPlanLimits(supabase, teamId);
+  const planName = planData?.planName || 'starter';
+  const allowed = planData?.limits?.chat?.enabled ?? false;
+
+  return {
+    allowed,
+    planName,
+    requiredPlan: allowed ? undefined : 'professional',
+  };
+}
+
+// ============================================================================
+// END PLAN LIMITS HELPERS
+// ============================================================================
 
 // Team Management API Routes
 app.get('/api/teams/my-team', express.json(), async (req, res) => {
@@ -1788,6 +2174,20 @@ app.post('/api/teams/invite', express.json(), async (req, res) => {
     }
     const { team } = teamResult;
 
+    // Check team member limit before inviting
+    const memberLimitCheck = await checkTeamMemberLimit(supabase, team.id);
+    if (!memberLimitCheck.allowed) {
+      return res.status(402).json({
+        error: 'team_member_limit_reached',
+        message: `You've reached the limit of ${memberLimitCheck.limit} team members on the ${memberLimitCheck.planName} plan.`,
+        current: memberLimitCheck.current,
+        limit: memberLimitCheck.limit,
+        planName: memberLimitCheck.planName,
+        requiredPlan: memberLimitCheck.requiredPlan,
+        upgradeUrl: '/pricing',
+      });
+    }
+
     const normalizedEmail = email.trim().toLowerCase();
 
     // Check for existing pending invitation
@@ -1924,6 +2324,75 @@ app.get('/api/teams/invitations/pending', express.json(), async (req, res) => {
   }
 });
 
+// Get invitation details by token (public - no auth required)
+app.get('/api/invitations/:token', express.json(), async (req, res) => {
+  const { token } = req.params;
+  if (!token) {
+    return res.status(400).json({ error: 'Token is required' });
+  }
+
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase service client unavailable' });
+  }
+
+  try {
+    const { data: invitation, error } = await supabase
+      .from('team_invitations')
+      .select('id, team_id, email, status, expires_at, created_at')
+      .eq('token', token)
+      .maybeSingle();
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    if (!invitation) {
+      return res.status(404).json({ error: 'Invitation not found or has expired' });
+    }
+
+    // Check if invitation is expired or already used
+    if (invitation.status !== 'pending') {
+      return res.status(400).json({
+        error: invitation.status === 'accepted' ? 'This invitation has already been accepted' : 'This invitation is no longer valid',
+        status: invitation.status,
+      });
+    }
+
+    if (new Date(invitation.expires_at) < new Date()) {
+      return res.status(400).json({ error: 'This invitation has expired' });
+    }
+
+    // Get team details
+    const { data: team, error: teamError } = await supabase
+      .from('teams')
+      .select('id, name')
+      .eq('id', invitation.team_id)
+      .single();
+
+    if (teamError || !team) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+
+    return res.json({
+      invitation: {
+        id: invitation.id,
+        email: invitation.email,
+        status: invitation.status,
+        expires_at: invitation.expires_at,
+        created_at: invitation.created_at,
+      },
+      team: {
+        id: team.id,
+        name: team.name,
+      },
+    });
+  } catch (err: any) {
+    console.error('Get invitation error:', err);
+    return res.status(500).json({ error: 'Failed to get invitation details' });
+  }
+});
+
 app.post('/api/teams/invitations/accept', express.json(), async (req, res) => {
   const user = await getAuthenticatedUser(req);
   if (!user) {
@@ -1956,6 +2425,542 @@ app.post('/api/teams/invitations/accept', express.json(), async (req, res) => {
   } catch (err: any) {
     console.error('Accept invitation error:', err);
     return res.status(500).json({ error: 'Failed to accept invitation' });
+  }
+});
+
+// List sent invitations (for team settings page)
+app.get('/api/teams/invitations/sent', express.json(), async (req, res) => {
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase service client unavailable' });
+  }
+
+  try {
+    const teamResult = await getUserTeam(supabase, user.id);
+    if (!teamResult) {
+      return res.status(400).json({ error: 'No team found' });
+    }
+    const { team, membership } = teamResult;
+
+    // Check permission: owner or can_manage_team
+    if (!membership.is_owner && !membership.can_manage_team) {
+      return res.status(403).json({ error: 'Permission denied. Only team managers can view invitations.' });
+    }
+
+    const { data: invitations, error } = await supabase
+      .from('team_invitations')
+      .select('id, team_id, inviter_id, email, status, expires_at, created_at, can_view_billing, can_manage_billing, can_view_usage, can_manage_team, can_manage_settings, can_create_events, can_view_all_events, can_delete_events')
+      .eq('team_id', team.id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.json({ invitations: invitations ?? [] });
+  } catch (err: any) {
+    console.error('Get sent invitations error:', err);
+    return res.status(500).json({ error: 'Failed to get invitations' });
+  }
+});
+
+// Cancel a pending invitation
+app.delete('/api/teams/invitations/:id', express.json(), async (req, res) => {
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const invitationId = req.params.id;
+  if (!invitationId) {
+    return res.status(400).json({ error: 'Invitation ID is required' });
+  }
+
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase service client unavailable' });
+  }
+
+  try {
+    const teamResult = await getUserTeam(supabase, user.id);
+    if (!teamResult) {
+      return res.status(400).json({ error: 'No team found' });
+    }
+    const { team, membership } = teamResult;
+
+    // Check permission: owner or can_manage_team
+    if (!membership.is_owner && !membership.can_manage_team) {
+      return res.status(403).json({ error: 'Permission denied. Only team managers can cancel invitations.' });
+    }
+
+    // Verify invitation belongs to this team
+    const { data: invitation, error: fetchError } = await supabase
+      .from('team_invitations')
+      .select('id, team_id')
+      .eq('id', invitationId)
+      .single();
+
+    if (fetchError || !invitation) {
+      return res.status(404).json({ error: 'Invitation not found' });
+    }
+
+    if (invitation.team_id !== team.id) {
+      return res.status(403).json({ error: 'Invitation does not belong to your team' });
+    }
+
+    const { error: deleteError } = await supabase
+      .from('team_invitations')
+      .delete()
+      .eq('id', invitationId);
+
+    if (deleteError) {
+      return res.status(500).json({ error: deleteError.message });
+    }
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Cancel invitation error:', err);
+    return res.status(500).json({ error: 'Failed to cancel invitation' });
+  }
+});
+
+// Resend a pending invitation
+app.post('/api/teams/invitations/:id/resend', express.json(), async (req, res) => {
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const invitationId = req.params.id;
+  if (!invitationId) {
+    return res.status(400).json({ error: 'Invitation ID is required' });
+  }
+
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase service client unavailable' });
+  }
+
+  try {
+    const teamResult = await getUserTeam(supabase, user.id);
+    if (!teamResult) {
+      return res.status(400).json({ error: 'No team found' });
+    }
+    const { team, membership } = teamResult;
+
+    // Check permission: owner or can_manage_team
+    if (!membership.is_owner && !membership.can_manage_team) {
+      return res.status(403).json({ error: 'Permission denied. Only team managers can resend invitations.' });
+    }
+
+    // Verify invitation belongs to this team
+    const { data: invitation, error: fetchError } = await supabase
+      .from('team_invitations')
+      .select('id, team_id, email, status')
+      .eq('id', invitationId)
+      .single();
+
+    if (fetchError || !invitation) {
+      return res.status(404).json({ error: 'Invitation not found' });
+    }
+
+    if (invitation.team_id !== team.id) {
+      return res.status(403).json({ error: 'Invitation does not belong to your team' });
+    }
+
+    if (invitation.status !== 'pending') {
+      return res.status(400).json({ error: 'Can only resend pending invitations' });
+    }
+
+    const generateToken = () =>
+      Buffer.from(Math.random().toString(36) + Date.now().toString(36)).toString('base64url').slice(0, 48);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: updatedInvite, error: updateError } = await supabase
+      .from('team_invitations')
+      .update({
+        inviter_id: user.id,
+        token: generateToken(),
+        expires_at: expiresAt,
+        created_at: new Date().toISOString(),
+      })
+      .eq('id', invitationId)
+      .select()
+      .single();
+
+    if (updateError) {
+      return res.status(500).json({ error: updateError.message });
+    }
+
+    // Send notification to invitee
+    await notifyTeamInvitation(supabase, invitation.email, team.id, team.name ?? null, user.id);
+
+    return res.json({ invitation: updatedInvite, resent: true });
+  } catch (err: any) {
+    console.error('Resend invitation error:', err);
+    return res.status(500).json({ error: 'Failed to resend invitation' });
+  }
+});
+
+// Update team member permissions
+app.patch('/api/team/members/:id/permissions', express.json(), async (req, res) => {
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const memberId = req.params.id;
+  if (!memberId) {
+    return res.status(400).json({ error: 'Member ID is required' });
+  }
+
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase service client unavailable' });
+  }
+
+  try {
+    const teamResult = await getUserTeam(supabase, user.id);
+    if (!teamResult) {
+      return res.status(400).json({ error: 'No team found' });
+    }
+    const { team, membership } = teamResult;
+
+    // Check permission: owner or can_manage_team
+    if (!membership.is_owner && !membership.can_manage_team) {
+      return res.status(403).json({ error: 'Permission denied. Only team managers can update permissions.' });
+    }
+
+    // Fetch the member to update
+    const { data: targetMember, error: fetchError } = await supabase
+      .from('team_members')
+      .select('id, team_id, user_id, is_owner')
+      .eq('id', memberId)
+      .single();
+
+    if (fetchError || !targetMember) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    if (targetMember.team_id !== team.id) {
+      return res.status(403).json({ error: 'Member does not belong to your team' });
+    }
+
+    // Cannot change owner's permissions
+    if (targetMember.is_owner) {
+      return res.status(400).json({ error: 'Cannot modify owner permissions' });
+    }
+
+    // Extract only permission fields from body
+    const {
+      can_view_billing,
+      can_manage_billing,
+      can_view_usage,
+      can_manage_team,
+      can_manage_settings,
+      can_create_events,
+      can_view_all_events,
+      can_delete_events,
+    } = req.body ?? {};
+
+    const permissionUpdates: Record<string, boolean> = {};
+    if (typeof can_view_billing === 'boolean') permissionUpdates.can_view_billing = can_view_billing;
+    if (typeof can_manage_billing === 'boolean') permissionUpdates.can_manage_billing = can_manage_billing;
+    if (typeof can_view_usage === 'boolean') permissionUpdates.can_view_usage = can_view_usage;
+    if (typeof can_manage_team === 'boolean') permissionUpdates.can_manage_team = can_manage_team;
+    if (typeof can_manage_settings === 'boolean') permissionUpdates.can_manage_settings = can_manage_settings;
+    if (typeof can_create_events === 'boolean') permissionUpdates.can_create_events = can_create_events;
+    if (typeof can_view_all_events === 'boolean') permissionUpdates.can_view_all_events = can_view_all_events;
+    if (typeof can_delete_events === 'boolean') permissionUpdates.can_delete_events = can_delete_events;
+
+    // Enforce dependency: can_manage_billing implies can_view_billing
+    if (permissionUpdates.can_manage_billing) {
+      permissionUpdates.can_view_billing = true;
+    }
+
+    if (Object.keys(permissionUpdates).length === 0) {
+      return res.status(400).json({ error: 'No valid permissions provided' });
+    }
+
+    const { data: updatedMember, error: updateError } = await supabase
+      .from('team_members')
+      .update(permissionUpdates)
+      .eq('id', memberId)
+      .select()
+      .single();
+
+    if (updateError) {
+      return res.status(500).json({ error: updateError.message });
+    }
+
+    return res.json({ member: updatedMember });
+  } catch (err: any) {
+    console.error('Update member permissions error:', err);
+    return res.status(500).json({ error: 'Failed to update permissions' });
+  }
+});
+
+// Remove a team member
+app.delete('/api/team/members/:id', express.json(), async (req, res) => {
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const memberId = req.params.id;
+  if (!memberId) {
+    return res.status(400).json({ error: 'Member ID is required' });
+  }
+
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase service client unavailable' });
+  }
+
+  try {
+    const teamResult = await getUserTeam(supabase, user.id);
+    if (!teamResult) {
+      return res.status(400).json({ error: 'No team found' });
+    }
+    const { team, membership } = teamResult;
+
+    // Check permission: owner or can_manage_team
+    if (!membership.is_owner && !membership.can_manage_team) {
+      return res.status(403).json({ error: 'Permission denied. Only team managers can remove members.' });
+    }
+
+    // Fetch the member to remove
+    const { data: targetMember, error: fetchError } = await supabase
+      .from('team_members')
+      .select('id, team_id, user_id, is_owner')
+      .eq('id', memberId)
+      .single();
+
+    if (fetchError || !targetMember) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    if (targetMember.team_id !== team.id) {
+      return res.status(403).json({ error: 'Member does not belong to your team' });
+    }
+
+    // Cannot remove owner
+    if (targetMember.is_owner) {
+      return res.status(400).json({ error: 'Cannot remove the team owner' });
+    }
+
+    const { error: deleteError } = await supabase
+      .from('team_members')
+      .delete()
+      .eq('id', memberId);
+
+    if (deleteError) {
+      return res.status(500).json({ error: deleteError.message });
+    }
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Remove member error:', err);
+    return res.status(500).json({ error: 'Failed to remove member' });
+  }
+});
+
+// Leave team (for non-owners)
+app.post('/api/team/leave', express.json(), async (req, res) => {
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase service client unavailable' });
+  }
+
+  try {
+    const teamResult = await getUserTeam(supabase, user.id);
+    if (!teamResult) {
+      return res.status(400).json({ error: 'No team found' });
+    }
+    const { team, membership } = teamResult;
+
+    // Owner cannot leave - must delete team instead
+    if (membership.is_owner) {
+      return res.status(400).json({
+        error: 'Owner cannot leave the team. Delete the account instead.',
+        code: 'OWNER_CANNOT_LEAVE'
+      });
+    }
+
+    const { error: deleteError } = await supabase
+      .from('team_members')
+      .delete()
+      .eq('team_id', team.id)
+      .eq('user_id', user.id);
+
+    if (deleteError) {
+      return res.status(500).json({ error: deleteError.message });
+    }
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Leave team error:', err);
+    return res.status(500).json({ error: 'Failed to leave team' });
+  }
+});
+
+// Invite member with granular permissions
+app.post('/api/teams/invite-with-permissions', express.json(), async (req, res) => {
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { email, permissions } = req.body ?? {};
+  if (typeof email !== 'string' || !email.includes('@')) {
+    return res.status(400).json({ error: 'Valid email is required' });
+  }
+
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase service client unavailable' });
+  }
+
+  try {
+    const teamResult = await getUserTeam(supabase, user.id);
+    if (!teamResult) {
+      return res.status(400).json({ error: 'Create a team before inviting members' });
+    }
+    const { team, membership } = teamResult;
+
+    // Check permission: owner or can_manage_team
+    if (!membership.is_owner && !membership.can_manage_team) {
+      return res.status(403).json({ error: 'Permission denied. Only team managers can invite members.' });
+    }
+
+    // Check team member limit before inviting
+    const memberLimitCheck = await checkTeamMemberLimit(supabase, team.id);
+    if (!memberLimitCheck.allowed) {
+      return res.status(402).json({
+        error: 'team_member_limit_reached',
+        message: `You've reached the limit of ${memberLimitCheck.limit} team members on the ${memberLimitCheck.planName} plan.`,
+        current: memberLimitCheck.current,
+        limit: memberLimitCheck.limit,
+        planName: memberLimitCheck.planName,
+        requiredPlan: memberLimitCheck.requiredPlan,
+        upgradeUrl: '/pricing',
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Check if user is already a team member
+    const { data: existingMember } = await supabase
+      .from('team_members')
+      .select('id, user_id')
+      .eq('team_id', team.id)
+      .single();
+
+    // Check for existing user with this email
+    const { data: existingUsers } = await supabase.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === normalizedEmail);
+
+    if (existingUser && existingMember?.user_id === existingUser.id) {
+      return res.status(400).json({ error: 'This user is already a team member' });
+    }
+
+    // Check for existing pending invitation
+    const { data: existingInvite } = await supabase
+      .from('team_invitations')
+      .select('id')
+      .eq('team_id', team.id)
+      .eq('email', normalizedEmail)
+      .eq('status', 'pending')
+      .maybeSingle();
+
+    const generateToken = () =>
+      Buffer.from(Math.random().toString(36) + Date.now().toString(36)).toString('base64url').slice(0, 48);
+    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(); // 14 days
+
+    // Default permissions if none provided
+    const defaultPermissions = {
+      can_view_billing: false,
+      can_manage_billing: false,
+      can_view_usage: false,
+      can_manage_team: false,
+      can_manage_settings: false,
+      can_create_events: true,
+      can_view_all_events: true,
+      can_delete_events: false,
+    };
+
+    const invitePermissions = {
+      ...defaultPermissions,
+      ...(permissions || {}),
+    };
+
+    // Enforce dependency: can_manage_billing implies can_view_billing
+    if (invitePermissions.can_manage_billing) {
+      invitePermissions.can_view_billing = true;
+    }
+
+    if (existingInvite) {
+      const { data: updatedInvite, error: updateError } = await supabase
+        .from('team_invitations')
+        .update({
+          inviter_id: user.id,
+          token: generateToken(),
+          expires_at: expiresAt,
+          status: 'pending',
+          accepted_at: null,
+          created_at: new Date().toISOString(),
+          ...invitePermissions,
+        })
+        .eq('id', existingInvite.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Update invitation error:', updateError);
+        return res.status(500).json({ error: updateError.message });
+      }
+
+      await notifyTeamInvitation(supabase, normalizedEmail, team.id, team.name ?? null, user.id);
+
+      return res.status(200).json({ invitation: updatedInvite, resent: true });
+    }
+
+    const { data: invitation, error: inviteError } = await supabase
+      .from('team_invitations')
+      .insert({
+        team_id: team.id,
+        inviter_id: user.id,
+        email: normalizedEmail,
+        token: generateToken(),
+        status: 'pending',
+        expires_at: expiresAt,
+        ...invitePermissions,
+      })
+      .select()
+      .single();
+
+    if (inviteError) {
+      console.error('Create invitation error:', inviteError);
+      return res.status(500).json({ error: inviteError.message });
+    }
+
+    await notifyTeamInvitation(supabase, normalizedEmail, team.id, team.name ?? null, user.id);
+
+    return res.status(201).json({ invitation });
+  } catch (err: any) {
+    console.error('Invite with permissions error:', err);
+    return res.status(500).json({ error: 'Failed to send invitation' });
   }
 });
 
@@ -2656,6 +3661,20 @@ app.post('/api/events', express.json(), async (req, res) => {
         return res.status(400).json({ error: 'You must be part of a team to create team events. Create a personal event instead.' });
       }
       teamId = teamResult.team.id;
+
+      // Check event limit for the team
+      const eventLimitCheck = await checkEventLimit(supabase, teamId as string);
+      if (!eventLimitCheck.allowed) {
+        return res.status(402).json({
+          error: 'event_limit_reached',
+          message: `You've reached the limit of ${eventLimitCheck.limit} active events on the ${eventLimitCheck.planName} plan.`,
+          current: eventLimitCheck.current,
+          limit: eventLimitCheck.limit,
+          planName: eventLimitCheck.planName,
+          requiredPlan: eventLimitCheck.requiredPlan,
+          upgradeUrl: '/pricing',
+        });
+      }
     }
 
     const { data: event, error } = await supabase
@@ -3430,8 +4449,16 @@ app.post('/api/suppliers', express.json(), async (req, res) => {
       finalVisibility = 'private';
       finalTeamId = null;
     } else if (userTeamId) {
-      finalVisibility = 'team';
-      finalTeamId = userTeamId;
+      // Check if plan allows team sharing
+      const sharingCheck = await checkTeamSharingAllowed(supabase, userTeamId, 'suppliers');
+      if (!sharingCheck.allowed) {
+        // Plan doesn't allow team sharing - force to private
+        finalVisibility = 'private';
+        finalTeamId = null;
+      } else {
+        finalVisibility = 'team';
+        finalTeamId = userTeamId;
+      }
     } else {
       // User has no team and wants to share - fallback to private
       finalVisibility = 'private';
@@ -3678,8 +4705,16 @@ app.post('/api/contacts', express.json(), async (req, res) => {
       finalVisibility = 'private';
       finalTeamId = null;
     } else if (userTeamId) {
-      finalVisibility = 'team';
-      finalTeamId = userTeamId;
+      // Check if plan allows team sharing
+      const sharingCheck = await checkTeamSharingAllowed(supabase, userTeamId, 'contacts');
+      if (!sharingCheck.allowed) {
+        // Plan doesn't allow team sharing - force to private
+        finalVisibility = 'private';
+        finalTeamId = null;
+      } else {
+        finalVisibility = 'team';
+        finalTeamId = userTeamId;
+      }
     } else {
       // User has no team and wants to share - fallback to private
       finalVisibility = 'private';
@@ -6061,8 +7096,36 @@ app.post('/api/tasks', express.json(), async (req, res) => {
       return res.status(404).json({ error: 'No team found' });
     }
 
-    // Validate assignee is in the same team
+    // Check task limit for the event (if event_id provided)
+    if (event_id) {
+      const taskLimitCheck = await checkTaskLimit(supabase, team.team_id, event_id);
+      if (!taskLimitCheck.allowed) {
+        return res.status(402).json({
+          error: 'task_limit_reached',
+          message: `You've reached the limit of ${taskLimitCheck.limit} tasks per event on the ${taskLimitCheck.planName} plan.`,
+          current: taskLimitCheck.current,
+          limit: taskLimitCheck.limit,
+          planName: taskLimitCheck.planName,
+          requiredPlan: taskLimitCheck.requiredPlan,
+          upgradeUrl: '/pricing',
+        });
+      }
+    }
+
+    // Check if task assignment is allowed
     if (assignee_id) {
+      const assignmentCheck = await checkTaskAssignmentAllowed(supabase, team.team_id);
+      if (!assignmentCheck.allowed) {
+        return res.status(402).json({
+          error: 'task_assignment_not_allowed',
+          message: `Task assignment is available on Professional and Enterprise plans.`,
+          planName: assignmentCheck.planName,
+          requiredPlan: assignmentCheck.requiredPlan,
+          upgradeUrl: '/pricing',
+        });
+      }
+
+      // Validate assignee is in the same team
       const { data: assigneeMember } = await supabase
         .from('team_members')
         .select('user_id')
@@ -7300,6 +8363,23 @@ app.post('/api/crm/deals', express.json(), async (req, res) => {
       return res.status(500).json({ error: 'Supabase service client unavailable' });
     }
 
+    // Get user's team to check deal limit
+    const teamResult = await getUserTeam(supabase, user.id);
+    if (teamResult?.team?.id) {
+      const dealLimitCheck = await checkDealLimit(supabase, teamResult.team.id);
+      if (!dealLimitCheck.allowed) {
+        return res.status(402).json({
+          error: 'deal_limit_reached',
+          message: `You've reached the limit of ${dealLimitCheck.limit} client profiles on the ${dealLimitCheck.planName} plan.`,
+          current: dealLimitCheck.current,
+          limit: dealLimitCheck.limit,
+          planName: dealLimitCheck.planName,
+          requiredPlan: dealLimitCheck.requiredPlan,
+          upgradeUrl: '/pricing',
+        });
+      }
+    }
+
     const {
       pipelineId,
       stageId,
@@ -8093,11 +9173,21 @@ app.get('/api/subscriptions/my-subscription', async (req, res) => {
       .select('*', { count: 'exact', head: true })
       .eq('team_id', userTeam.team_id);
 
+    // Get active event count for the team
+    const { count: eventCount } = await supabase
+      .from('events')
+      .select('*', { count: 'exact', head: true })
+      .eq('team_id', userTeam.team_id)
+      .not('status', 'eq', 'archived');
+
     // Get add-ons
     const { data: addons } = await supabase
       .from('subscription_addons')
       .select('*')
       .eq('team_subscription_id', subscription.id);
+
+    // Get plan limits from the JSONB column
+    const planLimits = subscription.plan?.limits || {};
 
     res.json({
       subscription: {
@@ -8114,10 +9204,12 @@ app.get('/api/subscriptions/my-subscription', async (req, res) => {
           displayName: subscription.plan.display_name,
           maxTeamMembers: subscription.plan.max_team_members,
           maxEvents: subscription.plan.max_events,
+          limits: planLimits,
         } : null,
       },
       teamId: userTeam.team_id,
       memberCount: memberCount || 0,
+      eventCount: eventCount || 0,
       addons: addons || [],
       status: subscription.status,
     });
@@ -8332,9 +9424,127 @@ app.get('/api/subscriptions/config', (req, res) => {
   });
 });
 
+// POST /api/subscriptions/sync - Manually sync subscription from Stripe (for debugging/fallback)
+app.post('/api/subscriptions/sync', express.json(), async (req, res) => {
+  try {
+    if (!stripeClient) {
+      return res.status(500).json({ error: 'Stripe not configured' });
+    }
+
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database unavailable' });
+    }
+
+    // Get user's team
+    const userTeam = await getSubscriptionUserTeam(user.id);
+    if (!userTeam) {
+      return res.status(400).json({ error: 'User is not part of any team' });
+    }
+
+    // Get current subscription record to find Stripe customer ID
+    const { data: existingSub } = await supabase
+      .from('team_subscriptions')
+      .select('stripe_customer_id, stripe_subscription_id')
+      .eq('team_id', userTeam.team_id)
+      .single();
+
+    if (!existingSub?.stripe_customer_id) {
+      return res.status(400).json({ error: 'No Stripe customer found for this team' });
+    }
+
+    // Fetch subscriptions from Stripe
+    const subscriptions = await stripeClient.subscriptions.list({
+      customer: existingSub.stripe_customer_id,
+      status: 'all',
+      limit: 1,
+    });
+
+    if (subscriptions.data.length === 0) {
+      return res.status(400).json({ error: 'No subscriptions found in Stripe' });
+    }
+
+    const subscription = subscriptions.data[0];
+    console.log('[Sync] Found Stripe subscription:', subscription.id, 'Status:', subscription.status);
+
+    // Get the price ID and find matching plan
+    const priceId = subscription.items.data[0]?.price?.id;
+    let planId = null;
+
+    if (priceId) {
+      const { data: matchedPlan } = await supabase
+        .from('subscription_plans')
+        .select('id, name')
+        .or(`stripe_price_id_monthly.eq.${priceId},stripe_price_id_annual.eq.${priceId}`)
+        .single();
+
+      if (matchedPlan) {
+        planId = matchedPlan.id;
+        console.log('[Sync] Matched plan:', matchedPlan.name, '(', planId, ')');
+      }
+    }
+
+    // Determine billing interval
+    const billingInterval = subscription.items.data[0]?.price?.recurring?.interval === 'year' ? 'year' : 'month';
+
+    // Helper to safely convert Stripe timestamp to ISO string
+    const toISOString = (timestamp: number | null | undefined): string | null => {
+      if (!timestamp || timestamp <= 0) return null;
+      try {
+        return new Date(timestamp * 1000).toISOString();
+      } catch {
+        return null;
+      }
+    };
+
+    // Update the subscription in database
+    const { error: updateError } = await supabase
+      .from('team_subscriptions')
+      .update({
+        plan_id: planId,
+        stripe_subscription_id: subscription.id,
+        status: subscription.status,
+        billing_interval: billingInterval,
+        current_period_start: toISOString((subscription as any).current_period_start),
+        current_period_end: toISOString((subscription as any).current_period_end),
+        cancel_at_period_end: subscription.cancel_at_period_end,
+        trial_end: toISOString(subscription.trial_end),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('team_id', userTeam.team_id);
+
+    if (updateError) {
+      console.error('[Sync] Error updating subscription:', updateError);
+      return res.status(500).json({ error: 'Failed to update subscription' });
+    }
+
+    console.log('[Sync] Successfully synced subscription for team', userTeam.team_id);
+    res.json({
+      success: true,
+      message: 'Subscription synced from Stripe',
+      subscription: {
+        id: subscription.id,
+        status: subscription.status,
+        planId,
+        priceId,
+      }
+    });
+  } catch (error: any) {
+    console.error('[POST /api/subscriptions/sync] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to sync subscription' });
+  }
+});
+
 // POST /api/webhooks/stripe - Handle Stripe webhooks
 // IMPORTANT: This must use express.raw() for signature verification
 app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  console.log('[Stripe Webhook] Received request, body type:', typeof req.body, Buffer.isBuffer(req.body) ? 'Buffer' : 'Not Buffer');
+
   if (!stripeClient) {
     console.warn('[Stripe Webhook] Stripe not configured, ignoring webhook');
     return res.status(200).json({ received: true, processed: false });
@@ -8383,7 +9593,13 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
-        console.log(`[Stripe Webhook] Subscription ${event.type}:`, subscription.id);
+        const priceId = (subscription as any).items?.data?.[0]?.price?.id;
+        console.log(`[Stripe Webhook] Subscription ${event.type}:`, {
+          subscriptionId: subscription.id,
+          status: subscription.status,
+          priceId,
+          metadata: subscription.metadata,
+        });
         await handleSubscriptionUpdate(supabase, subscription);
         break;
       }
@@ -8422,26 +9638,54 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
 
 // Helper: Handle subscription update from Stripe
 async function handleSubscriptionUpdate(
-  supabase: any, 
+  supabase: any,
   subscription: any, // Use any to handle different Stripe SDK versions
   checkoutMetadata?: Record<string, string> | null
 ) {
   const metadata = subscription.metadata || checkoutMetadata || {};
   const teamId = metadata.team_id;
-  const planId = metadata.plan_id;
+  let planId = metadata.plan_id;
 
   if (!teamId) {
     console.error('[handleSubscriptionUpdate] No team_id in subscription metadata');
     return;
   }
 
-  const customerId = typeof subscription.customer === 'string' 
-    ? subscription.customer 
+  const customerId = typeof subscription.customer === 'string'
+    ? subscription.customer
     : subscription.customer?.id;
 
   // Determine billing interval from subscription
   const priceData = subscription.items.data[0]?.price;
   const billingInterval = priceData?.recurring?.interval === 'year' ? 'year' : 'month';
+  const stripePriceId = priceData?.id;
+
+  // IMPORTANT: Look up the plan from the Stripe price ID
+  // This handles upgrades/downgrades via Stripe Portal where metadata isn't updated
+  if (stripePriceId) {
+    const { data: matchedPlan, error: planError } = await supabase
+      .from('subscription_plans')
+      .select('id, name')
+      .or(`stripe_price_id_monthly.eq.${stripePriceId},stripe_price_id_annual.eq.${stripePriceId}`)
+      .single();
+
+    if (matchedPlan) {
+      console.log(`[handleSubscriptionUpdate] Resolved plan from price ${stripePriceId}: ${matchedPlan.name} (${matchedPlan.id})`);
+      planId = matchedPlan.id;
+    } else if (planError && planError.code !== 'PGRST116') {
+      console.warn(`[handleSubscriptionUpdate] Could not find plan for price ${stripePriceId}:`, planError);
+    }
+  }
+
+  // Helper to safely convert Stripe timestamp to ISO string
+  const toISOString = (timestamp: number | null | undefined): string | null => {
+    if (!timestamp || timestamp <= 0) return null;
+    try {
+      return new Date(timestamp * 1000).toISOString();
+    } catch {
+      return null;
+    }
+  };
 
   // Upsert subscription record
   const { error } = await supabase
@@ -8453,18 +9697,12 @@ async function handleSubscriptionUpdate(
       stripe_subscription_id: subscription.id,
       status: subscription.status,
       billing_interval: billingInterval,
-      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      current_period_start: toISOString(subscription.current_period_start),
+      current_period_end: toISOString(subscription.current_period_end),
       cancel_at_period_end: subscription.cancel_at_period_end,
-      trial_start: subscription.trial_start 
-        ? new Date(subscription.trial_start * 1000).toISOString() 
-        : null,
-      trial_end: subscription.trial_end 
-        ? new Date(subscription.trial_end * 1000).toISOString() 
-        : null,
-      canceled_at: subscription.canceled_at 
-        ? new Date(subscription.canceled_at * 1000).toISOString() 
-        : null,
+      trial_start: toISOString(subscription.trial_start),
+      trial_end: toISOString(subscription.trial_end),
+      canceled_at: toISOString(subscription.canceled_at),
       updated_at: new Date().toISOString(),
     }, {
       onConflict: 'team_id',

@@ -10,9 +10,16 @@ import { AuthCallbackPage, AuthUrlHandler } from './auth/index.ts';
 import { WeddingDashboard } from './dashboard/index';
 import SuppliersPage from './suppliers/SuppliersPage';
 import PricingPage from './PricingPage';
+import InviteAcceptPage from './InviteAcceptPage.js';
 
-// Lazy load LayoutMakerPage to avoid circular dependency issues
-const LayoutMakerPage = lazy(() => import('./LayoutMakerPage'));
+// Lazy load LayoutMakerPage (store-based version) to avoid circular dependency issues
+const LayoutMakerPage = lazy(() => import('./LayoutMakerPageStore'));
+
+// Lazy load Phase 2 Test Page
+const Phase2TestPage = lazy(() => import('../layout-maker/components/Phase2TestPage').then(module => ({ default: module.Phase2TestPage })));
+
+// Lazy load Phase 5 Test Page
+const Phase5TestPage = lazy(() => import('../layout-maker/components/Phase5TestPage').then(module => ({ default: module.Phase5TestPage })));
 
 // Simple placeholder component for pages under construction
 const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
@@ -81,20 +88,54 @@ const App: React.FC = () => {
                 justifyContent: 'center', 
                 height: '100vh',
                 background: '#ffffff',
-                flexDirection: 'column',
-                gap: '1rem'
               }}>
-                <div>Loading Layout Maker...</div>
-                <img src="/loadinglogo.png" alt="Loading" style={{ width: '120px', height: 'auto' }} />
+                <img src="/loadinglogo.png" alt="Loading" style={{ width: '160px', height: 'auto' }} />
               </div>
             }>
               <LayoutMakerPage />
             </Suspense>
           } 
         />
+        <Route 
+          path="/layout-maker-phase2" 
+          element={
+            <Suspense fallback={
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                height: '100vh',
+                background: '#ffffff',
+              }}>
+                Loading Phase 2...
+              </div>
+            }>
+              <Phase2TestPage />
+            </Suspense>
+          } 
+        />
+        <Route 
+          path="/layout-maker-phase5" 
+          element={
+            <Suspense fallback={
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                height: '100vh',
+                background: '#ffffff',
+              }}>
+                Loading Phase 5...
+              </div>
+            }>
+              <Phase5TestPage />
+            </Suspense>
+          } 
+        />
         <Route path="/suppliers" element={<SuppliersPage />} />
         <Route path="/demo" element={<PlaceholderPage title="Book a Demo" />} />
         <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/invite/:token" element={<InviteAcceptPage />} />
         <Route path="/privacy" element={<PlaceholderPage title="Privacy Policy" />} />
         <Route path="/terms" element={<PlaceholderPage title="Terms of Service" />} />
         <Route path="/contact" element={<PlaceholderPage title="Contact Us" />} />

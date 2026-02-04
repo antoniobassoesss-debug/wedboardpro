@@ -25,10 +25,11 @@ interface ToolbarProps {
 
 const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange, onAddSpace, onAddTable, onAddWalls, brushSize = 2, brushColor = '#000000', onBrushSizeChange, onBrushColorChange, availableSpaces = [] }) => {
   const toolbarWidth = 60;
-  const toolbarHeight = 300; // Increased to fit Structure button
-  const buttonSize = 44;
+  const toolbarHeight = 300;
+  const buttonSize = 60; // Matches Elements button size
   const buttonSpacing = 12;
   const padding = 20;
+  const floatingButtonOffset = 74; // Distance above toolbar for floating buttons
   
   const [hoveredTool, setHoveredTool] = useState<string | null>(null);
   const [disableHover, setDisableHover] = useState<boolean>(false);
@@ -467,7 +468,92 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange, onAddSpace,
 
   return (
     <>
-        <div
+      {/* Wall Maker Button - Floating above toolbar */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          console.log('Wall Maker button clicked');
+          setShowWallMaker(true);
+          setWallMakerSize({ width: 800, height: 600 });
+        }}
+        style={{
+          position: 'fixed',
+          left: `${padding}px`,
+          top: 'calc(50% - 215px - 60px - 8px)',
+          width: '60px',
+          height: '60px',
+          borderRadius: '50%',
+          background: 'white',
+          border: '1px solid #e0e0e0',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+          zIndex: 10002,
+          transition: 'all 0.2s ease',
+          pointerEvents: 'auto',
+        }}
+        title="Wall Maker"
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = '#f8fafc';
+          e.currentTarget.style.borderColor = '#3b82f6';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'white';
+          e.currentTarget.style.borderColor = '#e0e0e0';
+        }}
+      >
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 20 20"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <rect x="2" y="4" width="4" height="12" rx="1" stroke="#666666" strokeWidth="1.5" fill="none" />
+          <rect x="8" y="4" width="4" height="12" rx="1" stroke="#666666" strokeWidth="1.5" fill="none" />
+          <rect x="14" y="4" width="4" height="12" rx="1" stroke="#666666" strokeWidth="1.5" fill="none" />
+        </svg>
+      </button>
+
+      {/* Structure Button - Floating above toolbar, below Wall Maker */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleStructureClick();
+        }}
+        onMouseEnter={() => setHoveredTool('structure')}
+        onMouseLeave={() => setHoveredTool(null)}
+        style={{
+          position: 'fixed',
+          left: `${padding}px`,
+          top: 'calc(50% - 215px)',
+          width: '60px',
+          height: '60px',
+          borderRadius: '50%',
+          background: isStructureMenuOpen ? '#c0c0c0' : 'transparent',
+          border: '2px solid transparent',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '24px',
+          fontWeight: '400',
+          transition: 'all 0.2s ease',
+          color: '#666666',
+          padding: '6px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+          zIndex: 10001,
+          pointerEvents: 'auto',
+        }}
+        title="Structure"
+      >
+        <img src="/icons/plus.png" alt="Structure" style={{ width: '20px', height: '20px', objectFit: 'contain', filter: isStructureMenuOpen ? 'brightness(0.2)' : 'brightness(0.6)' }} />
+      </button>
+
+      {/* Main Toolbar */}
+      <div
         style={{
           position: 'fixed',
           left: `${padding}px`,
@@ -503,9 +589,12 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange, onAddSpace,
               }
             }}
             onClick={() => {
-              if (tool.id === 'brush' && effectiveActiveTool === 'brush') {
+              if (tool.id === 'brush' && activeTool === 'brush') {
                 // Toggle brush settings when clicking brush tool again
                 setShowBrushSettings(prev => !prev);
+              } else if (activeTool === tool.id) {
+                // Clicking the already-selected tool deselects it (back to hand)
+                onToolChange('hand');
               } else {
                 onToolChange(tool.id);
               }
@@ -573,36 +662,6 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange, onAddSpace,
             )}
           </button>
         ))}
-        
-        {/* Structure Button */}
-        <button
-          onClick={handleStructureClick}
-          onMouseEnter={() => setHoveredTool('structure')}
-          onMouseLeave={() => setHoveredTool(null)}
-          style={{
-            width: `${buttonSize}px`,
-            height: `${buttonSize}px`,
-            borderRadius: '12px',
-            border: '2px solid transparent',
-            background: isStructureMenuOpen
-              ? '#c0c0c0'
-              : hoveredTool === 'structure'
-                ? '#e5e5e5'
-                : 'transparent',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '24px',
-            fontWeight: '400',
-            transition: 'all 0.2s ease',
-            color: '#333333',
-            padding: '0',
-          }}
-          title="Structure"
-        >
-          <img src="/icons/plus.png" alt="Structure" style={{ width: '20px', height: '20px', objectFit: 'contain' }} />
-        </button>
       </div>
 
       {/* Brush Controls Panel - appears when brush tool is active */}
@@ -2023,58 +2082,144 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange, onAddSpace,
             {showWallMakerAdvancedSettings && (
               <div
                 style={{
-                  marginTop: '16px',
-                  padding: '16px 24px',
-                  borderBottom: '1px solid #e0e0e0',
-                  background: '#f9f9f9',
-                  display: 'flex',
-                  gap: '16px',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  fontSize: '12px',
+                  marginTop: '12px',
+                  padding: '16px 20px',
+                  background: '#f8fafc',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
                 }}
               >
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={wallMakerConfig.snapToGrid}
-                    onChange={(e) => setWallMakerConfig({ ...wallMakerConfig, snapToGrid: e.target.checked })}
-                  />
-                  Snap to Grid
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={wallMakerConfig.showGrid}
-                    onChange={(e) => setWallMakerConfig({ ...wallMakerConfig, showGrid: e.target.checked })}
-                  />
-                  Show Grid
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={wallMakerConfig.showMeasurements}
-                    onChange={(e) => setWallMakerConfig({ ...wallMakerConfig, showMeasurements: e.target.checked })}
-                  />
-                  Measurements
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                  Grid Size (m):
-                  <input
-                    type="number"
-                    value={(wallMakerConfig.gridSize / 100).toFixed(2)}
-                    onChange={(e) => {
-                      const sizeMeters = parseFloat(e.target.value);
-                      if (!isNaN(sizeMeters) && sizeMeters > 0) {
-                        setWallMakerConfig({ ...wallMakerConfig, gridSize: sizeMeters * 100 });
-                      }
-                    }}
-                    step="0.1"
-                    style={{ width: '60px', padding: '4px 8px', border: '1px solid #e0e0e0', borderRadius: '6px', outline: 'none' }}
-                    min="0.05"
-                    max="1"
-                  />
-                </label>
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <div style={{ position: 'relative', width: '18px', height: '18px' }}>
+                      <input
+                        type="checkbox"
+                        checked={wallMakerConfig.snapToGrid}
+                        onChange={(e) => setWallMakerConfig({ ...wallMakerConfig, snapToGrid: e.target.checked })}
+                        style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
+                      />
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '4px',
+                        border: wallMakerConfig.snapToGrid ? '2px solid #3b82f6' : '2px solid #cbd5e1',
+                        background: wallMakerConfig.snapToGrid ? '#3b82f6' : 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s ease',
+                      }}>
+                        {wallMakerConfig.snapToGrid && (
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: '500', color: '#475569' }}>Snap to Grid</span>
+                  </label>
+                  
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <div style={{ position: 'relative', width: '18px', height: '18px' }}>
+                      <input
+                        type="checkbox"
+                        checked={wallMakerConfig.showGrid}
+                        onChange={(e) => setWallMakerConfig({ ...wallMakerConfig, showGrid: e.target.checked })}
+                        style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
+                      />
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '4px',
+                        border: wallMakerConfig.showGrid ? '2px solid #3b82f6' : '2px solid #cbd5e1',
+                        background: wallMakerConfig.showGrid ? '#3b82f6' : 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s ease',
+                      }}>
+                        {wallMakerConfig.showGrid && (
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: '500', color: '#475569' }}>Show Grid</span>
+                  </label>
+                  
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <div style={{ position: 'relative', width: '18px', height: '18px' }}>
+                      <input
+                        type="checkbox"
+                        checked={wallMakerConfig.showMeasurements}
+                        onChange={(e) => setWallMakerConfig({ ...wallMakerConfig, showMeasurements: e.target.checked })}
+                        style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
+                      />
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '4px',
+                        border: wallMakerConfig.showMeasurements ? '2px solid #3b82f6' : '2px solid #cbd5e1',
+                        background: wallMakerConfig.showMeasurements ? '#3b82f6' : 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s ease',
+                      }}>
+                        {wallMakerConfig.showMeasurements && (
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: '500', color: '#475569' }}>Measurements</span>
+                  </label>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '500', color: '#475569' }}>Grid Size:</span>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="number"
+                        value={(wallMakerConfig.gridSize / 100).toFixed(2)}
+                        onChange={(e) => {
+                          const sizeMeters = parseFloat(e.target.value);
+                          if (!isNaN(sizeMeters) && sizeMeters > 0) {
+                            setWallMakerConfig({ ...wallMakerConfig, gridSize: sizeMeters * 100 });
+                          }
+                        }}
+                        step="0.1"
+                        style={{
+                          width: '70px',
+                          padding: '8px 12px 8px 36px',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '8px',
+                          outline: 'none',
+                          fontSize: '13px',
+                          fontWeight: '500',
+                          color: '#334155',
+                          background: 'white',
+                          transition: 'all 0.15s ease',
+                        }}
+                        min="0.05"
+                        max="1"
+                        onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                        onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
+                      />
+                      <span style={{
+                        position: 'absolute',
+                        left: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        color: '#94a3b8',
+                        pointerEvents: 'none',
+                      }}>m</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 

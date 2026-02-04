@@ -5,9 +5,10 @@ import './wedding-dashboard.css';
 import { browserSupabaseClient } from '../browserSupabaseClient';
 import NotificationsBell from '../components/NotificationsBell';
 import { NewProjectModal, type NewProjectPayload } from '../components/NewProjectModal';
-import { createEvent } from '../api/eventsPipelineApi';
+import { createEvent, type LimitErrorResponse } from '../api/eventsPipelineApi';
 import { AccountModal } from '../components/AccountModal';
 import VerificationBanner from '../components/VerificationBanner';
+import { UpgradePromptModal } from '../components/UpgradePromptModal';
 
 const safeParse = (raw: string | null) => {
   if (!raw) return null;
@@ -62,6 +63,10 @@ const WeddingDashboard: React.FC = () => {
   const [accountOpen, setAccountOpen] = useState(false);
   const [emailVerified, setEmailVerified] = useState(true); // Assume verified by default
   const [checkingVerification, setCheckingVerification] = useState(true);
+  
+  // Upgrade prompt state
+  const [upgradePromptOpen, setUpgradePromptOpen] = useState(false);
+  const [upgradePromptData, setUpgradePromptData] = useState<LimitErrorResponse | null>(null);
 
   const fetchProfileFromSupabase = useCallback(async () => {
     if (typeof window === 'undefined') {
@@ -189,8 +194,7 @@ const WeddingDashboard: React.FC = () => {
         collapsed={collapsed}
         onToggle={() => setCollapsed((prev) => !prev)}
         onSelect={setActive}
-        userName={displayName}
-        avatarUrl={avatarUrl}
+        hideMobileToggle={active === 'chat'}
       />
       <div className="wp-main">
         {/* Floating top-right controls */}
@@ -217,7 +221,7 @@ const WeddingDashboard: React.FC = () => {
           </button>
         </div>
 
-        <section className="wp-content">
+        <section className={`wp-content ${active === 'chat' ? 'wp-content-chat' : ''}`}>
           <DashboardContent active={active} onNavigate={setActive} userName={displayName} />
         </section>
       </div>
@@ -230,12 +234,21 @@ const WeddingDashboard: React.FC = () => {
             payload.eventDate && payload.eventDate.trim().length > 0
               ? payload.eventDate
               : new Date().toISOString().slice(0, 10);
-          const { data, error } = await createEvent({
+          const { data, error, limitError } = await createEvent({
             title: payload.title || `New Wedding – ${new Date().toLocaleDateString()}`,
             wedding_date: dateForSave,
             visibility: payload.visibility || 'team', // Default to team if not specified
           });
           setIsCreating(false);
+          
+          // Handle limit error - show upgrade modal
+          if (limitError) {
+            setIsGlobalProjectModalOpen(false);
+            setUpgradePromptData(limitError);
+            setUpgradePromptOpen(true);
+            return;
+          }
+          
           if (error) {
             // eslint-disable-next-line no-alert
             alert(`Failed to create event: ${error}`);
@@ -249,11 +262,25 @@ const WeddingDashboard: React.FC = () => {
           setIsGlobalProjectModalOpen(false);
         }}
       />
+      
+      {/* Upgrade Prompt Modal */}
+      <UpgradePromptModal
+        isOpen={upgradePromptOpen}
+        onClose={() => {
+          setUpgradePromptOpen(false);
+          setUpgradePromptData(null);
+        }}
+        feature="active events"
+        currentPlan={upgradePromptData?.planName || 'starter'}
+        requiredPlan={upgradePromptData?.requiredPlan || 'professional'}
+        currentUsage={upgradePromptData?.current ?? 0}
+        limit={upgradePromptData?.limit ?? 10}
+        message={upgradePromptData?.message || ''}
+      />
+      
       <AccountModal open={accountOpen} onOpenChange={setAccountOpen} />
     </div>
   );
 };
 
 export default WeddingDashboard;
-
-

@@ -33,16 +33,15 @@ export const CalendarIcon = () => (
 
 export const LayoutIcon = () => (
   <svg {...iconProps} viewBox="0 0 24 24">
-    <rect x="3" y="4" width="18" height="16" rx="2" />
-    <rect x="7" y="8" width="5" height="8" rx="1" />
-    <rect x="14" y="8" width="4" height="8" rx="1" />
+    <rect x="4" y="4" width="16" height="16" rx="2" />
+    <path d="M4 12h16M12 4v16" />
   </svg>
 );
 
 export const QuotesIcon = () => (
   <svg {...iconProps} viewBox="0 0 24 24">
-    <path d="M7 9h5M7 13h3M7 17h10" />
-    <rect x="4" y="5" width="16" height="14" rx="2" />
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
   </svg>
 );
 
@@ -55,25 +54,29 @@ export const TodoIcon = () => (
 
 export const UsersIcon = () => (
   <svg {...iconProps} viewBox="0 0 24 24">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <line x1="19" y1="8" x2="19" y2="14" />
+    <line x1="22" y1="11" x2="16" y2="11" />
   </svg>
 );
 
 export const SuppliersIcon = () => (
   <svg {...iconProps} viewBox="0 0 24 24">
-    <path d="M4 7h16v4H4z" />
-    <path d="M6 11v6h3v-6" />
-    <path d="M15 11v6h3v-6" />
-    <path d="M9 7V5a3 3 0 0 1 6 0v2" />
+    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
   </svg>
 );
 
 export const ChatIcon = () => (
   <svg {...iconProps} viewBox="0 0 24 24">
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+);
+
+export const FilesIcon = () => (
+  <svg {...iconProps} viewBox="0 0 24 24">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
   </svg>
 );
 

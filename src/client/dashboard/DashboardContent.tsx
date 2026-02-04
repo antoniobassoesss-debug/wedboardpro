@@ -10,6 +10,7 @@ import {
 import TeamsSection from './teams/TeamsSection';
 import CrmSection from './crm/CrmSection';
 import ChatSection from './ChatTab';
+import FilesSection from './FilesSection';
 
 interface DashboardContentProps {
   active: string;
@@ -33,6 +34,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ active, onNavigate,
       return <TodoSection />;
     case 'suppliers':
       return <SuppliersSection />;
+    case 'files':
+      return <FilesSection />;
     case 'chat':
       return <ChatSection />;
     case 'teams':

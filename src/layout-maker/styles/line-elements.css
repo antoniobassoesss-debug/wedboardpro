@@ -1,0 +1,344 @@
+/**
+ * Line-Based SVG Element Styles
+ *
+ * Architectural floor plan style rendering.
+ * All elements use transparent fills with black outlines.
+ */
+
+export const lineElementStyles = `
+/* ============================================
+   BASE LAYOUT ELEMENT
+   ============================================ */
+
+.layout-element {
+  fill: transparent;
+  stroke: #1a1a1a;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  cursor: grab;
+  transition: stroke-width 0.15s ease, stroke 0.15s ease, opacity 0.15s ease;
+}
+
+.layout-element:active {
+  cursor: grabbing;
+}
+
+/* ============================================
+   STROKE HIERARCHY
+   ============================================ */
+
+/* Walls - heaviest stroke for structural elements */
+.element-wall {
+  stroke-width: 2.5px;
+  stroke: #1a1a1a;
+}
+
+/* Tables - medium stroke for primary furniture */
+.element-table {
+  stroke-width: 1.5px;
+  stroke: #1a1a1a;
+}
+
+/* Seats and furniture - standard stroke */
+.element-seat,
+.element-furniture {
+  stroke-width: 1px;
+  stroke: #1a1a1a;
+}
+
+/* Electrical - dashed to distinguish from physical objects */
+.element-electrical {
+  stroke-width: 1px;
+  stroke: #1a1a1a;
+  stroke-dasharray: 4 2;
+}
+
+/* Annotations - lightest stroke for labels/dimensions */
+.element-annotation {
+  stroke-width: 0.5px;
+  stroke: #1a1a1a;
+}
+
+/* ============================================
+   STATE CLASSES
+   ============================================ */
+
+/* Hover state - subtle weight increase */
+.layout-element:hover {
+  stroke-width: calc(var(--base-stroke-width, 1px) + 0.5px);
+}
+
+/* Selection state - blue border with resize handles */
+.layout-element.selected {
+  stroke: #3b82f6;
+  stroke-width: calc(var(--base-stroke-width, 1px) + 1px);
+}
+
+.layout-element.selected:hover {
+  stroke: #2563eb;
+  stroke-width: calc(var(--base-stroke-width, 1px) + 1.5px);
+}
+
+/* Locked state - reduced opacity and cursor change */
+.layout-element.locked {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.layout-element.locked:hover {
+  opacity: 0.8;
+}
+
+/* ============================================
+   SELECTION RESIZE HANDLES
+   ============================================ */
+
+.selection-handle {
+  fill: #ffffff;
+  stroke: #3b82f6;
+  stroke-width: 1.5px;
+  cursor: pointer;
+}
+
+.selection-handle:hover {
+  fill: #3b82f6;
+  stroke: #2563eb;
+}
+
+/* Corner handles for rotation/scaling */
+.selection-handle.corner {
+  width: 10px;
+  height: 10px;
+  r: 5;
+}
+
+/* Edge handles for single-axis scaling */
+.selection-handle.edge {
+  width: 8px;
+  height: 8px;
+  r: 4;
+}
+
+/* Rotation handle */
+.rotation-handle {
+  fill: #ffffff;
+  stroke: #3b82f6;
+  stroke-width: 1.5px;
+  cursor: grab;
+}
+
+.rotation-handle:hover {
+  fill: #3b82f6;
+  stroke: #2563eb;
+  cursor: grabbing;
+}
+
+/* ============================================
+   TABLE-SPECIFIC STYLES
+   ============================================ */
+
+.element-table-round {
+  fill: transparent;
+  stroke: #1a1a1a;
+  stroke-width: 1.5px;
+}
+
+.element-table-rectangular {
+  fill: transparent;
+  stroke: #1a1a1a;
+  stroke-width: 1.5px;
+}
+
+.element-table-oval {
+  fill: transparent;
+  stroke: #1a1a1a;
+  stroke-width: 1.5px;
+}
+
+/* ============================================
+   CHAIR-SPECIFIC STYLES
+   ============================================ */
+
+.element-chair {
+  fill: transparent;
+  stroke: #1a1a1a;
+  stroke-width: 1px;
+}
+
+.element-chair.assigned {
+  stroke: #1a1a1a;
+}
+
+.element-chair.unassigned {
+  stroke-dasharray: 2 2;
+}
+
+/* ============================================
+   ZONE STYLES (Dance Floor, Stage, etc.)
+   ============================================ */
+
+.element-zone {
+  fill: rgba(0, 0, 0, 0.02);
+  stroke: #1a1a1a;
+  stroke-width: 1px;
+}
+
+.element-dance-floor {
+  fill: rgba(0, 0, 0, 0.03);
+  stroke: #1a1a1a;
+  stroke-width: 1px;
+}
+
+.element-stage {
+  fill: rgba(0, 0, 0, 0.05);
+  stroke: #1a1a1a;
+  stroke-width: 1.5px;
+}
+
+/* Stage height indicator */
+.element-stage::before {
+  content: '';
+  stroke: #1a1a1a;
+  stroke-width: 0.5px;
+}
+
+/* ============================================
+   ELECTRICAL STYLES
+   ============================================ */
+
+.element-electrical-outlet {
+  fill: transparent;
+  stroke: #1a1a1a;
+  stroke-width: 1px;
+  stroke-dasharray: 4 2;
+}
+
+.element-electrical-cable {
+  fill: transparent;
+  stroke: #1a1a1a;
+  stroke-width: 1px;
+  stroke-dasharray: 3 3;
+}
+
+.element-power-point {
+  fill: transparent;
+  stroke: #1a1a1a;
+  stroke-width: 1px;
+  stroke-dasharray: 4 2;
+}
+
+/* ============================================
+   DECORATION STYLES
+   ============================================ */
+
+.element-decor {
+  fill: transparent;
+  stroke: #1a1a1a;
+  stroke-width: 1px;
+}
+
+.element-flower-arrangement {
+  stroke-width: 0.75px;
+}
+
+.element-arch {
+  fill: transparent;
+  stroke: #1a1a1a;
+  stroke-width: 1.5px;
+}
+
+/* ============================================
+   ANNOTATION STYLES
+   ============================================ */
+
+.element-label {
+  fill: #1a1a1a;
+  stroke: none;
+  font-size: 12px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.element-dimension {
+  fill: none;
+  stroke: #1a1a1a;
+  stroke-width: 0.5px;
+  font-size: 10px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.element-dimension-line {
+  stroke: #1a1a1a;
+  stroke-width: 0.5px;
+}
+
+.element-dimension-arrow {
+  fill: #1a1a1a;
+  stroke: #1a1a1a;
+  stroke-width: 0.5px;
+}
+
+/* ============================================
+   GRID AND CANVAS
+   ============================================ */
+
+.canvas-grid {
+  stroke: #e5e5e5;
+  stroke-width: 0.5px;
+  fill: transparent;
+}
+
+.canvas-grid.major {
+  stroke: #d4d4d4;
+  stroke-width: 1px;
+}
+
+.canvas-background {
+  fill: #fafafa;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes element-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.layout-element.pulsing {
+  animation: element-pulse 1s ease-in-out infinite;
+}
+
+/* Dragging state */
+.layout-element.dragging {
+  opacity: 0.8;
+  stroke-width: calc(var(--base-stroke-width, 1px) + 1px);
+}
+
+/* Resizing state */
+.layout-element.resizing {
+  stroke: #3b82f6;
+  opacity: 0.9;
+}
+
+/* ============================================
+   ELEMENT TYPE MAPPING
+   ============================================ */
+
+/*
+ * These classes should be applied based on element.type:
+ *
+ * .layout-element.element-table      - for tables
+ * .layout-element.element-seat       - for chairs
+ * .layout-element.element-furniture  - for bars, buffets, etc.
+ * .layout-element.element-electrical - for outlets, cables
+ * .layout-element.element-annotation - for labels, dimensions
+ * .layout-element.element-wall       - for walls/doors
+ */
+`;
+
+export default lineElementStyles;

@@ -1,15 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import EventIndicator from './components/EventIndicator';
+
+interface EventInfo {
+  title: string;
+  weddingDate?: string;
+}
 
 interface HeaderBarProps {
   showDashboardButton?: boolean;
   showLogo?: boolean;
-  // Save functionality
   onSaveCurrentLayout?: () => void;
   onSaveAllLayouts?: () => void;
   isSaving?: boolean;
-  saveStatus?: 'idle' | 'saving' | 'saved' | 'error';
   projectCount?: number;
+  eventInfo?: EventInfo;
 }
 
 const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -18,8 +23,8 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   onSaveCurrentLayout,
   onSaveAllLayouts,
   isSaving = false,
-  saveStatus = 'idle',
   projectCount = 1,
+  eventInfo,
 }) => {
   const [showSaveDropdown, setShowSaveDropdown] = useState(false);
   const saveDropdownRef = useRef<HTMLDivElement>(null);
@@ -49,13 +54,6 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   const handleSaveAllClick = () => {
     setShowSaveDropdown(false);
     onSaveAllLayouts?.();
-  };
-
-  const getSaveButtonText = () => {
-    if (saveStatus === 'saving') return 'Saving...';
-    if (saveStatus === 'saved') return 'Saved!';
-    if (saveStatus === 'error') return 'Error';
-    return 'Save';
   };
 
   return (
@@ -92,6 +90,12 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
             }}
           />
         )}
+        {eventInfo && (
+          <EventIndicator
+            eventTitle={eventInfo.title}
+            {...(eventInfo.weddingDate ? { weddingDate: eventInfo.weddingDate } : {})}
+          />
+        )}
       </div>
 
       {/* Right side - Save button and Dashboard button */}
@@ -106,8 +110,8 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
                 padding: '10px 18px',
                 borderRadius: '20px',
                 border: '1px solid #e0e0e0',
-                background: saveStatus === 'saved' ? '#f0fdf4' : saveStatus === 'error' ? '#fef2f2' : '#fff',
-                color: saveStatus === 'saved' ? '#16a34a' : saveStatus === 'error' ? '#dc2626' : '#0c0c0c',
+                background: '#fff',
+                color: '#0c0c0c',
                 fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial',
                 fontSize: '14px',
                 fontWeight: 500,
@@ -120,7 +124,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
                 transition: 'all 0.2s ease',
               }}
             >
-              {saveStatus === 'saving' ? (
+              {isSaving ? (
                 <div
                   style={{
                     width: 14,
@@ -138,7 +142,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
                   <polyline points="7 3 7 8 15 8" />
                 </svg>
               )}
-              {getSaveButtonText()}
+              Save
             </button>
 
             {/* Dropdown Menu */}

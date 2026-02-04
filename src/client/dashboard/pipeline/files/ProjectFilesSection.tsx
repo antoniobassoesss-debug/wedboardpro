@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import type { ProjectFileFolder, ProjectFile } from '../../../api/projectFilesApi';
 import { useProjectFilesState } from './useProjectFilesState';
 import './files.css';
@@ -204,7 +204,6 @@ const ProjectFilesSection: React.FC<ProjectFilesSectionProps> = ({ projectId }) 
     const fileList = event.dataTransfer.files;
     if (!fileList || fileList.length === 0) return;
     const filesArr: File[] = [];
-    // eslint-disable-next-line no-plusplus
     for (let i = 0; i < fileList.length; i++) {
       const f = fileList.item(i);
       if (f) filesArr.push(f);
@@ -268,109 +267,30 @@ const ProjectFilesSection: React.FC<ProjectFilesSectionProps> = ({ projectId }) 
   };
 
   const currentFolderLabel =
-    breadcrumbs.length > 1 ? breadcrumbs[breadcrumbs.length - 1]?.label : 'All files for this project';
+    breadcrumbs.length > 1 ? breadcrumbs[breadcrumbs.length - 1]?.label : 'Project Files';
+
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   return (
     <div className="files-shell">
-      <div className={`files-sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <div className="files-sidebar-header">
-          <div className="files-sidebar-title">
-            <span className="dot" />
-            <span>Files</span>
-          </div>
-          <button type="button" className="files-btn subtle hide-desktop" onClick={() => setSidebarOpen(false)}>
-            Close
-          </button>
-        </div>
-        <div className="files-sidebar-section">
-          <div className="files-sidebar-section-title">Library</div>
-          <button
-            type="button"
-            className={`files-pill ${currentFolderId === null ? 'active' : ''}`}
-            onClick={() => openFolder(null)}
-          >
-            All files
-          </button>
-        </div>
-        <div className="files-sidebar-section">
-          <div className="files-sidebar-section-title">Folders</div>
-          {treeRoots.length === 0 ? (
-            <div className="files-sidebar-empty">No folders yet. Create your first folder.</div>
-          ) : (
-            <ul className="files-tree">
-              {treeRoots.map((node) => (
-                <FolderNode
-                  key={node.id}
-                  node={node}
-                  activeId={currentFolderId}
-                  onOpen={(id) => {
-                    openFolder(id);
-                    setSidebarOpen(false);
-                  }}
-                  onRename={startRenameFolder}
-                  onDelete={(folder) =>
-                    setDeleteTarget({ type: 'folder', id: folder.id, name: folder.name })
-                  }
-                />
-              ))}
-            </ul>
-          )}
-        </div>
-        <div className="files-sidebar-new-folder">
-          <input
-            type="text"
-            placeholder="New folder name"
-            value={newFolderName}
-            onChange={(e) => setNewFolderName(e.target.value)}
-          />
-          <button
-            type="button"
-            className="files-btn primary"
-            disabled={!newFolderName.trim()}
-            onClick={async () => {
-              const value = newFolderName.trim();
-              if (!value) return;
-              await createNewFolder(value);
-              setNewFolderName('');
-            }}
-          >
-            New folder
-          </button>
-        </div>
-      </div>
-
-      <div
-        className={`files-main ${isDragging ? 'dragging' : ''}`}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-      >
-        {isDragging && <div className="files-drop-overlay">Drop files to upload to {currentFolderLabel}</div>}
-        <div className="files-toolbar">
-          <div className="files-breadcrumbs">
-            {breadcrumbs.map((crumb, index) => (
-              <button
-                // eslint-disable-next-line react/no-array-index-key
-                key={`${crumb.id ?? 'root'}-${index}`}
-                type="button"
-                className={`files-breadcrumb ${index === breadcrumbs.length - 1 ? 'active' : ''}`}
-                onClick={() => openFolder(crumb.id)}
-                disabled={index === breadcrumbs.length - 1}
-              >
-                {crumb.label}
-              </button>
-            ))}
-          </div>
-          <div className="files-toolbar-actions">
-            <button
-              type="button"
-              className="files-btn subtle show-tablet"
-              onClick={() => setSidebarOpen((prev) => !prev)}
-            >
-              Folders
-            </button>
-            <label className="files-upload-btn">
-              <span>Upload</span>
+      {isMobile ? (
+        <div className="files-mobile-view">
+          <div className="files-mobile-header">
+            <h2 className="files-mobile-title">Files</h2>
+            <label className="files-mobile-upload-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              <span>Add</span>
               <input
                 type="file"
                 multiple
@@ -378,184 +298,345 @@ const ProjectFilesSection: React.FC<ProjectFilesSectionProps> = ({ projectId }) 
                   const fileList = event.target.files;
                   if (!fileList || fileList.length === 0) return;
                   const filesArr: File[] = [];
-                  // eslint-disable-next-line no-plusplus
                   for (let i = 0; i < fileList.length; i++) {
                     const f = fileList.item(i);
                     if (f) filesArr.push(f);
                   }
                   uploadNewFiles(filesArr);
-                  // reset input so same file can be uploaded again
-                  // eslint-disable-next-line no-param-reassign
                   event.target.value = '';
                 }}
               />
             </label>
-            <div className="files-view-toggle">
+          </div>
+
+          <div className="files-mobile-list">
+            {loading && <div className="files-mobile-loading">Loading...</div>}
+            
+            {error && <div className="files-mobile-error">{error}</div>}
+            
+            {!loading && files.length === 0 && folders.length === 0 && (
+              <div className="files-mobile-empty">
+                <p>No files yet</p>
+                <p className="files-mobile-empty-sub">Upload files to get started</p>
+              </div>
+            )}
+
+            {folders.map((folder) => (
               <button
+                key={folder.id}
                 type="button"
-                className={`files-view-btn ${viewMode === 'grid' ? 'active' : ''}`}
-                onClick={() => setViewMode('grid')}
+                className="files-mobile-item"
+                onClick={() => openFolder(folder.id)}
               >
-                Grid
+                <div className="files-mobile-item-icon folder" />
+                <span className="files-mobile-item-name">{folder.name}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
               </button>
+            ))}
+
+            {files.map((file) => (
+              <button
+                key={file.id}
+                type="button"
+                className="files-mobile-item"
+                onClick={() => openPreview(file)}
+              >
+                <div className={`files-mobile-item-icon ${isImageFile(file) ? 'image' : isPdfFile(file) ? 'pdf' : 'doc'}`} />
+                <span className="files-mobile-item-name">{file.file_name}</span>
+                <span className="files-mobile-item-size">{prettyFileSize(file.size_bytes)}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="files-desktop-view">
+          <div className={`files-sidebar ${sidebarOpen ? 'open' : ''}`}>
+            <div className="files-sidebar-header">
+              <div className="files-sidebar-title">
+                <span className="dot" />
+                <span>Files</span>
+              </div>
+              <button type="button" className="files-btn subtle hide-desktop" onClick={() => setSidebarOpen(false)}>
+                Close
+              </button>
+            </div>
+            <div className="files-sidebar-section">
+              <div className="files-sidebar-section-title">Library</div>
               <button
                 type="button"
-                className={`files-view-btn ${viewMode === 'list' ? 'active' : ''}`}
-                onClick={() => setViewMode('list')}
+                className={`files-pill ${currentFolderId === null ? 'active' : ''}`}
+                onClick={() => openFolder(null)}
               >
-                List
+                All files
+              </button>
+            </div>
+            <div className="files-sidebar-section">
+              <div className="files-sidebar-section-title">Folders</div>
+              {treeRoots.length === 0 ? (
+                <div className="files-sidebar-empty">No folders yet. Create your first folder.</div>
+              ) : (
+                <ul className="files-tree">
+                  {treeRoots.map((node) => (
+                    <FolderNode
+                      key={node.id}
+                      node={node}
+                      activeId={currentFolderId}
+                      onOpen={(id) => {
+                        openFolder(id);
+                        setSidebarOpen(false);
+                      }}
+                      onRename={startRenameFolder}
+                      onDelete={(folder) =>
+                        setDeleteTarget({ type: 'folder', id: folder.id, name: folder.name })
+                      }
+                    />
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="files-sidebar-new-folder">
+              <input
+                type="text"
+                placeholder="New folder name"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+              />
+              <button
+                type="button"
+                className="files-btn primary"
+                disabled={!newFolderName.trim()}
+                onClick={async () => {
+                  const value = newFolderName.trim();
+                  if (!value) return;
+                  await createNewFolder(value);
+                  setNewFolderName('');
+                }}
+              >
+                New folder
               </button>
             </div>
           </div>
-        </div>
 
-        <div className="files-main-header">
-          <div>
-            <div className="files-main-title">{currentFolderLabel}</div>
-          </div>
-          {loading && <div className="files-badge">Syncing…</div>}
-        </div>
-
-        {error && <div className="files-error">Failed to load files: {error}</div>}
-
-        {folders.length === 0 && files.length === 0 && !loading ? (
-          <div className="files-empty-state">
-            <div className="files-empty-illustration" />
-            <h3>Start the story for this wedding</h3>
-            <p>Create folders like “Contracts”, “Moodboards”, or “Vendors”, then drag files here from your desktop.</p>
-          </div>
-        ) : (
-          <>
-            {folders.length > 0 && (
-              <div className="files-section-label">Folders</div>
-            )}
-            {folders.length > 0 && (
-              <div className={`files-grid folders ${viewMode === 'list' ? 'list' : ''}`}>
-                {folders.map((folder) => (
+          <div
+            className={`files-main ${isDragging ? 'dragging' : ''}`}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+          >
+            {isDragging && <div className="files-drop-overlay">Drop files to upload to {currentFolderLabel}</div>}
+            <div className="files-toolbar">
+              <div className="files-breadcrumbs">
+                {breadcrumbs.map((crumb, index) => (
                   <button
-                    key={folder.id}
+                    key={`${crumb.id ?? 'root'}-${index}`}
                     type="button"
-                    className="files-item files-item-folder"
-                    onDoubleClick={() => openFolder(folder.id)}
-                    onClick={() => openFolder(folder.id)}
+                    className={`files-breadcrumb ${index === breadcrumbs.length - 1 ? 'active' : ''}`}
+                    onClick={() => openFolder(crumb.id)}
+                    disabled={index === breadcrumbs.length - 1}
                   >
-                    <div className="files-item-icon folder" />
-                    <div className="files-item-meta">
-                      <div className="files-item-name">{folder.name}</div>
-                      <div className="files-item-sub">Folder</div>
-                    </div>
-                    <div className="files-item-actions">
-                      <button
-                        type="button"
-                        className="files-icon-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startRenameFolder(folder);
-                        }}
-                      >
-                        Rename
-                      </button>
-                      <button
-                        type="button"
-                        className="files-icon-btn destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteTarget({ type: 'folder', id: folder.id, name: folder.name });
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    {crumb.label}
                   </button>
                 ))}
               </div>
-            )}
-
-            {files.length > 0 && (
-              <div className="files-section-label">Files</div>
-            )}
-            {files.length > 0 && (
-              <div className={`files-grid ${viewMode === 'list' ? 'list' : ''}`}>
-                {files.map((file) => (
+              <div className="files-toolbar-actions">
+                <button
+                  type="button"
+                  className="files-btn subtle show-tablet"
+                  onClick={() => setSidebarOpen((prev) => !prev)}
+                >
+                  Folders
+                </button>
+                <label className="files-upload-btn">
+                  <span>Upload</span>
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(event) => {
+                      const fileList = event.target.files;
+                      if (!fileList || fileList.length === 0) return;
+                      const filesArr: File[] = [];
+                      for (let i = 0; i < fileList.length; i++) {
+                        const f = fileList.item(i);
+                        if (f) filesArr.push(f);
+                      }
+                      uploadNewFiles(filesArr);
+                      event.target.value = '';
+                    }}
+                  />
+                </label>
+                <div className="files-view-toggle">
                   <button
-                    key={file.id}
                     type="button"
-                    className="files-item"
-                    onDoubleClick={() => openPreview(file)}
+                    className={`files-view-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                    onClick={() => setViewMode('grid')}
                   >
-                    <div className={`files-item-icon ${isImageFile(file) ? 'image' : isPdfFile(file) ? 'pdf' : 'doc'}`} />
-                    <div className="files-item-meta">
-                      <div className="files-item-name">{file.file_name}</div>
-                      <div className="files-item-sub">
-                        {file.mime_type || file.extension || 'File'} · {prettyFileSize(file.size_bytes)}
-                      </div>
-                    </div>
-                    <div className="files-item-actions">
-                      <button
-                        type="button"
-                        className="files-icon-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openPreview(file);
-                        }}
-                      >
-                        Preview
-                      </button>
-                      <button
-                        type="button"
-                        className="files-icon-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startRenameFile(file);
-                        }}
-                      >
-                        Rename
-                      </button>
-                      <button
-                        type="button"
-                        className="files-icon-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startMoveFile(file);
-                        }}
-                      >
-                        Move
-                      </button>
-                      <button
-                        type="button"
-                        className="files-icon-btn destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteTarget({ type: 'file', id: file.id, name: file.file_name });
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    Grid
                   </button>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
-        {uploads.length > 0 && (
-          <div className="files-upload-tray">
-            <div className="files-upload-tray-header">Uploading</div>
-            <div className="files-upload-tray-list">
-              {uploads.map((u) => (
-                <div key={u.file.name} className="files-upload-row">
-                  <div className="files-upload-name">{u.file.name}</div>
-                  <div className="files-upload-bar">
-                    <span style={{ width: `${u.progress}%` }} />
-                  </div>
-                  <div className="files-upload-status">{u.status}</div>
+                  <button
+                    type="button"
+                    className={`files-view-btn ${viewMode === 'list' ? 'active' : ''}`}
+                    onClick={() => setViewMode('list')}
+                  >
+                    List
+                  </button>
                 </div>
-              ))}
+              </div>
             </div>
+
+            <div className="files-main-header">
+              <div>
+                <div className="files-main-title">{currentFolderLabel}</div>
+              </div>
+              {loading && <div className="files-badge">Syncing…</div>}
+            </div>
+
+            {error && <div className="files-error">Failed to load files: {error}</div>}
+
+            {folders.length === 0 && files.length === 0 && !loading ? (
+              <div className="files-empty-state">
+                <div className="files-empty-illustration" />
+                <h3>Start the story for this wedding</h3>
+                <p>Create folders like "Contracts", "Moodboards", or "Vendors", then drag files here from your desktop.</p>
+              </div>
+            ) : (
+              <>
+                {folders.length > 0 && (
+                  <div className="files-section-label">Folders</div>
+                )}
+                {folders.length > 0 && (
+                  <div className={`files-grid folders ${viewMode === 'list' ? 'list' : ''}`}>
+                    {folders.map((folder) => (
+                      <button
+                        key={folder.id}
+                        type="button"
+                        className="files-item files-item-folder"
+                        onDoubleClick={() => openFolder(folder.id)}
+                        onClick={() => openFolder(folder.id)}
+                      >
+                        <div className="files-item-icon folder" />
+                        <div className="files-item-meta">
+                          <div className="files-item-name">{folder.name}</div>
+                          <div className="files-item-sub">Folder</div>
+                        </div>
+                        <div className="files-item-actions">
+                          <button
+                            type="button"
+                            className="files-icon-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startRenameFolder(folder);
+                            }}
+                          >
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            className="files-icon-btn destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget({ type: 'folder', id: folder.id, name: folder.name });
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {files.length > 0 && (
+                  <div className="files-section-label">Files</div>
+                )}
+                {files.length > 0 && (
+                  <div className={`files-grid ${viewMode === 'list' ? 'list' : ''}`}>
+                    {files.map((file) => (
+                      <button
+                        key={file.id}
+                        type="button"
+                        className="files-item"
+                        onDoubleClick={() => openPreview(file)}
+                      >
+                        <div className={`files-item-icon ${isImageFile(file) ? 'image' : isPdfFile(file) ? 'pdf' : 'doc'}`} />
+                        <div className="files-item-meta">
+                          <div className="files-item-name">{file.file_name}</div>
+                          <div className="files-item-sub">
+                            {file.mime_type || file.extension || 'File'} · {prettyFileSize(file.size_bytes)}
+                          </div>
+                        </div>
+                        <div className="files-item-actions">
+                          <button
+                            type="button"
+                            className="files-icon-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openPreview(file);
+                            }}
+                          >
+                            Preview
+                          </button>
+                          <button
+                            type="button"
+                            className="files-icon-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startRenameFile(file);
+                            }}
+                          >
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            className="files-icon-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startMoveFile(file);
+                            }}
+                          >
+                            Move
+                          </button>
+                          <button
+                            type="button"
+                            className="files-icon-btn destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget({ type: 'file', id: file.id, name: file.file_name });
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {uploads.length > 0 && (
+              <div className="files-upload-tray">
+                <div className="files-upload-tray-header">Uploading</div>
+                <div className="files-upload-tray-list">
+                  {uploads.map((u) => (
+                    <div key={u.file.name} className="files-upload-row">
+                      <div className="files-upload-name">{u.file.name}</div>
+                      <div className="files-upload-bar">
+                        <span style={{ width: `${u.progress}%` }} />
+                      </div>
+                      <div className="files-upload-status">{u.status}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <BasicModal
         title={renameFolderTarget ? 'Rename folder' : 'Rename file'}
@@ -717,5 +798,3 @@ const FolderNode: React.FC<FolderNodeProps> = ({ node, activeId, onOpen, onRenam
 };
 
 export default ProjectFilesSection;
-
-

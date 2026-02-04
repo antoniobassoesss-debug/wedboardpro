@@ -31,6 +31,23 @@ import {
 } from '../../api/crmApi';
 import './crm.css';
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return isMobile;
+}
+
+const PlusIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
+  <svg className={className} style={style} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+  </svg>
+);
+
 // =====================
 // New Deal Modal
 // =====================
@@ -698,6 +715,7 @@ const DealDrawer: React.FC<DealDrawerProps> = ({ dealId, onClose, onDealUpdated,
 // Main CRM Section
 // =====================
 export default function CrmSection() {
+  const isMobile = useIsMobile();
   const [pipeline, setPipeline] = useState<CrmPipeline | null>(null);
   const [stages, setStages] = useState<CrmStage[]>([]);
   const [deals, setDeals] = useState<CrmDealCard[]>([]);
@@ -1061,6 +1079,11 @@ export default function CrmSection() {
       <NewDealModal isOpen={isNewDealOpen} stages={stages} pipelineId={pipeline?.id || ''} onClose={() => setIsNewDealOpen(false)} onSubmit={handleCreateDeal} />
       <DealDrawer dealId={selectedDealId} onClose={() => setSelectedDealId(null)} onDealUpdated={() => loadData(filters)} stages={stages} />
       {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onLogActivity={handleContextLogActivity} onMarkLost={handleContextMarkLost} onMarkWon={handleContextMarkWon} />}
+      {isMobile && !selectedDealId && (
+        <button type="button" className="crm-fab" onClick={() => setIsNewDealOpen(true)} aria-label="Add new deal">
+          <PlusIcon />
+        </button>
+      )}
     </div>
   );
 }

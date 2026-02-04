@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { browserSupabaseClient } from '../browserSupabaseClient';
 import './chat.css';
 import { groupMessagesBySender, groupByDate } from './chatUtils';
@@ -7,6 +8,7 @@ import DateSeparator from './DateSeparator';
 import type { MediaFile, MediaUploadResult } from '../utils/mediaUpload';
 import { validateFile, getMediaType, uploadMediaFile } from '../utils/mediaUpload';
 import { MediaPreviewModal } from '../components/MediaPreviewModal';
+import { useSubscription } from '../hooks/useSubscription';
 
 type Message = {
   id: string;
@@ -82,15 +84,30 @@ const SearchIcon = () => (
   </svg>
 );
 
-const PlusIcon = () => (
+const SmallPlusIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+
+const ComposeIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 2 11 13" />
+    <polygon points="22 2 15 22 11 13 2 9 22 2" />
   </svg>
 );
 
 const SendIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" />
+  </svg>
+);
+
+const MenuIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <line x1="3" y1="18" x2="21" y2="18" />
   </svg>
 );
 
@@ -101,6 +118,9 @@ const CloseIcon = () => (
 );
 
 export default function ChatTab() {
+  const navigate = useNavigate();
+  const { canUseChat, planName, loading: subscriptionLoading } = useSubscription();
+  
   const [team, setTeam] = useState<{ id: string; name: string } | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
@@ -123,6 +143,13 @@ export default function ChatTab() {
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  
+  // Mobile: track if we're viewing chat or list
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
+  const [sideMenuOpen, setSideMenuOpen] = useState(false);
+
+  // Check if chat is available for this plan
+  const chatEnabled = canUseChat();
 
   // Media upload state
   const [attachments, setAttachments] = useState<MediaFile[]>([]);
@@ -681,7 +708,6 @@ export default function ChatTab() {
 
   const handleSelectConversation = useCallback(
     (convId: string) => {
-      // Extract recipient ID first to ensure states stay in sync
       const recipientId = convId.startsWith('direct-') ? convId.replace('direct-', '') : null;
 
       console.log('[ChatTab] Selecting conversation:', {
@@ -690,14 +716,17 @@ export default function ChatTab() {
         isDirect: convId.startsWith('direct-'),
       });
 
-      // Update all states together
       setActiveConversation(convId);
       setActiveRecipientId(recipientId);
       setMessages([]);
       setLoading(true);
 
-      // Mark conversation as read
       markConversationAsRead(recipientId);
+      
+      // On mobile, switch to chat view
+      if (window.innerWidth < 768) {
+        setMobileView('chat');
+      }
     },
     [markConversationAsRead],
   );
@@ -876,6 +905,19 @@ export default function ChatTab() {
     return () => clearInterval(interval);
   }, [accessToken, fetchConversations]);
 
+  // Handle window resize for mobile view
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setMobileView('list');
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const filteredConversations = useMemo(() => {
     let filtered = conversations;
     if (filterType !== 'all') {
@@ -895,6 +937,13 @@ export default function ChatTab() {
   const activeConv = conversations.find((c) => c.id === activeConversation);
   const activeConvName = activeConv?.name || 'Chat';
 
+  const goBackToList = useCallback(() => {
+    setActiveConversation(null);
+    setActiveRecipientId(null);
+    setMessages([]);
+    setMobileView('list');
+  }, []);
+
   const getInitials = (name: string) => {
     return (name || 'U')
       .split(' ')
@@ -904,16 +953,107 @@ export default function ChatTab() {
       .toUpperCase();
   };
 
+  // Show upgrade message for Starter plan users
+  if (!subscriptionLoading && !chatEnabled) {
+    return (
+      <div className="chat-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div
+          style={{
+            textAlign: 'center',
+            maxWidth: 400,
+            padding: 40,
+          }}
+        >
+          <div
+            style={{
+              width: 80,
+              height: 80,
+              background: 'linear-gradient(135deg, #f0f0f0 0%, #e5e5e5 100%)',
+              borderRadius: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 24px',
+            }}
+          >
+            <svg
+              width="40"
+              height="40"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#666"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              <path d="M8 10h.01M12 10h.01M16 10h.01" />
+            </svg>
+          </div>
+          <h2
+            style={{
+              margin: '0 0 12px',
+              fontSize: 22,
+              fontWeight: 700,
+              color: '#0c0c0c',
+              letterSpacing: '-0.02em',
+            }}
+          >
+            Team Chat
+          </h2>
+          <p
+            style={{
+              margin: '0 0 24px',
+              fontSize: 15,
+              color: '#666',
+              lineHeight: 1.6,
+            }}
+          >
+            Team chat and collaboration is available on Professional and Enterprise plans. Upgrade to communicate with your team in real-time.
+          </p>
+          <button
+            onClick={() => navigate('/pricing')}
+            style={{
+              padding: '14px 32px',
+              border: 'none',
+              borderRadius: 12,
+              background: '#0c0c0c',
+              color: '#fff',
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#333';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#0c0c0c';
+            }}
+          >
+            Upgrade to Professional
+          </button>
+          <p
+            style={{
+              margin: '16px 0 0',
+              fontSize: 13,
+              color: '#999',
+            }}
+          >
+            Currently on: <strong style={{ color: '#666' }}>{planName.charAt(0).toUpperCase() + planName.slice(1)}</strong> plan
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="chat-shell">
-      {/* Sidebar - Conversations List */}
-      <div className="chat-sidebar">
+      {/* Sidebar - Conversations List - Hidden on mobile when in chat view */}
+      <div className={`chat-sidebar ${mobileView === 'chat' ? 'chat-sidebar-hidden-mobile' : ''}`}>
         <div className="chat-sidebar-header">
           <div className="chat-sidebar-title-row">
             <h2 className="chat-sidebar-title">Messages</h2>
-            <button type="button" className="chat-new-btn" onClick={handleOpenNewChatModal}>
-              <PlusIcon /> New
-            </button>
           </div>
           <div className="chat-search">
             <span className="chat-search-icon">
@@ -1050,10 +1190,35 @@ export default function ChatTab() {
             })
           )}
         </div>
+
+        {/* Floating Action Button - New Chat */}
+        <button
+          type="button"
+          className="chat-fab chat-fab-mobile"
+          onClick={handleOpenNewChatModal}
+          aria-label="New message"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+
+        {/* Menu Button - Bottom Right */}
+        <button
+          type="button"
+          className="chat-sidebar-menu-btn chat-sidebar-menu-btn-mobile"
+          onClick={() => {
+            setSideMenuOpen(!sideMenuOpen);
+            window.dispatchEvent(new CustomEvent('wbp:toggle-mobile-menu'));
+          }}
+          aria-label="Open menu"
+        >
+          <MenuIcon />
+        </button>
       </div>
 
-      {/* Main Chat Area */}
-      <div className="chat-main">
+      {/* Main Chat Area - Shown on desktop always, on mobile only when in chat view */}
+      <div className={`chat-main ${mobileView === 'list' ? 'chat-main-hidden-mobile' : ''}`}>
         {error && !activeConversation && (
           <div className="chat-error">{error}</div>
         )}
@@ -1062,6 +1227,11 @@ export default function ChatTab() {
           <>
             {/* Chat Header */}
             <div className="chat-header">
+              <button type="button" className="chat-back-btn" onClick={goBackToList} aria-label="Go back">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
               <div className={`chat-header-avatar ${activeConv?.type === 'team' ? 'team' : ''}`}>
                 {activeConv?.type === 'team' ? (
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1106,22 +1276,15 @@ export default function ChatTab() {
               ) : (
                 (() => {
                   try {
-                    // Group messages by sender for Instagram-style display
                     const messageGroups = groupMessagesBySender(messages);
-                    // Group by date for date separators
                     const groupedByDate = groupByDate(messageGroups);
-
-                    // Find the last message group sent by the current user
                     const allGroups = groupedByDate.flatMap(d => d.groups);
                     const lastOwnMessageGroupIndex = allGroups.map(g => g.user_id === authedUserId).lastIndexOf(true);
 
                     let groupCounter = 0;
                     return groupedByDate.map((dateGroup) => (
                       <React.Fragment key={dateGroup.date}>
-                        {/* Date separator */}
                         <DateSeparator date={dateGroup.date} timestamp={dateGroup.timestamp} />
-
-                        {/* Message groups for this date */}
                         {dateGroup.groups.map((group) => {
                           const isOwnMessage = group.user_id === authedUserId;
                           const isLastOwnMessageGroup = groupCounter === lastOwnMessageGroupIndex;
@@ -1142,11 +1305,7 @@ export default function ChatTab() {
                     ));
                   } catch (err) {
                     console.error('[ChatTab] Error rendering messages:', err);
-                    return (
-                      <div className="chat-error">
-                        Error rendering messages: {String(err)}
-                      </div>
-                    );
+                    return <div className="chat-error">Error rendering messages</div>;
                   }
                 })()
               )}
@@ -1155,7 +1314,6 @@ export default function ChatTab() {
             {/* Composer */}
             <div className="chat-composer">
               <form className="chat-composer-form" onSubmit={sendMessage}>
-                {/* Attachment Button */}
                 <button
                   type="button"
                   className="chat-attach-btn"
@@ -1174,7 +1332,6 @@ export default function ChatTab() {
                   </svg>
                 </button>
 
-                {/* Hidden File Input */}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -1218,7 +1375,7 @@ export default function ChatTab() {
             <h3 className="chat-empty-title">Select a conversation</h3>
             <p className="chat-empty-text">Choose a conversation from the list to start messaging, or create a new one.</p>
             <button type="button" className="chat-empty-btn" onClick={handleOpenNewChatModal}>
-              <PlusIcon /> Start New Chat
+              <SmallPlusIcon /> Start New Chat
             </button>
           </div>
         )}

@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import {
   parseCSV,
   mapRowToGuest,
@@ -6,7 +7,7 @@ import {
   importGuests,
   type GuestCreate,
 } from '../../../api/weddingGuestsApi';
-import { Download, Upload, ArrowRight, X, AlertCircle } from 'lucide-react';
+import { Download, Upload, ArrowRight, X, AlertCircle, Zap, FileSpreadsheet } from 'lucide-react';
 
 interface ImportGuestsModalProps {
   eventId: string;
@@ -14,7 +15,8 @@ interface ImportGuestsModalProps {
   onSuccess: (count: number) => void;
 }
 
-type Step = 'upload' | 'mapping' | 'preview' | 'importing';
+type ImportMode = 'choose' | 'quick' | 'advanced';
+type Step = 'mode' | 'upload' | 'mapping' | 'preview' | 'importing';
 
 const CSV_FIELD_OPTIONS = [
   { value: '', label: '-- Skip --' },
@@ -34,7 +36,8 @@ const CSV_FIELD_OPTIONS = [
 ];
 
 const ImportGuestsModal: React.FC<ImportGuestsModalProps> = ({ eventId, onClose, onSuccess }) => {
-  const [step, setStep] = useState<Step>('upload');
+  const [importMode, setImportMode] = useState<ImportMode>('choose');
+  const [step, setStep] = useState<Step>('mode');
   const [isDragging, setIsDragging] = useState(false);
   const [fileName, setFileName] = useState('');
   const [headers, setHeaders] = useState<string[]>([]);
@@ -44,20 +47,54 @@ const ImportGuestsModal: React.FC<ImportGuestsModalProps> = ({ eventId, onClose,
   const [validationErrors, setValidationErrors] = useState<Array<{ row: number; error: string }>>([]);
   const [importProgress, setImportProgress] = useState(0);
   const [importErrors, setImportErrors] = useState<Array<{ row: number; error: string }>>([]);
+  const [quickImportNames, setQuickImportNames] = useState<string[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle file selection
-  const handleFileSelect = (file: File) => {
+  // Parse Excel file
+  const parseExcelFile = (file: File): Promise<{ headers: string[]; rows: string[][] }> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result;
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json<string[]>(firstSheet, { header: 1 });
+
+          if (jsonData.length === 0) {
+            resolve({ headers: [], rows: [] });
+            return;
+          }
+
+          // First row is headers
+          const headers = (jsonData[0] || []).map(h => String(h || '').trim());
+          const rows = jsonData.slice(1).map(row =>
+            (row || []).map(cell => String(cell || '').trim())
+          ).filter(row => row.some(cell => cell.length > 0)); // Filter empty rows
+
+          resolve({ headers, rows });
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  // Handle file selection for quick import (names only)
+  const handleQuickFileSelect = async (file: File) => {
     if (!file) return;
 
-    // Validate file type
-    if (!file.name.endsWith('.csv')) {
-      alert('Please select a CSV file');
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+    const isCsv = file.name.endsWith('.csv');
+
+    if (!isExcel && !isCsv) {
+      alert('Please select a CSV or Excel file (.csv, .xlsx, .xls)');
       return;
     }
 
-    // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
       alert('File too large. Maximum 5MB.');
       return;
@@ -65,13 +102,98 @@ const ImportGuestsModal: React.FC<ImportGuestsModalProps> = ({ eventId, onClose,
 
     setFileName(file.name);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const { headers: csvHeaders, rows: csvRows } = parseCSV(text);
+    try {
+      let names: string[] = [];
+
+      if (isExcel) {
+        const { rows } = await parseExcelFile(file);
+        // Take the first column as names (skip header if it looks like a header)
+        names = rows.map(row => row[0]).filter(Boolean);
+
+        // Check if first row might be a header
+        if (names.length > 0) {
+          const firstValue = names[0].toLowerCase();
+          if (firstValue === 'name' || firstValue === 'names' || firstValue === 'guest' || firstValue === 'guests' || firstValue === 'guest name') {
+            names = names.slice(1);
+          }
+        }
+      } else {
+        // CSV
+        const text = await file.text();
+        const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+        names = lines.map(line => {
+          // Handle CSV with quotes and commas - just take first column
+          const match = line.match(/^"?([^",]*)"?/);
+          return match ? match[1].trim() : line.split(',')[0].trim();
+        }).filter(Boolean);
+
+        // Check if first row might be a header
+        if (names.length > 0) {
+          const firstValue = names[0].toLowerCase();
+          if (firstValue === 'name' || firstValue === 'names' || firstValue === 'guest' || firstValue === 'guests' || firstValue === 'guest name') {
+            names = names.slice(1);
+          }
+        }
+      }
+
+      setQuickImportNames(names);
+
+      // Auto-create guest objects
+      const guests: GuestCreate[] = names.map(name => ({
+        guest_name: name,
+        rsvp_status: 'pending' as const,
+        side: 'both' as const,
+        guest_group: 'other' as const,
+        dietary_restrictions: [],
+        plus_one_allowed: false,
+        is_child: false,
+        needs_accessibility: false,
+      }));
+
+      setParsedGuests(guests);
+      setStep('preview');
+    } catch (err) {
+      console.error('Error parsing file:', err);
+      alert('Could not parse file. Please check the format.');
+    }
+  };
+
+  // Handle file selection for advanced import
+  const handleFileSelect = async (file: File) => {
+    if (!file) return;
+
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+    const isCsv = file.name.endsWith('.csv');
+
+    if (!isExcel && !isCsv) {
+      alert('Please select a CSV or Excel file (.csv, .xlsx, .xls)');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File too large. Maximum 5MB.');
+      return;
+    }
+
+    setFileName(file.name);
+
+    try {
+      let csvHeaders: string[] = [];
+      let csvRows: string[][] = [];
+
+      if (isExcel) {
+        const result = await parseExcelFile(file);
+        csvHeaders = result.headers;
+        csvRows = result.rows;
+      } else {
+        const text = await file.text();
+        const { headers: h, rows: r } = parseCSV(text);
+        csvHeaders = h;
+        csvRows = r;
+      }
 
       if (csvHeaders.length === 0) {
-        alert('Could not parse CSV. Please check the file format.');
+        alert('Could not parse file. Please check the format.');
         return;
       }
 
@@ -83,7 +205,6 @@ const ImportGuestsModal: React.FC<ImportGuestsModalProps> = ({ eventId, onClose,
       csvHeaders.forEach((header, idx) => {
         const normalized = header.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
-        // Try to match common header patterns
         if (normalized.includes('name') && !normalized.includes('plus')) {
           autoMapping.guest_name = idx;
         } else if (normalized.includes('email')) {
@@ -111,16 +232,23 @@ const ImportGuestsModal: React.FC<ImportGuestsModalProps> = ({ eventId, onClose,
 
       setColumnMapping(autoMapping);
       setStep('mapping');
-    };
-
-    reader.readAsText(file);
+    } catch (err) {
+      console.error('Error parsing file:', err);
+      alert('Could not parse file. Please check the format.');
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) handleFileSelect(file);
+    if (file) {
+      if (importMode === 'quick') {
+        handleQuickFileSelect(file);
+      } else {
+        handleFileSelect(file);
+      }
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -136,13 +264,11 @@ const ImportGuestsModal: React.FC<ImportGuestsModalProps> = ({ eventId, onClose,
   const handleMappingChange = (field: string, columnIndex: number) => {
     setColumnMapping((prev) => {
       const next = { ...prev };
-      // Remove previous mapping for this field
       Object.keys(next).forEach((key) => {
         if (next[key] === columnIndex && key !== field) {
           delete next[key];
         }
       });
-      // Set new mapping
       if (columnIndex >= 0) {
         next[field] = columnIndex;
       } else {
@@ -152,7 +278,7 @@ const ImportGuestsModal: React.FC<ImportGuestsModalProps> = ({ eventId, onClose,
     });
   };
 
-  // Proceed to preview step
+  // Proceed to preview step (advanced mode)
   const handlePreview = () => {
     if (columnMapping.guest_name === undefined) {
       alert('Please map the Guest Name column (required)');
@@ -167,7 +293,7 @@ const ImportGuestsModal: React.FC<ImportGuestsModalProps> = ({ eventId, onClose,
       if (guest) {
         guests.push(guest);
       } else {
-        errors.push({ row: idx + 2, error: 'Missing or invalid guest name' }); // +2 for header row and 0-index
+        errors.push({ row: idx + 2, error: 'Missing or invalid guest name' });
       }
     });
 
@@ -216,24 +342,159 @@ const ImportGuestsModal: React.FC<ImportGuestsModalProps> = ({ eventId, onClose,
     URL.revokeObjectURL(url);
   };
 
+  // Select import mode
+  const selectMode = (mode: ImportMode) => {
+    setImportMode(mode);
+    setStep('upload');
+  };
+
+  const getStepTitle = () => {
+    if (step === 'mode') return 'Import Guests';
+    if (step === 'upload') return importMode === 'quick' ? 'Quick Import - Names Only' : 'Import from File';
+    if (step === 'mapping') return 'Map Columns';
+    if (step === 'preview') return 'Preview Import';
+    if (step === 'importing') return 'Importing...';
+    return 'Import Guests';
+  };
+
   return (
     <div className="guest-modal-backdrop" onClick={onClose}>
       <div className="guest-modal import-modal" onClick={(e) => e.stopPropagation()}>
         <div className="guest-modal-header">
-          <h2 className="guest-modal-title">
-            {step === 'upload' && 'Import Guests from CSV'}
-            {step === 'mapping' && 'Map Columns'}
-            {step === 'preview' && 'Preview Import'}
-            {step === 'importing' && 'Importing...'}
-          </h2>
+          <h2 className="guest-modal-title">{getStepTitle()}</h2>
           <button className="guest-modal-close" onClick={onClose}>
             <X size={20} />
           </button>
         </div>
 
         <div className="guest-modal-body">
-          {/* Step 1: Upload */}
-          {step === 'upload' && (
+          {/* Step 0: Choose Mode */}
+          {step === 'mode' && (
+            <div style={{ display: 'flex', gap: 16, flexDirection: 'column' }}>
+              <button
+                className="import-mode-card"
+                onClick={() => selectMode('quick')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 16,
+                  padding: 20,
+                  border: '2px solid #e2e8f0',
+                  borderRadius: 12,
+                  background: '#fff',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.borderColor = '#3b82f6';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 10,
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <Zap size={24} color="#fff" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1e293b', marginBottom: 4 }}>
+                    Quick Import (Names Only)
+                  </div>
+                  <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>
+                    Just have a list of names? Import them instantly. Perfect for Excel or CSV files with just guest names.
+                  </div>
+                </div>
+              </button>
+
+              <button
+                className="import-mode-card"
+                onClick={() => selectMode('advanced')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 16,
+                  padding: 20,
+                  border: '2px solid #e2e8f0',
+                  borderRadius: 12,
+                  background: '#fff',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.borderColor = '#3b82f6';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 10,
+                  background: 'linear-gradient(135deg, #10b981 0%, #14b8a6 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <FileSpreadsheet size={24} color="#fff" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1e293b', marginBottom: 4 }}>
+                    Advanced Import (Full Details)
+                  </div>
+                  <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>
+                    Import names, emails, phone numbers, RSVP status, dietary info and more. Map your columns to our fields.
+                  </div>
+                </div>
+              </button>
+            </div>
+          )}
+
+          {/* Step 1: Upload (Quick Mode) */}
+          {step === 'upload' && importMode === 'quick' && (
+            <>
+              <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
+                Upload a file with guest names. We'll read the first column and create guests automatically with default settings.
+              </p>
+              <div
+                className={`import-dropzone ${isDragging ? 'dragging' : ''}`}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={(e) => e.target.files?.[0] && handleQuickFileSelect(e.target.files[0])}
+                />
+                <div className="import-dropzone-icon">
+                  <Upload size={40} color="#94a3b8" />
+                </div>
+                <p className="import-dropzone-text">Drag file here or click to browse</p>
+                <p className="import-dropzone-hint">Excel (.xlsx, .xls) or CSV, max 5MB</p>
+              </div>
+            </>
+          )}
+
+          {/* Step 1: Upload (Advanced Mode) */}
+          {step === 'upload' && importMode === 'advanced' && (
             <>
               <div
                 className={`import-dropzone ${isDragging ? 'dragging' : ''}`}
@@ -245,14 +506,14 @@ const ImportGuestsModal: React.FC<ImportGuestsModalProps> = ({ eventId, onClose,
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv"
+                  accept=".csv,.xlsx,.xls"
                   onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
                 />
                 <div className="import-dropzone-icon">
                   <Upload size={40} color="#94a3b8" />
                 </div>
-                <p className="import-dropzone-text">Drag CSV file here or click to browse</p>
-                <p className="import-dropzone-hint">CSV format, max 5MB</p>
+                <p className="import-dropzone-text">Drag file here or click to browse</p>
+                <p className="import-dropzone-hint">Excel (.xlsx, .xls) or CSV, max 5MB</p>
               </div>
 
               <button className="import-template-link" onClick={handleDownloadTemplate}>
@@ -262,8 +523,8 @@ const ImportGuestsModal: React.FC<ImportGuestsModalProps> = ({ eventId, onClose,
             </>
           )}
 
-          {/* Step 2: Column Mapping */}
-          {step === 'mapping' && (
+          {/* Step 2: Column Mapping (Advanced only) */}
+          {step === 'mapping' && importMode === 'advanced' && (
             <>
               <div className="import-file-preview">
                 <p className="import-file-name">{fileName}</p>
@@ -271,7 +532,6 @@ const ImportGuestsModal: React.FC<ImportGuestsModalProps> = ({ eventId, onClose,
                   Found {rows.length} rows with {headers.length} columns
                 </p>
 
-                {/* Preview first 3 rows */}
                 <div style={{ overflowX: 'auto' }}>
                   <table className="import-preview-table">
                     <thead>
@@ -332,40 +592,52 @@ const ImportGuestsModal: React.FC<ImportGuestsModalProps> = ({ eventId, onClose,
                 )}
               </div>
 
-              {/* Preview table */}
+              {importMode === 'quick' && (
+                <p style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
+                  All guests will be created with RSVP status "Pending". You can edit details after import.
+                </p>
+              )}
+
               <div style={{ overflowX: 'auto', maxHeight: 300 }}>
                 <table className="import-preview-table">
                   <thead>
                     <tr>
                       <th>Name</th>
-                      <th>Email</th>
-                      <th>Phone</th>
-                      <th>Side</th>
-                      <th>Group</th>
+                      {importMode === 'advanced' && (
+                        <>
+                          <th>Email</th>
+                          <th>Phone</th>
+                          <th>Side</th>
+                          <th>Group</th>
+                        </>
+                      )}
                       <th>RSVP</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {parsedGuests.slice(0, 10).map((guest, i) => (
+                    {parsedGuests.slice(0, 15).map((guest, i) => (
                       <tr key={i}>
                         <td>{guest.guest_name}</td>
-                        <td>{guest.email || '-'}</td>
-                        <td>{guest.phone || '-'}</td>
-                        <td>{guest.side || '-'}</td>
-                        <td>{guest.guest_group || '-'}</td>
+                        {importMode === 'advanced' && (
+                          <>
+                            <td>{guest.email || '-'}</td>
+                            <td>{guest.phone || '-'}</td>
+                            <td>{guest.side || '-'}</td>
+                            <td>{guest.guest_group || '-'}</td>
+                          </>
+                        )}
                         <td>{guest.rsvp_status || 'pending'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {parsedGuests.length > 10 && (
+                {parsedGuests.length > 15 && (
                   <p style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>
-                    ... and {parsedGuests.length - 10} more
+                    ... and {parsedGuests.length - 15} more
                   </p>
                 )}
               </div>
 
-              {/* Validation errors */}
               {validationErrors.length > 0 && (
                 <div className="import-validation-errors">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -417,10 +689,18 @@ const ImportGuestsModal: React.FC<ImportGuestsModalProps> = ({ eventId, onClose,
         </div>
 
         <div className="guest-modal-footer">
-          {step === 'upload' && (
+          {step === 'mode' && (
             <button className="guests-btn secondary" onClick={onClose}>
               Cancel
             </button>
+          )}
+
+          {step === 'upload' && (
+            <>
+              <button className="guests-btn secondary" onClick={() => setStep('mode')}>
+                Back
+              </button>
+            </>
           )}
 
           {step === 'mapping' && (
@@ -436,7 +716,10 @@ const ImportGuestsModal: React.FC<ImportGuestsModalProps> = ({ eventId, onClose,
 
           {step === 'preview' && (
             <>
-              <button className="guests-btn secondary" onClick={() => setStep('mapping')}>
+              <button
+                className="guests-btn secondary"
+                onClick={() => setStep(importMode === 'quick' ? 'upload' : 'mapping')}
+              >
                 Back
               </button>
               <button

@@ -9,6 +9,23 @@ import {
 } from '../api/suppliersApi';
 import CreateCategoryModal from '../dashboard/pipeline/vendors/CreateCategoryModal';
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return isMobile;
+}
+
+const PlusIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
+  <svg className={className} style={style} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+  </svg>
+);
+
 const PRESET_CATEGORIES: { value: SupplierCategory | 'all'; label: string }[] = [
   { value: 'all', label: 'All categories' },
   { value: 'flowers', label: 'Flowers' },
@@ -28,6 +45,7 @@ interface SuppliersPageProps {
 }
 
 const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
+  const isMobile = useIsMobile();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [customCategories, setCustomCategories] = useState<CustomVendorCategory[]>([]);
   const [categories, setCategories] = useState<{ value: string; label: string }[]>(PRESET_CATEGORIES);
@@ -291,35 +309,38 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
           </button>
         </div>
 
-        {/* Table */}
+        {/* Suppliers list */}
         <div
           style={{
-            borderRadius: 20,
+            borderRadius: isMobile ? 16 : 20,
             border: '1px solid rgba(148,163,184,0.3)',
             overflow: 'hidden',
             background: '#ffffff',
           }}
         >
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'minmax(0, 2.2fr) repeat(5, minmax(0, 1.1fr)) 80px',
-              gap: 0,
-              padding: '10px 16px',
-              background: '#f9fafb',
-              fontSize: 11,
-              fontWeight: 600,
-              color: '#6b7280',
-            }}
-          >
-            <span>Name</span>
-            <span>Category</span>
-            <span>Location</span>
-            <span>Email</span>
-            <span>Phone</span>
-            <span>Rating</span>
-            <span style={{ textAlign: 'right' }}>Events</span>
-          </div>
+          {/* Table Header - Desktop */}
+          {!isMobile && (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0, 2.2fr) repeat(5, minmax(0, 1.1fr)) 80px',
+                gap: 0,
+                padding: '10px 16px',
+                background: '#f9fafb',
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#6b7280',
+              }}
+            >
+              <span>Name</span>
+              <span>Category</span>
+              <span>Location</span>
+              <span>Email</span>
+              <span>Phone</span>
+              <span>Rating</span>
+              <span style={{ textAlign: 'right' }}>Events</span>
+            </div>
+          )}
 
           {loading && (
             <div style={{ padding: 16, fontSize: 13, color: '#6b7280' }}>Loading suppliers…</div>
@@ -339,60 +360,180 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
               <div
                 key={s.id}
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(0, 2.2fr) repeat(5, minmax(0, 1.1fr)) 80px',
-                  gap: 0,
-                  padding: '10px 16px',
+                  display: isMobile ? 'flex' : 'grid',
+                  flexDirection: isMobile ? 'column' : undefined,
+                  gridTemplateColumns: isMobile ? undefined : 'minmax(0, 2.2fr) repeat(5, minmax(0, 1.1fr)) 80px',
+                  gap: isMobile ? 12 : 0,
+                  padding: isMobile ? 16 : '10px 16px',
                   borderTop: '1px solid rgba(226,232,240,0.8)',
-                  fontSize: 12,
-                  alignItems: 'center',
+                  fontSize: isMobile ? 14 : 12,
+                  alignItems: isMobile ? 'stretch' : 'center',
                   background: '#ffffff',
                   transition: 'background 0.15s ease, transform 0.12s ease',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: 999,
-                      background: '#020617',
-                      color: '#f9fafb',
-                      fontSize: 11,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {s.name
-                      .split(' ')
-                      .map((part) => part[0])
-                      .slice(0, 2)
-                      .join('')
-                      .toUpperCase()}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontWeight: 500 }}>{s.name}</span>
-                    {s.company_name && (
-                      <span style={{ fontSize: 11, color: '#6b7280' }}>{s.company_name}</span>
-                    )}
-                  </div>
-                </div>
-                <span style={{ textTransform: 'capitalize' }}>{s.category}</span>
-                <span>{s.location ?? '—'}</span>
-                <span>{s.email ?? '—'}</span>
-                <span>{s.phone ?? '—'}</span>
-                <span>
-                  {s.rating_internal
-                    ? '★'.repeat(s.rating_internal).padEnd(5, '☆')
-                    : '—'}
-                </span>
-                <span style={{ textAlign: 'right', color: '#64748b', fontSize: 11 }}>
-                  {s.linked_events_count ?? 0}
-                </span>
+                {isMobile ? (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 999,
+                          background: '#020617',
+                          color: '#f9fafb',
+                          fontSize: 14,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {s.name
+                          .split(' ')
+                          .map((part) => part[0])
+                          .slice(0, 2)
+                          .join('')
+                          .toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 15 }}>{s.name}</div>
+                        {s.company_name && (
+                          <div style={{ fontSize: 13, color: '#6b7280' }}>{s.company_name}</div>
+                        )}
+                      </div>
+                      <span
+                        style={{
+                          textTransform: 'capitalize',
+                          fontSize: 12,
+                          padding: '4px 10px',
+                          background: '#f1f5f9',
+                          borderRadius: 999,
+                          color: '#475569',
+                        }}
+                      >
+                        {s.category}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: 8,
+                        marginTop: 4,
+                        paddingTop: 12,
+                        borderTop: '1px solid #f1f5f9',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase' }}>Location</div>
+                        <div>{s.location ?? '—'}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase' }}>Rating</div>
+                        <div>
+                          {s.rating_internal
+                            ? '★'.repeat(s.rating_internal).padEnd(5, '☆')
+                            : '—'}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase' }}>Email</div>
+                        <div>{s.email ?? '—'}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase' }}>Phone</div>
+                        <div>{s.phone ?? '—'}</div>
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginTop: 8,
+                        paddingTop: 12,
+                        borderTop: '1px solid #f1f5f9',
+                      }}
+                    >
+                      <span style={{ color: '#64748b', fontSize: 13 }}>
+                        {s.linked_events_count ?? 0} events
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div
+                        style={{
+                          width: 26,
+                          height: 26,
+                          borderRadius: 999,
+                          background: '#020617',
+                          color: '#f9fafb',
+                          fontSize: 11,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {s.name
+                          .split(' ')
+                          .map((part) => part[0])
+                          .slice(0, 2)
+                          .join('')
+                          .toUpperCase()}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontWeight: 500 }}>{s.name}</span>
+                        {s.company_name && (
+                          <span style={{ fontSize: 11, color: '#6b7280' }}>{s.company_name}</span>
+                        )}
+                      </div>
+                    </div>
+                    <span style={{ textTransform: 'capitalize' }}>{s.category}</span>
+                    <span>{s.location ?? '—'}</span>
+                    <span>{s.email ?? '—'}</span>
+                    <span>{s.phone ?? '—'}</span>
+                    <span>
+                      {s.rating_internal
+                        ? '★'.repeat(s.rating_internal).padEnd(5, '☆')
+                        : '—'}
+                    </span>
+                    <span style={{ textAlign: 'right', color: '#64748b', fontSize: 11 }}>
+                      {s.linked_events_count ?? 0}
+                    </span>
+                  </>
+                )}
               </div>
             ))}
         </div>
+
+        {/* FAB for mobile */}
+        {isMobile && (
+          <button
+            type="button"
+            onClick={() => setShowCreate(true)}
+            style={{
+              position: 'fixed',
+              bottom: 24,
+              right: 24,
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              background: '#0c0c0c',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+              zIndex: 100,
+            }}
+          >
+            <PlusIcon />
+          </button>
+        )}
       </div>
 
       {/* Simple create modal */}

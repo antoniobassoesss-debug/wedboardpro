@@ -8,9 +8,38 @@ type CalendarView = 'month' | 'week';
 
 type CalendarProps = {
   accountId: string;
-  currentUserId?: string; // if omitted, falls back to accountId
+  currentUserId?: string;
   weekStartsOn?: 'monday' | 'sunday';
 };
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return isMobile;
+}
+
+const ChevronLeft: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
+  <svg className={className} style={style} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+  </svg>
+);
+
+const ChevronRight: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
+  <svg className={className} style={style} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+  </svg>
+);
+
+const PlusIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
+  <svg className={className} style={style} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+  </svg>
+);
 
 const EVENT_COLORS: Record<string, string> = {
   red: '#ef4444',
@@ -235,9 +264,10 @@ export function Calendar({ accountId, currentUserId, weekStartsOn = 'monday' }: 
     setEditorOpen(true);
   };
 
-  const resolveColor = (evt: CalendarEvent) => {
-    if (evt.color && EVENT_COLORS[evt.color]) return EVENT_COLORS[evt.color];
-    return EVENT_COLORS[evt.event_type] || EVENT_COLORS.default;
+  const resolveColor = (evt: CalendarEvent): string => {
+    if (evt.color && evt.color in EVENT_COLORS) return EVENT_COLORS[evt.color]!;
+    if (evt.event_type in EVENT_COLORS) return EVENT_COLORS[evt.event_type]!;
+    return EVENT_COLORS.default!;
   };
 
   const getSharingLabel = (evt: CalendarEvent): string => {
@@ -585,6 +615,209 @@ const WeekView: React.FC<WeekViewProps> = ({
   const selectedDayLabel = selectedDayDate
     ? selectedDayDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
     : '';
+
+  const isMobile = useIsMobile();
+
+  const MobileCalendar: React.FC = () => {
+    const [mobileSelectedDay, setMobileSelectedDay] = useState<string | null>(null);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const isToday = (date: Date) => {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      return d.getTime() === today.getTime();
+    };
+
+    const handlePrevMonth = () => setCurrentDate(addMonths(currentDate, -1));
+    const handleNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
+
+    const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    const daysForCurrentMonth = useMemo(() => {
+      const start = startOfWeek(monthStart);
+      return Array.from({ length: 42 }, (_, i) => addDays(start, i));
+    }, [monthStart]);
+
+    return (
+      <div className="wp-calendar-mobile">
+        <div className="wp-calendar-mobile-header">
+          <div className="wp-calendar-mobile-nav">
+            <button className="wp-calendar-mobile-nav-left" onClick={handlePrevMonth}>
+              <ChevronLeft />
+            </button>
+            <span className="wp-calendar-mobile-title">{formatMonthLabel(currentDate)}</span>
+            <button className="wp-calendar-mobile-today" onClick={() => setCurrentDate(new Date())}>
+              Today
+            </button>
+            <button className="wp-calendar-mobile-nav-right" onClick={handleNextMonth}>
+              <ChevronRight />
+            </button>
+          </div>
+          <div className="wp-calendar-mobile-view-toggle">
+            <button
+              className={`wp-calendar-mobile-view-btn ${view === 'month' ? 'active' : ''}`}
+              onClick={() => setView('month')}
+            >
+              Month
+            </button>
+            <button
+              className={`wp-calendar-mobile-view-btn ${view === 'week' ? 'active' : ''}`}
+              onClick={() => setView('week')}
+            >
+              Week
+            </button>
+          </div>
+        </div>
+
+        {view === 'month' ? (
+          <>
+            <div className="wp-calendar-mobile-grid">
+              <div className="wp-calendar-mobile-weekdays">
+                {weekDays.map((day) => (
+                  <div key={day} className="wp-calendar-mobile-weekday">{day}</div>
+                ))}
+              </div>
+              <div className="wp-calendar-mobile-days">
+                {daysForCurrentMonth.map((date) => {
+                  const dateStr = date.toISOString().slice(0, 10);
+                  const dayEvents = eventsByDay.get(dateStr) || [];
+                  const isCurrentMonth = date.getMonth() === currentDate.getMonth();
+                  const isDayToday = isToday(date);
+                  const showEvents = dayEvents.slice(0, 2);
+                  const moreCount = dayEvents.length - 2;
+
+                  return (
+                    <div
+                      key={dateStr}
+                      className={`wp-calendar-mobile-day ${isDayToday ? 'today' : ''} ${!isCurrentMonth ? 'other-month' : ''} ${dayEvents.length > 0 ? 'has-events' : ''} ${mobileSelectedDay === dateStr ? 'selected' : ''}`}
+                      onClick={() => {
+                        handleOpenCreate(dateStr);
+                        setMobileSelectedDay(dateStr);
+                      }}
+                    >
+                      <span className="wp-calendar-mobile-day-num">{date.getDate()}</span>
+                      {isCurrentMonth && dayEvents.length > 0 && (
+                        <div className="wp-calendar-mobile-events">
+                          {showEvents.map((ev) => (
+                            <div
+                              key={ev.id}
+                              className="wp-calendar-mobile-event"
+                              style={{ background: resolveColor(ev) }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenEdit(ev);
+                              }}
+                            >
+                              {ev.title}
+                            </div>
+                          ))}
+                          {moreCount > 0 && <div className="wp-calendar-mobile-more">+{moreCount}</div>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {mobileSelectedDay && (
+              <div className="wp-calendar-mobile-selected">
+                <div className="wp-calendar-mobile-selected-header">
+                  <span className="wp-calendar-mobile-selected-title">
+                    {new Date(mobileSelectedDay).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                  </span>
+                  <button
+                    className="wp-calendar-mobile-selected-close"
+                    onClick={() => setMobileSelectedDay(null)}
+                  >
+                    ×
+                  </button>
+                </div>
+                {(eventsByDay.get(mobileSelectedDay) || []).length === 0 ? (
+                  <div className="wp-calendar-mobile-empty">No events scheduled</div>
+                ) : (
+                  (eventsByDay.get(mobileSelectedDay) || []).map((ev) => (
+                    <div
+                      key={ev.id}
+                      className="wp-calendar-mobile-event-card"
+                      onClick={() => handleOpenEdit(ev)}
+                    >
+                      <div className="wp-calendar-mobile-event-color" style={{ background: resolveColor(ev) }} />
+                      <div className="wp-calendar-mobile-event-info">
+                        <div className="wp-calendar-mobile-event-title">{ev.title}</div>
+                        <div className="wp-calendar-mobile-event-time">
+                          {ev.all_day ? 'All day' : new Date(ev.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="wp-calendar-mobile-week-view">
+            <div className="wp-calendar-mobile-week-header">
+              {Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).map((d) => {
+                const dStr = d.toISOString().slice(0, 10);
+                const isDayToday = isToday(d);
+
+                return (
+                  <div
+                    key={dStr}
+                    className={`wp-calendar-mobile-week-day ${isDayToday ? 'today' : ''}`}
+                    onClick={() => {
+                      handleOpenCreate(dStr);
+                      setMobileSelectedDay(dStr);
+                    }}
+                  >
+                    <div className="wp-calendar-mobile-week-day-name">
+                      {d.toLocaleDateString(undefined, { weekday: 'short' })}
+                    </div>
+                    <div className="wp-calendar-mobile-week-day-num">{d.getDate()}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="wp-calendar-mobile-hours">
+              {hours.slice(0, 10).map((h) => {
+                const dayKey = weekStart.toISOString().slice(0, 10);
+                const dayEvents = eventsByDay.get(dayKey) || [];
+                const hourEvents = dayEvents.filter((ev) => new Date(ev.start_at).getHours() === h);
+
+                return (
+                  <div key={h} className="wp-calendar-mobile-hour">
+                    <div className="wp-calendar-mobile-hour-label">{String(h).padStart(2, '0')}:00</div>
+                    <div className="wp-calendar-mobile-hour-events">
+                      {hourEvents.map((ev) => (
+                        <div
+                          key={ev.id}
+                          className="wp-calendar-mobile-hour-event"
+                          style={{ background: resolveColor(ev) }}
+                          onClick={() => handleOpenEdit(ev)}
+                        >
+                          {ev.title}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <button className="wp-calendar-mobile-fab" onClick={() => handleOpenCreate(new Date().toISOString().slice(0, 10))}>
+          <PlusIcon />
+        </button>
+      </div>
+    );
+  };
+
+  if (isMobile) {
+    return <MobileCalendar />;
+  }
 
   return (
     <>

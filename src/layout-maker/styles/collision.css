@@ -1,0 +1,144 @@
+/**
+ * Collision Detection CSS
+ *
+ * Visual feedback styles for collision detection:
+ * - Pulsing red outline for colliding elements
+ * - Warning indicators
+ */
+
+export const collisionStyles = `
+/* Collision pulse animation */
+@keyframes collision-pulse {
+  0%, 100% {
+    outline-color: #EF4444;
+    outline-width: 2px;
+    outline-offset: 2px;
+  }
+  50% {
+    outline-color: #FCA5A5;
+    outline-width: 3px;
+    outline-offset: 3px;
+  }
+}
+
+/* Collision warning indicator */
+.collision-warning {
+  animation: collision-pulse 0.5s ease-in-out infinite;
+  outline: 2px solid #EF4444;
+  outline-offset: 2px;
+}
+
+/* Collision warning badge */
+.collision-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #EF4444;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 10px;
+  z-index: 100;
+}
+
+/* Collision overlay */
+.collision-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(239, 68, 68, 0.1);
+  border: 2px solid #EF4444;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* Drag collision state */
+.is-dragging-overlapping {
+  cursor: not-allowed;
+}
+
+.is-dragging-overlapping::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(239, 68, 68, 0.2);
+  border: 2px dashed #EF4444;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* Collision toast notification */
+.collision-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #B91C1C;
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 10000;
+  animation: slide-up 0.3s ease-out;
+}
+
+.collision-toast-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.collision-toast-message {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Element hover state when colliding */
+.collision-warning:hover {
+  outline-color: #DC2626;
+  outline-width: 3px;
+}
+
+/* Multi-selection collision indicators */
+.multi-selection-warning {
+  position: relative;
+}
+
+.multi-selection-warning::before {
+  content: attr(data-collision-count);
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  background: #EF4444;
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+`;
+
+export default collisionStyles;

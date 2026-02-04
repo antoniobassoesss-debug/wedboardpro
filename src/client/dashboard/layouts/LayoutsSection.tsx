@@ -1,76 +1,49 @@
+/**
+ * Layouts Section - Dashboard Tab
+ *
+ * Shows layout files organized by event.
+ * Each event has ONE layout file containing multiple tabs.
+ */
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './layouts.css';
+import {
+  listLayoutsWithEvents,
+  getOrCreateLayoutForEvent,
+  isLayoutFileData,
+  type LayoutRecord,
+  type LayoutFileData,
+} from '../../api/layoutsApi';
+import { listEvents, type Event } from '../../api/eventsPipelineApi';
+import EventSelectorModal from '../../components/EventSelectorModal';
 
-// Types for layouts (matches Layout Maker storage)
-interface LayoutProject {
-  id: string;
-  name: string;
-  canvasData: {
-    drawings: any[];
-    shapes: any[];
-    textElements: any[];
-    walls?: any[];
-    doors?: any[];
-    viewBox: { x: number; y: number; width: number; height: number };
-  };
-  // Extended metadata we'll add
-  description?: string;
-  category?: string;
-  tags?: string[];
-  linkedProjects?: string[];
-  createdAt?: string;
-  updatedAt?: string;
-  status?: 'active' | 'archived';
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return isMobile;
 }
 
-type ViewMode = 'grid' | 'table';
-type SortOption = 'updated' | 'name' | 'used';
-type CategoryFilter = 'all' | 'ceremony' | 'reception' | 'full-day' | 'timeline' | 'floorplan' | 'custom';
+const PlusIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
+  <svg className={className} style={style} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+  </svg>
+);
 
-const STORAGE_KEY = 'layout-maker-projects';
+interface LayoutWithEvent extends LayoutRecord {
+  event?: {
+    id: string;
+    title: string;
+    wedding_date: string;
+  };
+}
 
-const CATEGORY_OPTIONS: { value: CategoryFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'ceremony', label: 'Ceremony' },
-  { value: 'reception', label: 'Reception' },
-  { value: 'full-day', label: 'Full Day' },
-  { value: 'timeline', label: 'Timeline' },
-  { value: 'floorplan', label: 'Floorplan' },
-  { value: 'custom', label: 'Custom' },
-];
-
-const loadLayoutsFromStorage = (): LayoutProject[] => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
-        return parsed.map((p: any) => ({
-          ...p,
-          description: p.description || '',
-          category: p.category || 'custom',
-          tags: p.tags || [],
-          linkedProjects: p.linkedProjects || [],
-          createdAt: p.createdAt || new Date().toISOString(),
-          updatedAt: p.updatedAt || new Date().toISOString(),
-          status: p.status || 'active',
-        }));
-      }
-    }
-  } catch (error) {
-    console.error('[LayoutsSection] Error loading layouts:', error);
-  }
-  return [];
-};
-
-const saveLayoutsToStorage = (layouts: LayoutProject[]) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(layouts));
-  } catch (error) {
-    console.error('[LayoutsSection] Error saving layouts:', error);
-  }
-};
+type SortOption = 'updated' | 'event' | 'date';
 
 const formatDate = (dateStr: string | undefined): string => {
   if (!dateStr) return 'Unknown';
@@ -79,203 +52,83 @@ const formatDate = (dateStr: string | undefined): string => {
   return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-const getLayoutThumbnailClass = (layout: LayoutProject): string => {
-  const hasWalls = layout.canvasData?.walls && layout.canvasData.walls.length > 0;
-  const hasShapes = layout.canvasData?.shapes && layout.canvasData.shapes.length > 0;
-  const hasDrawings = layout.canvasData?.drawings && layout.canvasData.drawings.length > 0;
-  
-  if (hasWalls) return 'floorplan';
-  if (hasShapes) return 'shapes';
-  if (hasDrawings) return 'drawings';
-  return 'empty';
+const formatWeddingDate = (dateStr: string | undefined): string => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-interface QuickViewDrawerProps {
-  layout: LayoutProject | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onEdit: (layoutId: string) => void;
-  onDuplicate: (layoutId: string) => void;
-  onArchive: (layoutId: string) => void;
-  onDelete: (layoutId: string) => void;
-  onUpdateLayout: (layoutId: string, updates: Partial<LayoutProject>) => void;
-}
+const getTabCount = (layout: LayoutRecord): number => {
+  if (isLayoutFileData(layout.canvas_data)) {
+    return (layout.canvas_data as LayoutFileData).tabs.length;
+  }
+  return 1; // Legacy single canvas
+};
 
-const QuickViewDrawer: React.FC<QuickViewDrawerProps> = ({
-  layout,
-  isOpen,
-  onClose,
-  onEdit,
-  onDuplicate,
-  onArchive,
-  onDelete,
-  onUpdateLayout,
-}) => {
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [editName, setEditName] = useState('');
-
-  useEffect(() => {
-    if (layout) {
-      setEditName(layout.name);
-    }
-  }, [layout]);
-
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    if (isOpen) {
-      window.addEventListener('keydown', handleEsc);
-    }
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [isOpen, onClose]);
-
-  if (!layout || !isOpen) return null;
-
-  const handleSaveName = () => {
-    if (editName.trim() && editName !== layout.name) {
-      onUpdateLayout(layout.id, { name: editName.trim() });
-    }
-    setIsEditingName(false);
+const getLayoutPreviewInfo = (layout: LayoutRecord): { tables: number; elements: number } => {
+  if (isLayoutFileData(layout.canvas_data)) {
+    const fileData = layout.canvas_data as LayoutFileData;
+    let tables = 0;
+    let elements = 0;
+    fileData.tabs.forEach(tab => {
+      const shapes = tab.canvas.shapes || [];
+      tables += shapes.filter((s: any) => s.tableData).length;
+      elements += shapes.length + (tab.canvas.walls?.length || 0);
+    });
+    return { tables, elements };
+  }
+  // Legacy format
+  const shapes = layout.canvas_data.shapes || [];
+  return {
+    tables: shapes.filter((s: any) => s.tableData).length,
+    elements: shapes.length + (layout.canvas_data.walls?.length || 0),
   };
-
-  return (
-    <div className="layouts-drawer-backdrop" onClick={onClose}>
-      <div className="layouts-drawer" onClick={(e) => e.stopPropagation()}>
-        <div className="layouts-drawer-header">
-          <div className="layouts-drawer-title-row">
-            {isEditingName ? (
-              <input
-                type="text"
-                className="layouts-drawer-name-input"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                onBlur={handleSaveName}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveName();
-                  if (e.key === 'Escape') {
-                    setEditName(layout.name);
-                    setIsEditingName(false);
-                  }
-                }}
-                autoFocus
-              />
-            ) : (
-              <h3 className="layouts-drawer-title">
-                {layout.name}
-                <button
-                  type="button"
-                  className="layouts-edit-name-btn"
-                  onClick={() => setIsEditingName(true)}
-                  aria-label="Edit name"
-                >
-                  ✏️
-                </button>
-              </h3>
-            )}
-          </div>
-          <button type="button" className="layouts-drawer-close" onClick={onClose}>
-            ✕
-          </button>
-        </div>
-
-        <div className="layouts-drawer-body">
-          <button
-            type="button"
-            className="layouts-drawer-primary-btn"
-            onClick={() => onEdit(layout.id)}
-          >
-            Edit in Layout Maker
-          </button>
-
-          <div className="layouts-drawer-section">
-            <div className="layouts-drawer-section-title">Description</div>
-            <p className="layouts-drawer-description">
-              {layout.description || 'No description added yet.'}
-            </p>
-          </div>
-
-          <div className="layouts-drawer-section">
-            <div className="layouts-drawer-section-title">Tags</div>
-            <div className="layouts-drawer-tags">
-              {layout.tags && layout.tags.length > 0 ? (
-                layout.tags.map((tag) => (
-                  <span key={tag} className="layouts-tag">{tag}</span>
-                ))
-              ) : (
-                <span className="layouts-drawer-empty">No tags</span>
-              )}
-            </div>
-          </div>
-
-          <div className="layouts-drawer-section">
-            <div className="layouts-drawer-section-title">Linked Projects</div>
-            {layout.linkedProjects && layout.linkedProjects.length > 0 ? (
-              <ul className="layouts-drawer-projects-list">
-                {layout.linkedProjects.map((proj) => (
-                  <li key={proj}>{proj}</li>
-                ))}
-              </ul>
-            ) : (
-              <span className="layouts-drawer-empty">Not linked to any projects</span>
-            )}
-          </div>
-
-          <div className="layouts-drawer-section">
-            <div className="layouts-drawer-section-title">Details</div>
-            <div className="layouts-drawer-meta">
-              <div>Created: {formatDate(layout.createdAt)}</div>
-              <div>Last updated: {formatDate(layout.updatedAt)}</div>
-              <div>Status: <span className={`layouts-status-badge ${layout.status}`}>{layout.status}</span></div>
-            </div>
-          </div>
-        </div>
-
-        <div className="layouts-drawer-footer">
-          <button
-            type="button"
-            className="layouts-drawer-action-btn"
-            onClick={() => onDuplicate(layout.id)}
-          >
-            Duplicate
-          </button>
-          <button
-            type="button"
-            className="layouts-drawer-action-btn"
-            onClick={() => onArchive(layout.id)}
-          >
-            {layout.status === 'archived' ? 'Unarchive' : 'Archive'}
-          </button>
-          <button
-            type="button"
-            className="layouts-drawer-action-btn destructive"
-            onClick={() => onDelete(layout.id)}
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 };
 
 const LayoutsSection: React.FC = () => {
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
-  const [layouts, setLayouts] = useState<LayoutProject[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [layouts, setLayouts] = useState<LayoutWithEvent[]>([]);
+  const [eventsWithoutLayout, setEventsWithoutLayout] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [sortBy, setSortBy] = useState<SortOption>('updated');
-  const [selectedLayout, setSelectedLayout] = useState<LayoutProject | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [showEventModal, setShowEventModal] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Load layouts on mount
+  // Load layouts and events
   useEffect(() => {
-    setLayouts(loadLayoutsFromStorage());
+    loadData();
   }, []);
 
-  // Show toast notification
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      // Fetch layouts with event info
+      const layoutsResult = await listLayoutsWithEvents();
+      if (layoutsResult.data) {
+        setLayouts(layoutsResult.data);
+      }
+
+      // Fetch all events to find those without layouts
+      const eventsResult = await listEvents();
+      if (eventsResult.data && layoutsResult.data) {
+        const eventIdsWithLayouts = new Set(
+          layoutsResult.data.filter(l => l.event_id).map(l => l.event_id)
+        );
+        const withoutLayout = eventsResult.data.filter(
+          e => e.status !== 'completed' && !eventIdsWithLayouts.has(e.id)
+        );
+        setEventsWithoutLayout(withoutLayout);
+      }
+    } catch (err) {
+      console.error('[LayoutsSection] Error loading data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
@@ -283,7 +136,7 @@ const LayoutsSection: React.FC = () => {
 
   // Filter and sort layouts
   const filteredLayouts = useMemo(() => {
-    let result = layouts.filter((l) => l.status !== 'archived');
+    let result = layouts;
 
     // Search filter
     if (searchQuery.trim()) {
@@ -291,107 +144,58 @@ const LayoutsSection: React.FC = () => {
       result = result.filter(
         (l) =>
           l.name.toLowerCase().includes(q) ||
-          l.description?.toLowerCase().includes(q) ||
-          l.tags?.some((t) => t.toLowerCase().includes(q))
+          l.event?.title.toLowerCase().includes(q)
       );
     }
 
-    // Category filter
-    if (categoryFilter !== 'all') {
-      result = result.filter((l) => l.category === categoryFilter);
-    }
-
     // Sort
-    result.sort((a, b) => {
+    result = [...result].sort((a, b) => {
       switch (sortBy) {
-        case 'name':
-          return a.name.localeCompare(b.name);
-        case 'used':
-          return (b.linkedProjects?.length || 0) - (a.linkedProjects?.length || 0);
+        case 'event':
+          return (a.event?.title || '').localeCompare(b.event?.title || '');
+        case 'date':
+          return new Date(b.event?.wedding_date || 0).getTime() - new Date(a.event?.wedding_date || 0).getTime();
         case 'updated':
         default:
-          return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
+          return new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime();
       }
     });
 
     return result;
-  }, [layouts, searchQuery, categoryFilter, sortBy]);
+  }, [layouts, searchQuery, sortBy]);
 
   const handleNewLayout = () => {
-    navigate('/layout-maker');
+    setShowEventModal(true);
   };
 
-  const handleOpenLayout = (layoutId: string) => {
-    // Store the active project ID for Layout Maker
-    localStorage.setItem('layout-maker-active-project-id', layoutId);
-    navigate('/layout-maker');
-  };
+  const handleSelectEvent = async (eventId: string, eventTitle: string, existingLayoutId?: string) => {
+    setShowEventModal(false);
 
-  const handleDuplicateLayout = (layoutId: string) => {
-    const original = layouts.find((l) => l.id === layoutId);
-    if (!original) return;
-
-    const newId = `${Date.now()}`;
-    const duplicate: LayoutProject = {
-      ...original,
-      id: newId,
-      name: `${original.name} (Copy)`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      linkedProjects: [],
-    };
-
-    const updated = [duplicate, ...layouts];
-    setLayouts(updated);
-    saveLayoutsToStorage(updated);
-    showToast('Layout duplicated');
-    setIsDrawerOpen(false);
-  };
-
-  const handleArchiveLayout = (layoutId: string) => {
-    const updated = layouts.map((l) =>
-      l.id === layoutId
-        ? { ...l, status: l.status === 'archived' ? 'active' : 'archived' as const, updatedAt: new Date().toISOString() }
-        : l
-    );
-    setLayouts(updated);
-    saveLayoutsToStorage(updated);
-    const layout = layouts.find((l) => l.id === layoutId);
-    showToast(layout?.status === 'archived' ? 'Layout unarchived' : 'Layout archived');
-    setIsDrawerOpen(false);
-  };
-
-  const handleDeleteLayout = (layoutId: string) => {
-    if (!window.confirm('Are you sure you want to delete this layout? This cannot be undone.')) {
-      return;
+    if (existingLayoutId) {
+      // Open existing layout
+      navigate(`/layout-maker?eventId=${eventId}`);
+    } else {
+      // Create new layout for event
+      showToast('Creating layout...');
+      const result = await getOrCreateLayoutForEvent(eventId, eventTitle);
+      if (result.error) {
+        showToast(result.error, 'error');
+        return;
+      }
+      navigate(`/layout-maker?eventId=${eventId}`);
     }
-    const updated = layouts.filter((l) => l.id !== layoutId);
-    setLayouts(updated);
-    saveLayoutsToStorage(updated);
-    showToast('Layout deleted');
-    setIsDrawerOpen(false);
   };
 
-  const handleUpdateLayout = (layoutId: string, updates: Partial<LayoutProject>) => {
-    const updated = layouts.map((l) =>
-      l.id === layoutId ? { ...l, ...updates, updatedAt: new Date().toISOString() } : l
-    );
-    setLayouts(updated);
-    saveLayoutsToStorage(updated);
-    // Update selected layout if it's the one being edited
-    if (selectedLayout?.id === layoutId) {
-      setSelectedLayout({ ...selectedLayout, ...updates });
+  const handleOpenLayout = (layout: LayoutWithEvent) => {
+    if (layout.event_id) {
+      navigate(`/layout-maker?eventId=${layout.event_id}`);
+    } else {
+      // Legacy layout without event - open by layout ID
+      navigate(`/layout-maker?layoutId=${layout.id}`);
     }
-    showToast('Layout updated');
   };
 
-  const openQuickView = (layout: LayoutProject) => {
-    setSelectedLayout(layout);
-    setIsDrawerOpen(true);
-  };
-
-  const isEmpty = layouts.length === 0;
-  const hasNoResults = !isEmpty && filteredLayouts.length === 0;
+  const isEmpty = layouts.length === 0 && eventsWithoutLayout.length === 0;
 
   return (
     <div className="layouts-container">
@@ -399,12 +203,17 @@ const LayoutsSection: React.FC = () => {
       <div className="layouts-header">
         <div className="layouts-header-right">
           <button type="button" className="layouts-new-btn" onClick={handleNewLayout}>
-            + New layout
+            + New Layout
           </button>
         </div>
       </div>
 
-      {isEmpty ? (
+      {loading ? (
+        <div className="layouts-loading">
+          <div className="layouts-loading-spinner" />
+          <span>Loading layouts...</span>
+        </div>
+      ) : isEmpty ? (
         // Empty State
         <div className="layouts-empty-state">
           <div className="layouts-empty-illustration">
@@ -412,13 +221,8 @@ const LayoutsSection: React.FC = () => {
           </div>
           <h2 className="layouts-empty-title">No layouts yet</h2>
           <p className="layouts-empty-description">
-            Create your first layout to speed up your wedding planning and reuse designs across weddings.
+            Create a layout for your events to design floorplans, seating arrangements, and more.
           </p>
-          <ul className="layouts-empty-benefits">
-            <li>Save ceremony and reception floorplans as reusable templates</li>
-            <li>Keep layouts consistent across venues and seasons</li>
-            <li>Quickly tweak and duplicate for each new wedding</li>
-          </ul>
           <button type="button" className="layouts-empty-cta" onClick={handleNewLayout}>
             Create your first layout
           </button>
@@ -431,22 +235,10 @@ const LayoutsSection: React.FC = () => {
               <input
                 type="text"
                 className="layouts-search"
-                placeholder="Search layouts…"
+                placeholder="Search by event name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <div className="layouts-filter-chips">
-                {CATEGORY_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    className={`layouts-chip ${categoryFilter === opt.value ? 'active' : ''}`}
-                    onClick={() => setCategoryFilter(opt.value)}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
             </div>
             <div className="layouts-toolbar-right">
               <select
@@ -454,190 +246,115 @@ const LayoutsSection: React.FC = () => {
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
               >
-                <option value="updated">Last updated</option>
-                <option value="name">Name A–Z</option>
-                <option value="used">Most used</option>
+                <option value="updated">Last Updated</option>
+                <option value="event">Event Name</option>
+                <option value="date">Wedding Date</option>
               </select>
-              <div className="layouts-view-toggle">
-                <button
-                  type="button"
-                  className={`layouts-view-btn ${viewMode === 'grid' ? 'active' : ''}`}
-                  onClick={() => setViewMode('grid')}
-                  aria-label="Grid view"
-                >
-                  ▦
-                </button>
-                <button
-                  type="button"
-                  className={`layouts-view-btn ${viewMode === 'table' ? 'active' : ''}`}
-                  onClick={() => setViewMode('table')}
-                  aria-label="Table view"
-                >
-                  ☰
-                </button>
-              </div>
             </div>
           </div>
 
-          {hasNoResults ? (
-            <div className="layouts-no-results">
-              <p>No layouts match your search or filters.</p>
-              <button
-                type="button"
-                className="layouts-clear-filters"
-                onClick={() => {
-                  setSearchQuery('');
-                  setCategoryFilter('all');
-                }}
-              >
-                Clear filters
-              </button>
-            </div>
-          ) : viewMode === 'grid' ? (
-            // Grid View
-            <div className="layouts-grid">
-              {filteredLayouts.map((layout) => (
-                <div
-                  key={layout.id}
-                  className="layouts-card"
-                  onClick={() => openQuickView(layout)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') openQuickView(layout);
-                  }}
-                >
-                  <div className={`layouts-card-thumbnail ${getLayoutThumbnailClass(layout)}`}>
-                    <div className="layouts-card-thumbnail-inner" />
-                  </div>
-                  <div className="layouts-card-body">
-                    <div className="layouts-card-name">{layout.name}</div>
-                    {layout.description && (
-                      <div className="layouts-card-description">{layout.description}</div>
-                    )}
-                    <div className="layouts-card-tags">
-                      {layout.tags?.slice(0, 3).map((tag) => (
-                        <span key={tag} className="layouts-tag">{tag}</span>
-                      ))}
-                      {layout.category && layout.category !== 'custom' && (
-                        <span className="layouts-tag category">{layout.category}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="layouts-card-footer">
-                    <span className="layouts-card-date">Updated {formatDate(layout.updatedAt)}</span>
-                    <button
-                      type="button"
-                      className="layouts-card-menu"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openQuickView(layout);
-                      }}
-                      aria-label="More options"
-                    >
-                      ⋯
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    className="layouts-card-open-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenLayout(layout.id);
-                    }}
+          {/* Events without layouts section */}
+          {eventsWithoutLayout.length > 0 && (
+            <div className="layouts-section">
+              <h3 className="layouts-section-title">
+                Events without layouts ({eventsWithoutLayout.length})
+              </h3>
+              <div className="layouts-events-grid">
+                {eventsWithoutLayout.map((event) => (
+                  <div
+                    key={event.id}
+                    className="layouts-event-card create"
+                    onClick={() => handleSelectEvent(event.id, event.title)}
                   >
-                    Open in Layout Maker
-                  </button>
-                </div>
-              ))}
+                    <div className="layouts-event-card-icon">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                    </div>
+                    <div className="layouts-event-card-content">
+                      <span className="layouts-event-card-title">{event.title}</span>
+                      <span className="layouts-event-card-date">{formatWeddingDate(event.wedding_date)}</span>
+                    </div>
+                    <span className="layouts-event-card-action">Create Layout</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          ) : (
-            // Table View
-            <div className="layouts-table-wrapper">
-              <table className="layouts-table">
-                <thead>
-                  <tr>
-                    <th>Layout name</th>
-                    <th>Category</th>
-                    <th>Linked projects</th>
-                    <th>Last updated</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLayouts.map((layout) => (
-                    <tr
+          )}
+
+          {/* Existing layouts */}
+          {filteredLayouts.length > 0 && (
+            <div className="layouts-section">
+              <h3 className="layouts-section-title">
+                Layout Files ({filteredLayouts.length})
+              </h3>
+              <div className="layouts-grid">
+                {filteredLayouts.map((layout) => {
+                  const tabCount = getTabCount(layout);
+                  const { tables, elements } = getLayoutPreviewInfo(layout);
+
+                  return (
+                    <div
                       key={layout.id}
-                      onClick={() => openQuickView(layout)}
-                      className="layouts-table-row"
+                      className="layouts-card"
+                      onClick={() => handleOpenLayout(layout)}
                     >
-                      <td>
-                        <div className="layouts-table-name">
-                          <span className="layouts-table-icon">📐</span>
-                          {layout.name}
+                      <div className="layouts-card-thumbnail">
+                        <div className="layouts-card-thumbnail-content">
+                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <line x1="3" y1="9" x2="21" y2="9" />
+                            <line x1="9" y1="21" x2="9" y2="9" />
+                          </svg>
                         </div>
-                      </td>
-                      <td>
-                        <span className="layouts-tag category">{layout.category || 'Custom'}</span>
-                      </td>
-                      <td>{layout.linkedProjects?.length || 0} projects</td>
-                      <td>{formatDate(layout.updatedAt)}</td>
-                      <td>
-                        <span className={`layouts-status-badge ${layout.status}`}>
-                          {layout.status}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="layouts-table-actions">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenLayout(layout.id);
-                            }}
-                          >
-                            Open
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDuplicateLayout(layout.id);
-                            }}
-                          >
-                            Duplicate
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleArchiveLayout(layout.id);
-                            }}
-                          >
-                            Archive
-                          </button>
+                        <div className="layouts-card-badge">
+                          {tabCount} tab{tabCount !== 1 ? 's' : ''}
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                      <div className="layouts-card-info">
+                        <div className="layouts-card-event">
+                          {layout.event ? (
+                            <>
+                              <span className="layouts-card-event-name">{layout.event.title}</span>
+                              <span className="layouts-card-event-date">{formatWeddingDate(layout.event.wedding_date)}</span>
+                            </>
+                          ) : (
+                            <span className="layouts-card-event-name">{layout.name}</span>
+                          )}
+                        </div>
+                        <div className="layouts-card-meta">
+                          <span>{tables} table{tables !== 1 ? 's' : ''}</span>
+                          <span className="layouts-card-meta-divider">·</span>
+                          <span>{elements} element{elements !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="layouts-card-updated">
+                          Updated {formatDate(layout.updated_at)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {filteredLayouts.length === 0 && searchQuery && (
+            <div className="layouts-no-results">
+              <p>No layouts match "{searchQuery}"</p>
+              <button type="button" onClick={() => setSearchQuery('')}>
+                Clear search
+              </button>
             </div>
           )}
         </>
       )}
 
-      {/* Quick View Drawer */}
-      <QuickViewDrawer
-        layout={selectedLayout}
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        onEdit={handleOpenLayout}
-        onDuplicate={handleDuplicateLayout}
-        onArchive={handleArchiveLayout}
-        onDelete={handleDeleteLayout}
-        onUpdateLayout={handleUpdateLayout}
+      {/* Event Selector Modal */}
+      <EventSelectorModal
+        isOpen={showEventModal}
+        onClose={() => setShowEventModal(false)}
+        onSelectEvent={handleSelectEvent}
       />
 
       {/* Toast */}
@@ -646,9 +363,15 @@ const LayoutsSection: React.FC = () => {
           {toast.message}
         </div>
       )}
+
+      {/* FAB for mobile */}
+      {isMobile && (
+        <button type="button" className="layouts-fab" onClick={handleNewLayout} aria-label="Create new layout">
+          <PlusIcon />
+        </button>
+      )}
     </div>
   );
 };
 
 export default LayoutsSection;
-

@@ -8,6 +8,42 @@
 import { browserSupabaseClient } from '../browserSupabaseClient';
 
 // Types matching the Layout Maker project structure
+
+// Single tab canvas data (one area/project within a layout file)
+export interface TabCanvasData {
+  drawings: any[];
+  shapes: any[];
+  textElements: any[];
+  walls?: any[];
+  doors?: any[];
+  powerPoints?: any[];
+  viewBox: { x: number; y: number; width: number; height: number };
+}
+
+// A single tab within a layout file
+export interface LayoutTab {
+  id: string;
+  name: string;
+  canvas: TabCanvasData;
+  a4Dimensions?: {
+    a4X: number;
+    a4Y: number;
+    a4WidthPx: number;
+    a4HeightPx: number;
+  };
+  category?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// The full layout file data (contains multiple tabs)
+export interface LayoutFileData {
+  tabs: LayoutTab[];
+  activeTabId: string;
+  workflowPositions?: Record<string, { x: number; y: number }>;
+}
+
+// Legacy single canvas data (for backwards compatibility)
 export interface CanvasData {
   drawings: any[];
   shapes: any[];
@@ -24,11 +60,16 @@ export interface LayoutRecord {
   description?: string;
   category?: string;
   tags?: string[];
-  canvas_data: CanvasData;
-  event_id?: string;
+  canvas_data: LayoutFileData | CanvasData; // Support both new and legacy format
+  event_id?: string | null;
   status: 'active' | 'archived';
   created_at: string;
   updated_at: string;
+}
+
+// Helper to check if canvas_data is new format
+export function isLayoutFileData(data: LayoutFileData | CanvasData): data is LayoutFileData {
+  return 'tabs' in data && Array.isArray((data as LayoutFileData).tabs);
 }
 
 // Input for saving a layout
@@ -38,8 +79,8 @@ export interface SaveLayoutInput {
   description?: string;
   category?: string;
   tags?: string[];
-  canvasData: CanvasData;
-  eventId?: string;
+  canvasData: LayoutFileData | CanvasData;
+  eventId?: string | null;
   status?: 'active' | 'archived';
 }
 
@@ -64,6 +105,16 @@ const getAccountId = (): string | null => {
 };
 
 /**
+ * Get the Supabase client, throwing if not available
+ */
+const getSupabaseClient = () => {
+  if (!browserSupabaseClient) {
+    throw new Error('Supabase client not initialized');
+  }
+  return browserSupabaseClient;
+};
+
+/**
  * Fetch all layouts for the current user
  */
 export async function listLayouts(): Promise<ApiResponse<LayoutRecord[]>> {
@@ -73,7 +124,7 @@ export async function listLayouts(): Promise<ApiResponse<LayoutRecord[]>> {
       return { data: null, error: 'Not authenticated' };
     }
 
-    const { data, error } = await browserSupabaseClient
+    const { data, error } = await getSupabaseClient()
       .from('layouts')
       .select('*')
       .eq('account_id', accountId)
@@ -101,7 +152,7 @@ export async function getLayout(layoutId: string): Promise<ApiResponse<LayoutRec
       return { data: null, error: 'Not authenticated' };
     }
 
-    const { data, error } = await browserSupabaseClient
+    const { data, error } = await getSupabaseClient()
       .from('layouts')
       .select('*')
       .eq('id', layoutId)
@@ -144,7 +195,7 @@ export async function saveLayout(input: SaveLayoutInput): Promise<ApiResponse<La
 
     if (input.layoutId) {
       // Update existing layout
-      const { data, error } = await browserSupabaseClient
+      const { data, error } = await getSupabaseClient()
         .from('layouts')
         .update(payload)
         .eq('id', input.layoutId)
@@ -160,7 +211,7 @@ export async function saveLayout(input: SaveLayoutInput): Promise<ApiResponse<La
       return { data: data as LayoutRecord, error: null };
     } else {
       // Insert new layout
-      const { data, error } = await browserSupabaseClient
+      const { data, error } = await getSupabaseClient()
         .from('layouts')
         .insert(payload)
         .select()
@@ -231,7 +282,7 @@ export async function deleteLayout(layoutId: string): Promise<ApiResponse<boolea
       return { data: null, error: 'Not authenticated' };
     }
 
-    const { error } = await browserSupabaseClient
+    const { error } = await getSupabaseClient()
       .from('layouts')
       .delete()
       .eq('id', layoutId)
@@ -262,7 +313,7 @@ export async function setLayoutStatus(
       return { data: null, error: 'Not authenticated' };
     }
 
-    const { data, error } = await browserSupabaseClient
+    const { data, error } = await getSupabaseClient()
       .from('layouts')
       .update({ status })
       .eq('id', layoutId)
@@ -300,7 +351,7 @@ export async function attachLayoutsToProject(
       return { data: [], error: null };
     }
 
-    const { data, error } = await browserSupabaseClient
+    const { data, error } = await getSupabaseClient()
       .from('layouts')
       .update({ event_id: eventId })
       .in('id', layoutIds)
@@ -321,6 +372,7 @@ export async function attachLayoutsToProject(
 
 /**
  * Fetch all layouts linked to a specific project (event)
+ * @deprecated Use getLayoutForEvent instead - each event now has ONE layout file
  */
 export async function listLayoutsForProject(eventId: string): Promise<ApiResponse<LayoutRecord[]>> {
   try {
@@ -329,7 +381,7 @@ export async function listLayoutsForProject(eventId: string): Promise<ApiRespons
       return { data: null, error: 'Not authenticated' };
     }
 
-    const { data, error } = await browserSupabaseClient
+    const { data, error } = await getSupabaseClient()
       .from('layouts')
       .select('*')
       .eq('account_id', accountId)
@@ -344,6 +396,176 @@ export async function listLayoutsForProject(eventId: string): Promise<ApiRespons
     return { data: data as LayoutRecord[], error: null };
   } catch (err: any) {
     console.error('[layoutsApi] listLayoutsForProject exception:', err);
+    return { data: null, error: err.message || 'Unknown error' };
+  }
+}
+
+/**
+ * Create an empty layout file data structure with one default tab
+ */
+export function createEmptyLayoutFileData(): LayoutFileData {
+  const now = new Date().toISOString();
+  const defaultTabId = `tab-${Date.now()}`;
+  return {
+    tabs: [{
+      id: defaultTabId,
+      name: 'Main Layout',
+      canvas: {
+        drawings: [],
+        shapes: [],
+        textElements: [],
+        walls: [],
+        doors: [],
+        powerPoints: [],
+        viewBox: { x: 0, y: 0, width: 0, height: 0 },
+      },
+      createdAt: now,
+      updatedAt: now,
+    }],
+    activeTabId: defaultTabId,
+    workflowPositions: {},
+  };
+}
+
+/**
+ * Get THE layout file for a specific event (one-to-one relationship)
+ * Returns null if no layout exists for this event
+ */
+export async function getLayoutForEvent(eventId: string): Promise<ApiResponse<LayoutRecord | null>> {
+  try {
+    const accountId = getAccountId();
+    if (!accountId) {
+      return { data: null, error: 'Not authenticated' };
+    }
+
+    const { data, error } = await getSupabaseClient()
+      .from('layouts')
+      .select('*')
+      .eq('account_id', accountId)
+      .eq('event_id', eventId)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[layoutsApi] getLayoutForEvent error:', error);
+      return { data: null, error: error.message };
+    }
+
+    return { data: data as LayoutRecord | null, error: null };
+  } catch (err: any) {
+    console.error('[layoutsApi] getLayoutForEvent exception:', err);
+    return { data: null, error: err.message || 'Unknown error' };
+  }
+}
+
+/**
+ * Create a new layout file for an event
+ * Will fail if the event already has a layout (one-to-one relationship)
+ */
+export async function createLayoutForEvent(
+  eventId: string,
+  eventTitle: string
+): Promise<ApiResponse<LayoutRecord>> {
+  try {
+    const accountId = getAccountId();
+    if (!accountId) {
+      return { data: null, error: 'Not authenticated' };
+    }
+
+    // Check if event already has a layout
+    const existing = await getLayoutForEvent(eventId);
+    if (existing.data) {
+      return { data: null, error: 'Event already has a layout file' };
+    }
+
+    const payload = {
+      account_id: accountId,
+      name: `${eventTitle} - Layout`,
+      description: `Layout file for ${eventTitle}`,
+      category: 'custom',
+      tags: [],
+      canvas_data: createEmptyLayoutFileData(),
+      event_id: eventId,
+      status: 'active',
+    };
+
+    const { data, error } = await getSupabaseClient()
+      .from('layouts')
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[layoutsApi] createLayoutForEvent error:', error);
+      return { data: null, error: error.message };
+    }
+
+    return { data: data as LayoutRecord, error: null };
+  } catch (err: any) {
+    console.error('[layoutsApi] createLayoutForEvent exception:', err);
+    return { data: null, error: err.message || 'Unknown error' };
+  }
+}
+
+/**
+ * Get or create a layout file for an event
+ * Returns existing layout if found, creates new one if not
+ */
+export async function getOrCreateLayoutForEvent(
+  eventId: string,
+  eventTitle: string
+): Promise<ApiResponse<LayoutRecord>> {
+  try {
+    // Try to get existing layout
+    const existing = await getLayoutForEvent(eventId);
+    if (existing.error) {
+      return { data: null, error: existing.error };
+    }
+    if (existing.data) {
+      return { data: existing.data, error: null };
+    }
+
+    // Create new layout for this event
+    return await createLayoutForEvent(eventId, eventTitle);
+  } catch (err: any) {
+    console.error('[layoutsApi] getOrCreateLayoutForEvent exception:', err);
+    return { data: null, error: err.message || 'Unknown error' };
+  }
+}
+
+/**
+ * List all layouts with their associated event info
+ * Used for the dashboard layout tab - shows one layout file per event
+ */
+export async function listLayoutsWithEvents(): Promise<ApiResponse<Array<LayoutRecord & { event?: { id: string; title: string; wedding_date: string } }>>> {
+  try {
+    const accountId = getAccountId();
+    if (!accountId) {
+      return { data: null, error: 'Not authenticated' };
+    }
+
+    const { data, error } = await getSupabaseClient()
+      .from('layouts')
+      .select(`
+        *,
+        event:events!event_id (
+          id,
+          title,
+          wedding_date
+        )
+      `)
+      .eq('account_id', accountId)
+      .eq('status', 'active')
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('[layoutsApi] listLayoutsWithEvents error:', error);
+      return { data: null, error: error.message };
+    }
+
+    return { data: data as any, error: null };
+  } catch (err: any) {
+    console.error('[layoutsApi] listLayoutsWithEvents exception:', err);
     return { data: null, error: err.message || 'Unknown error' };
   }
 }

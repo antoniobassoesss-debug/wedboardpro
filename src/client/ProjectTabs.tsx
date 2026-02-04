@@ -12,6 +12,18 @@ interface ProjectTabsProps {
   onNewProject: () => void;
   onDeleteProject?: (projectId: string) => void;
   onRenameProject?: (projectId: string, newName: string) => void;
+  newlyCreatedProjectId?: string | null;
+  onOpenWorkflow?: () => void;
+  isWorkflowOpen?: boolean;
+}
+
+interface ProjectTabsProps {
+  projects: Project[];
+  activeProjectId: string;
+  onProjectSelect: (projectId: string) => void;
+  onNewProject: () => void;
+  onDeleteProject?: (projectId: string) => void;
+  onRenameProject?: (projectId: string, newName: string) => void;
   newlyCreatedProjectId?: string | null; // ID of project that should be in edit mode
 }
 
@@ -22,7 +34,9 @@ const ProjectTabs: React.FC<ProjectTabsProps> = ({
   onNewProject,
   onDeleteProject,
   onRenameProject,
-  newlyCreatedProjectId
+  newlyCreatedProjectId,
+  onOpenWorkflow,
+  isWorkflowOpen = false,
 }) => {
   const [contextMenu, setContextMenu] = useState<{ projectId: string; x: number; y: number } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -115,6 +129,46 @@ const ProjectTabs: React.FC<ProjectTabsProps> = ({
         isolation: 'isolate',
       }}
     >
+      {onOpenWorkflow && (
+        <button
+          onClick={onOpenWorkflow}
+          style={{
+            height: '32px',
+            padding: '0 16px',
+            borderRadius: '16px',
+            border: 'none',
+            background: isWorkflowOpen ? '#000000' : '#e5e5e5',
+            color: isWorkflowOpen ? '#ffffff' : '#666666',
+            fontSize: '13px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+          }}
+          onMouseEnter={(e) => {
+            if (!isWorkflowOpen) {
+              e.currentTarget.style.background = '#d0d0d0';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isWorkflowOpen) {
+              e.currentTarget.style.background = '#e5e5e5';
+            }
+          }}
+          title="Open Workflow View"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}>
+            <path d="M12 2L2 7l10 5 10-5-10-5z" />
+            <path d="M2 17l10 5 10-5" />
+            <path d="M2 12l10 5 10-5" />
+          </svg>
+          Workflow
+        </button>
+      )}
         {projects.map((project) => {
           const isEditing = editingProjectId === project.id;
           

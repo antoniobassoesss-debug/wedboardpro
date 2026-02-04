@@ -15,12 +15,24 @@ import { useToast } from "./ui/toast";
 import SubscriptionTab from "../dashboard/SubscriptionTab";
 import UsageTab from "../dashboard/UsageTab";
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return isMobile;
+}
+
 interface AccountModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function AccountModal({ open, onOpenChange }: AccountModalProps) {
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState<"profile" | "team" | "billing" | "usage" | "preferences">("profile");
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState<{
@@ -438,45 +450,71 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
     <DialogContent
         style={{
           background: '#ffffff',
-          padding: '32px 40px',
-          borderRadius: '32px',
+          padding: isMobile ? '20px' : '32px 40px',
+          borderRadius: isMobile ? '24px 24px 0 0' : '32px',
           boxShadow: '0 8px 30px rgba(0,0,0,0.08)',
-          maxWidth: '700px',
-          width: '90vw',
-          maxHeight: '85vh',
+          maxWidth: isMobile ? '100%' : '700px',
+          width: isMobile ? '100%' : '90vw',
+          maxHeight: isMobile ? '90vh' : '85vh',
           display: 'flex',
           flexDirection: 'column',
           fontFamily: "'Geist', 'Inter', sans-serif",
           overflow: 'hidden',
+          position: isMobile ? 'fixed' : 'relative',
+          bottom: isMobile ? 0 : 'auto',
+          left: isMobile ? 0 : 'auto',
+          right: isMobile ? 0 : 'auto',
+          margin: 0,
+          animation: isMobile ? 'account-modal-slide-up 300ms ease' : undefined,
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ marginBottom: 24 }}>
-          <h2 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px 0', color: '#0c0c0c' }}>Account Settings</h2>
-          <p style={{ fontSize: 14, color: '#7c7c7c', margin: 0 }}>Manage your account information</p>
+        <style>{`
+          @keyframes account-modal-slide-up {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+          }
+        `}</style>
+        <div style={{ marginBottom: isMobile ? 16 : 24 }}>
+          <h2 style={{ fontSize: isMobile ? 20 : 24, fontWeight: 700, margin: '0 0 8px 0', color: '#0c0c0c' }}>Account Settings</h2>
+          <p style={{ fontSize: isMobile ? 13 : 14, color: '#7c7c7c', margin: 0 }}>Manage your account information</p>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 32 }}>
+        <div style={{ 
+          display: 'flex', 
+          gap: isMobile ? 6 : 8, 
+          marginBottom: isMobile ? 20 : 32,
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          paddingBottom: isMobile ? 4 : 0,
+          marginLeft: isMobile ? -20 : 0,
+          paddingLeft: isMobile ? 20 : 0,
+          marginRight: isMobile ? -20 : 0,
+          paddingRight: isMobile ? 20 : 0,
+          flexShrink: 0,
+        }}>
           {[
             { id: "profile", label: "Profile" },
             { id: "team", label: "Team" },
             { id: "billing", label: "Billing" },
             { id: "usage", label: "Usage" },
-            { id: "preferences", label: "Preferences" },
+            { id: "preferences", label: "Prefs" },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               style={{
                 borderRadius: 999,
-                padding: '10px 20px',
+                padding: isMobile ? '8px 14px' : '10px 20px',
                 border: 'none',
                 cursor: 'pointer',
                 background: activeTab === tab.id ? '#0c0c0c' : 'transparent',
                 color: activeTab === tab.id ? '#fff' : '#7c7c7c',
                 fontWeight: 600,
-                fontSize: 14,
+                fontSize: isMobile ? 12 : 14,
                 transition: 'all 0.15s ease',
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
               }}
             >
               {tab.label}
@@ -488,29 +526,30 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           flex: 1,
           overflowY: 'auto',
           overflowX: 'hidden',
-          paddingRight: '8px',
-          marginRight: '-8px',
+          paddingRight: isMobile ? 0 : '8px',
+          marginRight: isMobile ? 0 : '-8px',
           minHeight: 0,
+          paddingBottom: isMobile ? 20 : 0,
         }}>
           {activeTab === "profile" && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 32, paddingBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                {/* Avatar with hover overlay and click handler */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 20 : 32, paddingBottom: isMobile ? 80 : 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 14 : 20 }}>
                 <div
                   style={{
                     position: 'relative',
-                    width: 64,
-                    height: 64,
+                    width: isMobile ? 72 : 64,
+                    height: isMobile ? 72 : 64,
                     borderRadius: 999,
                     overflow: 'hidden',
                     background: '#ebebeb',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 20,
+                    fontSize: isMobile ? 24 : 20,
                     fontWeight: 700,
                     color: '#0c0c0c',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    flexShrink: 0,
                   }}
                   onClick={() => setShowAvatarUpload(true)}
                 >
@@ -519,12 +558,11 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                   ) : (
                     (profile.full_name || profile.email || "U")
                       .split(" ")
-                      .map((s) => s[0])
+                      .map((s: string) => s[0])
                       .slice(0, 2)
                       .join("")
                       .toUpperCase()
                   )}
-                  {/* Hover overlay */}
                   <div
                     style={{
                       position: 'absolute',
@@ -536,38 +574,38 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                       justifyContent: 'center',
                       opacity: 0,
                       transition: 'opacity 0.2s',
-                      gap: 4
+                      gap: 4,
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
                     onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
                   >
-                    <span style={{ fontSize: 20 }}>📷</span>
-                    <span style={{ fontSize: 11, color: '#fff', fontWeight: 600 }}>
+                    <span style={{ fontSize: isMobile ? 24 : 20 }}>📷</span>
+                    <span style={{ fontSize: isMobile ? 12 : 11, color: '#fff', fontWeight: 600 }}>
                       {profile.avatar_url ? 'Change' : 'Upload'}
                     </span>
                   </div>
                 </div>
 
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px 0', color: '#0c0c0c' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h3 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 700, margin: '0 0 4px 0', color: '#0c0c0c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {profile.full_name || profile.email || "Your name"}
                   </h3>
-                  <p style={{ fontSize: 14, color: '#7c7c7c', margin: 0 }}>{profile.business_name ?? "Wedding Planner"}</p>
+                  <p style={{ fontSize: isMobile ? 13 : 14, color: '#7c7c7c', margin: 0 }}>{profile.business_name ?? "Wedding Planner"}</p>
                 </div>
 
-                {/* Remove button (only shown if avatar exists) */}
                 {profile.avatar_url && (
                   <button
                     onClick={handleRemoveAvatar}
                     style={{
-                      padding: '8px 16px',
+                      padding: isMobile ? '8px 12' : '8px 16px',
                       border: '1px solid #e3e3e3',
                       borderRadius: 999,
                       background: '#fff',
-                      fontSize: 13,
+                      fontSize: isMobile ? 12 : 13,
                       fontWeight: 600,
                       cursor: 'pointer',
-                      color: '#dc2626'
+                      color: '#dc2626',
+                      flexShrink: 0,
                     }}
                   >
                     Remove
@@ -575,99 +613,45 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                 )}
               </div>
 
-              <div style={{ height: 1, background: '#e3e3e3', margin: '0 -40px' }} />
+              <div style={{ height: 1, background: '#e3e3e3', margin: '0 -20px' }} />
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#0c0c0c' }}>Business Name</label>
-                  <input
-                    id="business-name"
-                    defaultValue={profile.business_name ?? ""}
-                    style={{
-                      borderRadius: 999,
-                      padding: '12px 18px',
-                      border: '1px solid #e3e3e3',
-                      background: '#fff',
-                      fontSize: 14,
-                      fontFamily: "'Geist', 'Inter', sans-serif",
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#0c0c0c' }}>Email</label>
-                  <input
-                    id="email"
-                    type="email"
-                    defaultValue={profile.email ?? ""}
-                    style={{
-                      borderRadius: 999,
-                      padding: '12px 18px',
-                      border: '1px solid #e3e3e3',
-                      background: '#fff',
-                      fontSize: 14,
-                      fontFamily: "'Geist', 'Inter', sans-serif",
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#0c0c0c' }}>Phone</label>
-                  <input
-                    id="phone"
-                    type="tel"
-                    defaultValue={profile.phone ?? ""}
-                    style={{
-                      borderRadius: 999,
-                      padding: '12px 18px',
-                      border: '1px solid #e3e3e3',
-                      background: '#fff',
-                      fontSize: 14,
-                      fontFamily: "'Geist', 'Inter', sans-serif",
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#0c0c0c' }}>Business Address</label>
-                  <input
-                    id="address"
-                    defaultValue={profile.address ?? ""}
-                    style={{
-                      borderRadius: 999,
-                      padding: '12px 18px',
-                      border: '1px solid #e3e3e3',
-                      background: '#fff',
-                      fontSize: 14,
-                      fontFamily: "'Geist', 'Inter', sans-serif",
-                    }}
-                  />
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 16 : 20 }}>
+                {['Business Name', 'Email', 'Phone', 'Business Address'].map((label, idx) => (
+                  <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <label style={{ fontSize: isMobile ? 11 : 12, fontWeight: 600, color: '#0c0c0c' }}>{label}</label>
+                    <input
+                      id={label.toLowerCase().replace(' ', '-')}
+                      defaultValue={label === 'Business Name' ? profile.business_name ?? "" : label === 'Email' ? profile.email ?? "" : label === 'Phone' ? profile.phone ?? "" : profile.address ?? ""}
+                      style={{
+                        borderRadius: 999,
+                        padding: '12px 18px',
+                        border: '1px solid #e3e3e3',
+                        background: '#fff',
+                        fontSize: isMobile ? 16 : 14,
+                        fontFamily: "'Geist', 'Inter', sans-serif",
+                        width: '100%',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                ))}
               </div>
 
-              <div style={{ height: 1, background: '#e3e3e3', margin: '32px 0' }} />
+              <div style={{ height: 1, background: '#e3e3e3', margin: isMobile ? '16px -20px' : '32px 0' }} />
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px 0', color: '#0c0c0c' }}>Account Actions</h3>
+                <h3 style={{ fontSize: isMobile ? 13 : 14, fontWeight: 700, margin: '0 0 12px 0', color: '#0c0c0c' }}>Account Actions</h3>
                 <button
                   onClick={async () => {
                     try {
-                      // Sign out from Supabase
-                      if (browserSupabaseClient) {
-                        await browserSupabaseClient.auth.signOut();
-                      }
-
-                      // Clear all session data from localStorage
+                      if (browserSupabaseClient) await browserSupabaseClient.auth.signOut();
                       localStorage.removeItem('wedboarpro_session');
                       localStorage.removeItem('wedboarpro_user');
                       localStorage.removeItem('wedboarpro_display_name');
-
-                      // Close modal and redirect to landing page
                       onOpenChange(false);
                       window.location.href = '/';
                     } catch (error) {
                       console.error('Logout error:', error);
-                      // Even if there's an error, clear local data and redirect
                       localStorage.removeItem('wedboarpro_session');
                       localStorage.removeItem('wedboarpro_user');
                       localStorage.removeItem('wedboarpro_display_name');
@@ -678,31 +662,24 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                   style={{
                     width: '100%',
                     borderRadius: 999,
-                    padding: '12px 18px',
+                    padding: '14px 18px',
                     border: '1px solid #e3e3e3',
                     background: '#fff',
                     color: '#dc2626',
                     fontWeight: 600,
-                    fontSize: 14,
+                    fontSize: isMobile ? 14 : 14,
                     cursor: 'pointer',
                     textAlign: 'left',
                     fontFamily: "'Geist', 'Inter', sans-serif",
                     transition: 'all 0.15s ease',
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#fef2f2';
-                    e.currentTarget.style.borderColor = '#dc2626';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#fff';
-                    e.currentTarget.style.borderColor = '#e3e3e3';
-                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.borderColor = '#dc2626'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e3e3e3'; }}
                 >
                   Log Out
                 </button>
               </div>
 
-              {/* Avatar Upload Modal */}
               <AvatarUploadModal
                 isOpen={showAvatarUpload}
                 onClose={() => setShowAvatarUpload(false)}
@@ -712,28 +689,30 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           )}
 
           {activeTab === "team" && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 16 : 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 16 }}>
                 <div>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px 0', color: '#0c0c0c' }}>Team Members</h3>
-                  <p style={{ fontSize: 14, color: '#7c7c7c', margin: 0 }}>
+                  <h3 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 700, margin: '0 0 4px 0', color: '#0c0c0c' }}>Team Members</h3>
+                  <p style={{ fontSize: isMobile ? 12 : 14, color: '#7c7c7c', margin: 0 }}>
                     {teamInfo ? `Workspace: ${teamInfo.name}` : 'Create a team to start collaborating'}
                   </p>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button
                     onClick={handleCreateTeamButton}
                     disabled={creatingTeam || Boolean(teamInfo)}
                     style={{
                       borderRadius: 999,
-                      padding: '10px 20px',
+                      padding: '10px 18px',
                       border: '1px solid #0c0c0c',
                       background: teamInfo ? '#fafafa' : '#0c0c0c',
                       color: teamInfo ? '#0c0c0c' : '#fff',
                       fontWeight: 600,
-                      fontSize: 14,
+                      fontSize: isMobile ? 13 : 14,
                       cursor: creatingTeam || teamInfo ? 'not-allowed' : 'pointer',
                       fontFamily: "'Geist', 'Inter', sans-serif",
+                      flex: 1,
+                      minWidth: isMobile ? 'calc(50% - 4px)' : 'auto',
                     }}
                   >
                     {creatingTeam ? 'Creating…' : 'Create Team'}
@@ -743,14 +722,16 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                     disabled={!teamInfo}
                     style={{
                       borderRadius: 999,
-                      padding: '10px 20px',
+                      padding: '10px 18px',
                       border: 'none',
                       background: teamInfo ? '#0c0c0c' : '#d7d7d7',
                       color: teamInfo ? '#fff' : '#888',
                       fontWeight: 600,
-                      fontSize: 14,
+                      fontSize: isMobile ? 13 : 14,
                       cursor: teamInfo ? 'pointer' : 'not-allowed',
                       fontFamily: "'Geist', 'Inter', sans-serif",
+                      flex: 1,
+                      minWidth: isMobile ? 'calc(50% - 4px)' : 'auto',
                     }}
                   >
                     Invite
@@ -759,59 +740,27 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
               </div>
 
               {teamError && (
-                <div
-                  style={{
-                    padding: 12,
-                    borderRadius: 999,
-                    background: '#fee2e2',
-                    color: '#b91c1c',
-                    fontSize: 13,
-                    fontWeight: 500,
-                  }}
-                >
+                <div style={{ padding: 12, borderRadius: 999, background: '#fee2e2', color: '#b91c1c', fontSize: 13, fontWeight: 500 }}>
                   {teamError}
                 </div>
               )}
 
               {teamLoading ? (
-                <div style={{ textAlign: 'center', padding: 32, color: '#7c7c7c', fontSize: 14 }}>
-                  Loading team information...
-                </div>
+                <div style={{ textAlign: 'center', padding: 32, color: '#7c7c7c', fontSize: 14 }}>Loading team information...</div>
               ) : !teamInfo ? (
-                <div
-                  style={{
-                    border: '1px dashed #cfcfcf',
-                    borderRadius: 20,
-                    padding: 24,
-                    background: '#fafafa',
-                    textAlign: 'center',
-                    color: '#6b6b6b',
-                    fontSize: 14,
-                  }}
-                >
-                  No team yet. Click the "Create Team" button above to set up your workspace.
+                <div style={{ border: '1px dashed #cfcfcf', borderRadius: 20, padding: 24, background: '#fafafa', textAlign: 'center', color: '#6b6b6b', fontSize: isMobile ? 13 : 14 }}>
+                  No team yet. Click "Create Team" to set up your workspace.
                 </div>
               ) : null}
 
               {(inviteActionError || acceptSuccessMessage) && (
-                <div
-                  style={{
-                    padding: 12,
-                    borderRadius: 999,
-                    background: inviteActionError ? '#fee2e2' : '#ecfdf5',
-                    color: inviteActionError ? '#b91c1c' : '#065f46',
-                    fontSize: 13,
-                    fontWeight: 500,
-                  }}
-                >
+                <div style={{ padding: 12, borderRadius: 999, background: inviteActionError ? '#fee2e2' : '#ecfdf5', color: inviteActionError ? '#b91c1c' : '#065f46', fontSize: 13, fontWeight: 500 }}>
                   {inviteActionError || acceptSuccessMessage}
                 </div>
               )}
 
               {loadingInvites ? (
-                <div style={{ textAlign: 'center', padding: 32, color: '#7c7c7c', fontSize: 14 }}>
-                  Checking for pending invitations...
-                </div>
+                <div style={{ textAlign: 'center', padding: 32, color: '#7c7c7c', fontSize: 14 }}>Checking for pending invitations...</div>
               ) : pendingInvites.length > 0 ? (
                 <div style={{ border: '1px solid #e3e3e3', borderRadius: 20, padding: 20, background: '#fafafa', display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div>
@@ -826,44 +775,14 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                       const expiresLabel = expiresAt ? `Expires ${expiresAt.toLocaleDateString()}` : 'Expires soon';
                       const isProcessing = acceptingToken === invite?.token;
                       return (
-                        <div
-                          key={invite.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: 16,
-                            borderRadius: 16,
-                            background: '#fff',
-                            border: '1px solid #e3e3e3',
-                            gap: 12,
-                            flexWrap: 'wrap',
-                          }}
-                        >
-                          <div style={{ flex: 1, minWidth: 200 }}>
+                        <div key={invite.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderRadius: 16, background: '#fff', border: '1px solid #e3e3e3', gap: 12, flexWrap: 'wrap' }}>
+                          <div style={{ flex: 1, minWidth: 150 }}>
                             <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#0c0c0c' }}>{teamName}</p>
-                            <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#6b6b6b' }}>
-                              Invited by {inviterEmail} · {expiresLabel}
-                            </p>
+                            <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#6b6b6b' }}>Invited by {inviterEmail} · {expiresLabel}</p>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <button
-                              onClick={() => handleAcceptInvite(invite.token)}
-                              disabled={isProcessing}
-                              style={{
-                                borderRadius: 999,
-                                padding: '8px 18px',
-                                border: 'none',
-                                background: isProcessing ? '#9ca3af' : '#0c0c0c',
-                                color: '#fff',
-                                fontSize: 13,
-                                fontWeight: 600,
-                                cursor: isProcessing ? 'not-allowed' : 'pointer',
-                              }}
-                            >
-                              {isProcessing ? 'Joining...' : 'Accept invite'}
-                            </button>
-                          </div>
+                          <button onClick={() => handleAcceptInvite(invite.token)} disabled={isProcessing} style={{ borderRadius: 999, padding: '8px 18px', border: 'none', background: isProcessing ? '#9ca3af' : '#0c0c0c', color: '#fff', fontSize: 13, fontWeight: 600, cursor: isProcessing ? 'not-allowed' : 'pointer' }}>
+                            {isProcessing ? 'Joining...' : 'Accept'}
+                          </button>
                         </div>
                       );
                     })}
@@ -871,135 +790,47 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                 </div>
               ) : null}
 
-              {teamInfo &&
-                (loadingMembers ? (
-                  <div style={{ textAlign: 'center', padding: 40, color: '#7c7c7c' }}>Loading team members...</div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {teamMembers.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: 40, color: '#7c7c7c' }}>
-                        No team members yet. Click "Invite" to add someone to your team.
-                      </div>
-                    ) : (
-                      teamMembers.map((member: any) => {
-                        const memberProfile = member.profile || member.profiles || {};
-                        const memberEmail = member.displayEmail || memberProfile.email || "";
-                        const memberName =
-                          member.displayName ||
-                          memberProfile.full_name ||
-                          memberEmail ||
-                          "Unknown";
-                        const memberAvatar = memberProfile.avatar_url;
-                        const initials = (memberName || "U")
-                          .split(" ")
-                          .map((s: string) => s[0])
-                          .slice(0, 2)
-                          .join("")
-                          .toUpperCase();
-
-                        return (
-                          <div
-                            key={member.id}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: 16,
-                              borderRadius: 16,
-                              border: '1px solid #e3e3e3',
-                              background: '#fff',
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                              {memberAvatar ? (
-                                <img
-                                  src={memberAvatar}
-                                  alt={memberName}
-                                  style={{
-                                    width: 40,
-                                    height: 40,
-                                    borderRadius: 999,
-                                    objectFit: 'cover',
-                                  }}
-                                />
-                              ) : (
-                                <div
-                                  style={{
-                                    width: 40,
-                                    height: 40,
-                                    borderRadius: 999,
-                                    background: '#ebebeb',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: 14,
-                                    fontWeight: 700,
-                                    color: '#0c0c0c',
-                                  }}
-                                >
-                                  {initials}
-                                </div>
-                              )}
-                              <div>
-                                <p style={{ fontSize: 14, fontWeight: 600, margin: '0 0 2px 0', color: '#0c0c0c' }}>{memberName}</p>
-                                <p style={{ fontSize: 12, color: '#7c7c7c', margin: 0 }}>{memberEmail}</p>
-                              </div>
-                            </div>
-                            <span
-                              style={{
-                                borderRadius: 999,
-                                padding: '4px 12px',
-                                background: '#ebebeb',
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: '#0c0c0c',
-                                textTransform: 'capitalize',
-                              }}
-                            >
-                              {member.role}
-                            </span>
+              {teamInfo && (loadingMembers ? (
+                <div style={{ textAlign: 'center', padding: 40, color: '#7c7c7c' }}>Loading team members...</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {teamMembers.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: 40, color: '#7c7c7c', fontSize: isMobile ? 13 : 14 }}>No team members yet. Click "Invite" to add someone.</div>
+                  ) : teamMembers.map((member) => {
+                    const memberProfile = member.profile || member.profiles || {};
+                    const memberName = member.displayName || memberProfile.full_name || memberProfile.email || "Unknown";
+                    const initials = ((memberName || "U").split(" ").map((s: string) => s[0]).slice(0, 2).join("")).toUpperCase();
+                    return (
+                      <div key={member.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? 12 : 16, borderRadius: 16, border: '1px solid #e3e3e3', background: '#fff', flexWrap: 'wrap', gap: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 150 }}>
+                          <div style={{ width: 40, height: 40, borderRadius: 999, background: '#ebebeb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#0c0c0c', flexShrink: 0 }}>
+                            {initials}
                           </div>
-                        );
-                      })
-                    )}
-                  </div>
-                ))}
+                          <div style={{ minWidth: 0 }}>
+                            <p style={{ fontSize: 14, fontWeight: 600, margin: '0 0 2px 0', color: '#0c0c0c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{memberName}</p>
+                            <p style={{ fontSize: 12, color: '#7c7c7c', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{memberProfile.email || member.displayEmail}</p>
+                          </div>
+                        </div>
+                        <span style={{ borderRadius: 999, padding: '4px 12px', background: '#ebebeb', fontSize: 12, fontWeight: 600, color: '#0c0c0c', textTransform: 'capitalize', flexShrink: 0 }}>{member.role}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           )}
 
-          {activeTab === "billing" && (
-            <SubscriptionTab onClose={() => onOpenChange(false)} />
-          )}
-
-          {activeTab === "usage" && (
-            <UsageTab />
-          )}
-
+          {activeTab === "billing" && <SubscriptionTab onClose={() => onOpenChange(false)} />}
+          {activeTab === "usage" && <UsageTab />}
           {activeTab === "preferences" && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#0c0c0c' }}>Notifications</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 20 : 32 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 16 }}>
+                <h3 style={{ fontSize: isMobile ? 13 : 14, fontWeight: 700, margin: 0, color: '#0c0c0c' }}>Notifications</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {[
-                    { label: "Email notifications for new quotes", checked: true },
-                    { label: "Task reminders", checked: true },
-                    { label: "Client messages", checked: true },
-                  ].map((pref) => (
-                    <label
-                      key={pref.label}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: 12,
-                        borderRadius: 16,
-                        border: '1px solid #e3e3e3',
-                        background: '#fff',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <span style={{ fontSize: 14, color: '#0c0c0c' }}>{pref.label}</span>
-                      <input type="checkbox" defaultChecked={pref.checked} style={{ width: 18, height: 18, cursor: 'pointer' }} />
+                  {["Email notifications for new quotes", "Task reminders", "Client messages"].map((pref) => (
+                    <label key={pref} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? 12 : 12, borderRadius: 16, border: '1px solid #e3e3e3', background: '#fff', cursor: 'pointer', flexWrap: 'wrap', gap: 8 }}>
+                      <span style={{ fontSize: isMobile ? 13 : 14, color: '#0c0c0c' }}>{pref}</span>
+                      <input type="checkbox" defaultChecked style={{ width: 20, height: 20, cursor: 'pointer', flexShrink: 0 }} />
                     </label>
                   ))}
                 </div>
@@ -1008,79 +839,33 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
               <div style={{ height: 1, background: '#e3e3e3' }} />
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#0c0c0c' }}>Security</h3>
-                <button
-                  style={{
-                    width: '100%',
-                    borderRadius: 999,
-                    padding: '12px 18px',
-                    border: '1px solid #e3e3e3',
-                    background: '#fff',
-                    color: '#0c0c0c',
-                    fontWeight: 600,
-                    fontSize: 14,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    fontFamily: "'Geist', 'Inter', sans-serif",
-                  }}
-                >
-                  Change Password
-                </button>
-                <button
-                  style={{
-                    width: '100%',
-                    borderRadius: 999,
-                    padding: '12px 18px',
-                    border: '1px solid #e3e3e3',
-                    background: '#fff',
-                    color: '#0c0c0c',
-                    fontWeight: 600,
-                    fontSize: 14,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    fontFamily: "'Geist', 'Inter', sans-serif",
-                  }}
-                >
-                  Enable Two-Factor Authentication
-                </button>
+                <h3 style={{ fontSize: isMobile ? 13 : 14, fontWeight: 700, margin: 0, color: '#0c0c0c' }}>Security</h3>
+                {['Change Password', 'Enable Two-Factor Authentication'].map((action, idx) => (
+                  <button key={action} style={{ width: '100%', borderRadius: 999, padding: '14px 18px', border: '1px solid #e3e3e3', background: '#fff', color: '#0c0c0c', fontWeight: 600, fontSize: isMobile ? 13 : 14, cursor: 'pointer', textAlign: 'left', fontFamily: "'Geist', 'Inter', sans-serif" }}>
+                    {action}
+                  </button>
+                ))}
               </div>
             </div>
           )}
         </div>
 
-        <div style={{ height: 1, background: '#e3e3e3', margin: '32px -40px 0 -40px' }} />
+        {!isMobile && <div style={{ height: 1, background: '#e3e3e3', margin: '32px -40px 0 -40px' }} />}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
-          <button
-            onClick={() => onOpenChange(false)}
-            style={{
-              borderRadius: 999,
-              padding: '10px 24px',
-              border: '1px solid #e3e3e3',
-              background: '#fff',
-              color: '#0c0c0c',
-              fontWeight: 600,
-              fontSize: 14,
-              cursor: 'pointer',
-              fontFamily: "'Geist', 'Inter', sans-serif",
-            }}
-          >
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'flex-end', 
+          gap: 12, 
+          marginTop: isMobile ? 20 : 24,
+          paddingTop: isMobile ? 16 : 0,
+          borderTop: isMobile ? '1px solid #e3e3e3' : 'none',
+          flexShrink: 0,
+          paddingBottom: isMobile ? 'calc(16px + env(safe-area-inset-bottom))' : 0,
+        }}>
+          <button onClick={() => onOpenChange(false)} style={{ borderRadius: 999, padding: isMobile ? '14px 24px' : '10px 24px', border: '1px solid #e3e3e3', background: '#fff', color: '#0c0c0c', fontWeight: 600, fontSize: isMobile ? 14 : 14, cursor: 'pointer', fontFamily: "'Geist', 'Inter', sans-serif" }}>
             Cancel
           </button>
-          <button
-            onClick={() => onOpenChange(false)}
-            style={{
-              borderRadius: 999,
-              padding: '10px 24px',
-              border: 'none',
-              background: '#0c0c0c',
-              color: '#fff',
-              fontWeight: 600,
-              fontSize: 14,
-              cursor: 'pointer',
-              fontFamily: "'Geist', 'Inter', sans-serif",
-            }}
-          >
+          <button onClick={() => onOpenChange(false)} style={{ borderRadius: 999, padding: isMobile ? '14px 24px' : '10px 24px', border: 'none', background: '#0c0c0c', color: '#fff', fontWeight: 600, fontSize: isMobile ? 14 : 14, cursor: 'pointer', fontFamily: "'Geist', 'Inter', sans-serif" }}>
             Save Changes
           </button>
         </div>
@@ -1094,10 +879,11 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           position: "fixed",
           inset: 0,
           display: "flex",
-          alignItems: "center",
+          alignItems: isMobile ? "flex-end" : "center",
           justifyContent: "center",
           background: "rgba(0,0,0,0.4)",
           zIndex: 70,
+          padding: isMobile ? 0 : 16,
         }}
         onClick={() => {
           setShowInviteModal(false);
@@ -1109,25 +895,33 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
         <div
           style={{
             background: "#ffffff",
-            padding: "32px",
-            borderRadius: "24px",
+            padding: isMobile ? '20px' : "32px",
+            borderRadius: isMobile ? '24px 24px 0 0' : "24px",
             boxShadow: "0 8px 30px rgba(0,0,0,0.08)",
-            maxWidth: "480px",
-            width: "90vw",
+            maxWidth: isMobile ? "100%" : "480px",
+            width: isMobile ? "100%" : "90vw",
             fontFamily: "'Geist', 'Inter', sans-serif",
+            animation: isMobile ? 'invite-modal-slide-up 300ms ease' : undefined,
+            marginBottom: isMobile ? 0 : 0,
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <h3 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 8px 0", color: "#0c0c0c" }}>
+          <style>{`
+            @keyframes invite-modal-slide-up {
+              from { transform: translateY(100%); }
+              to { transform: translateY(0); }
+            }
+          `}</style>
+          <h3 style={{ fontSize: isMobile ? 18 : 20, fontWeight: 700, margin: "0 0 8px 0", color: "#0c0c0c" }}>
             Invite Team Member
           </h3>
-          <p style={{ fontSize: 14, color: "#7c7c7c", margin: "0 0 24px 0" }}>
+          <p style={{ fontSize: isMobile ? 13 : 14, color: "#7c7c7c", margin: "0 0 20px 0" }}>
             Send an invitation to join your team. They'll need to sign up if they don't have an account yet.
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#0c0c0c" }}>Email Address</label>
+              <label style={{ fontSize: isMobile ? 11 : 12, fontWeight: 600, color: "#0c0c0c" }}>Email Address</label>
               <input
                 type="email"
                 value={inviteEmail}
@@ -1139,29 +933,21 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                 placeholder="colleague@example.com"
                 style={{
                   borderRadius: 999,
-                  padding: "12px 18px",
+                  padding: "14px 18px",
                   border: inviteError ? "1px solid #ef4444" : "1px solid #e3e3e3",
                   background: "#fff",
-                  fontSize: 14,
+                  fontSize: isMobile ? 16 : 14,
                   fontFamily: "'Geist', 'Inter', sans-serif",
+                  width: '100%',
+                  boxSizing: 'border-box',
                 }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleInvite();
-                  }
-                }}
+                onKeyDown={(e) => { if (e.key === "Enter") handleInvite(); }}
               />
-              {inviteError && (
-                <p style={{ fontSize: 12, color: "#ef4444", margin: 0 }}>{inviteError}</p>
-              )}
-              {inviteSuccess && (
-                <p style={{ fontSize: 12, color: "#10b981", margin: 0 }}>
-                  Invitation sent successfully! They'll receive an email with instructions.
-                </p>
-              )}
+              {inviteError && <p style={{ fontSize: 12, color: "#ef4444", margin: 0 }}>{inviteError}</p>}
+              {inviteSuccess && <p style={{ fontSize: 12, color: "#10b981", margin: 0 }}>Invitation sent successfully!</p>}
             </div>
 
-            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 8 }}>
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 8, flexWrap: 'wrap' }}>
               <button
                 onClick={() => {
                   setShowInviteModal(false);
@@ -1171,14 +957,15 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                 }}
                 style={{
                   borderRadius: 999,
-                  padding: "10px 24px",
+                  padding: "14px 24px",
                   border: "1px solid #e3e3e3",
                   background: "#fff",
                   color: "#0c0c0c",
                   fontWeight: 600,
-                  fontSize: 14,
+                  fontSize: isMobile ? 14 : 14,
                   cursor: "pointer",
                   fontFamily: "'Geist', 'Inter', sans-serif",
+                  flex: 1,
                 }}
               >
                 Cancel
@@ -1188,17 +975,18 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                 disabled={inviting || !inviteEmail}
                 style={{
                   borderRadius: 999,
-                  padding: "10px 24px",
+                  padding: "14px 24px",
                   border: "none",
-                  background: inviting || !inviteEmail ? "#9ca3af" : "#0c0c0c",
+                  background: (inviting || !inviteEmail) ? "#9ca3af" : "#0c0c0c",
                   color: "#fff",
                   fontWeight: 600,
-                  fontSize: 14,
-                  cursor: inviting || !inviteEmail ? "not-allowed" : "pointer",
+                  fontSize: isMobile ? 14 : 14,
+                  cursor: (inviting || !inviteEmail) ? "not-allowed" : "pointer",
                   fontFamily: "'Geist', 'Inter', sans-serif",
+                  flex: 1,
                 }}
               >
-                {inviting ? "Sending..." : "Send Invitation"}
+                {inviting ? "Sending..." : "Send"}
               </button>
             </div>
           </div>

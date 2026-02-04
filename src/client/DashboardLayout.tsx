@@ -123,9 +123,12 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ collapsed, activeId, onSelect, onToggle, mobileOpen }) => (
   <aside className={`dashboard-sidebar ${collapsed ? 'collapsed' : 'expanded'} ${mobileOpen ? 'mobile-open' : ''}`}>
       <div className="sidebar-header">
-        <div className="sidebar-title">{collapsed ? 'Menu' : 'Workspace'}</div>
-        <button className="sidebar-toggle desktop-only" type="button" onClick={onToggle}>
-          {collapsed ? 'Expand' : 'Collapse'}
+        <div className="sidebar-title desktop-only">{collapsed ? 'Menu' : 'Workspace'}</div>
+        <button className="sidebar-close-btn" type="button" onClick={() => onSelect(activeId)}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
       </div>
 
@@ -148,18 +151,24 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, activeId, onSelect, onTogg
 interface TopBarProps {
   title: string;
   onMobileMenu: () => void;
+  activeSectionId?: string;
 }
 
-const TopBar: React.FC<TopBarProps> = ({ title, onMobileMenu }) => (
+const TopBar: React.FC<TopBarProps> = ({ title, onMobileMenu, activeSectionId }) => (
   <header className="dashboard-topbar">
     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-      <button className="mobile-menu-btn" type="button" onClick={onMobileMenu}>
-        ☰ Menu
-      </button>
+      {activeSectionId !== 'chat' && (
+        <button className="mobile-menu-btn" type="button" onClick={onMobileMenu} aria-label="Open menu">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+      )}
       <h1>{title}</h1>
     </div>
     <div className="topbar-actions">
-      <div className="search-placeholder">Search or jump to…</div>
       <div className="topbar-avatar" style={{ width: 36, height: 36, borderRadius: '50%', background: '#e4e7ec' }} />
     </div>
   </header>
@@ -312,7 +321,7 @@ const DashboardLayout: React.FC = () => {
         onClick={() => setMobileSidebarOpen(false)}
       />
       <main className="dashboard-main">
-        <TopBar title={activeItem.label} onMobileMenu={() => setMobileSidebarOpen(true)} />
+        <TopBar title={activeItem.label} onMobileMenu={() => setMobileSidebarOpen(true)} activeSectionId={activeSectionId} />
         <section className="dashboard-content">{renderContent()}</section>
       </main>
     </div>

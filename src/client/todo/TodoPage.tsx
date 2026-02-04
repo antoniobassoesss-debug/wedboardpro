@@ -5,6 +5,23 @@ import { listTasks, createTask, updateTask, deleteTask, type Task as ApiTask } f
 import TaskList from './TaskList';
 import { createCalendarEvent } from '../api/calendarEventsApi';
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return isMobile;
+}
+
+const PlusIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
+  <svg className={className} style={style} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+  </svg>
+);
+
 type StatusFilter = 'all' | 'active' | 'completed';
 type PriorityFilter = 'all' | 'low' | 'medium' | 'high';
 type DueFilter = 'all' | 'today' | 'next7' | 'overdue';
@@ -68,6 +85,7 @@ function FilterDropdown<T extends string>({ label, value, options, onChange, def
 }
 
 const TodoPage: React.FC = () => {
+  const isMobile = useIsMobile();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -526,6 +544,13 @@ const TodoPage: React.FC = () => {
           teamMembers={teamMembers}
           projects={projects}
         />
+      )}
+
+      {/* FAB for mobile */}
+      {isMobile && (
+        <button type="button" className="todo-fab" onClick={() => setShowModal(true)} aria-label="Add new task">
+          <PlusIcon />
+        </button>
       )}
     </div>
   );

@@ -187,7 +187,39 @@ export async function listEvents(): Promise<Result<Event[]>> {
   }
 }
 
-export async function createEvent(input: CreateEventInput): Promise<Result<{ event: Event; stages: PipelineStage[] }>> {
+export async function getEvent(eventId: string): Promise<Result<Event>> {
+  try {
+    const token = await getValidAccessToken();
+    if (!token) return { data: null, error: 'Not authenticated' };
+
+    const res = await fetch(`/api/events/${eventId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { data: null, error: body.error || `Request failed (${res.status})` };
+    }
+
+    const data = await res.json();
+    return { data: data.event as Event, error: null };
+  } catch (err: any) {
+    return { data: null, error: err?.message || 'Failed to get event' };
+  }
+}
+
+export interface LimitErrorResponse {
+  error: string;
+  message: string;
+  current: number;
+  limit: number;
+  planName: string;
+  requiredPlan: string;
+  upgradeUrl: string;
+}
+
+export async function createEvent(input: CreateEventInput): Promise<Result<{ event: Event; stages: PipelineStage[] }> & { limitError?: LimitErrorResponse }> {
   try {
     const token = await getValidAccessToken();
     if (!token) return { data: null, error: 'Not authenticated' };
@@ -203,6 +235,16 @@ export async function createEvent(input: CreateEventInput): Promise<Result<{ eve
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
+      
+      // Check if this is a limit error (402 status)
+      if (res.status === 402 && body.error === 'event_limit_reached') {
+        return { 
+          data: null, 
+          error: body.message || body.error,
+          limitError: body as LimitErrorResponse,
+        };
+      }
+      
       return { data: null, error: body.error || `Request failed (${res.status})` };
     }
 

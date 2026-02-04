@@ -2,8 +2,18 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import {
   listTeamMembers,
   fetchTeamMember,
+  listSentInvitations,
+  cancelInvitation,
+  resendInvitation,
+  inviteMemberWithPermissions,
+  updateMemberPermissions,
+  removeMember,
+  type MemberPermissions,
+  type TeamInvitation,
 } from '../../api/teamsApi.js';
 import type { TeamMemberSummary, TeamMemberDetail } from '../../api/teamsApi.js';
+import { useSubscription } from '../../hooks/useSubscription.js';
+import { UpgradePromptModal } from '../../components/UpgradePromptModal.js';
 import './teams.css';
 
 type StatusFilter = 'all' | 'active' | 'pending' | 'disabled';
@@ -45,9 +55,10 @@ interface MemberDrawerProps {
   isOpen: boolean;
   isLoading: boolean;
   onClose: () => void;
+  onRemove?: (memberId: string) => void;
 }
 
-const MemberDrawer: React.FC<MemberDrawerProps> = ({ member, isOpen, isLoading, onClose }) => {
+const MemberDrawer: React.FC<MemberDrawerProps> = ({ member, isOpen, isLoading, onClose, onRemove }) => {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -201,15 +212,20 @@ const MemberDrawer: React.FC<MemberDrawerProps> = ({ member, isOpen, isLoading, 
             </div>
 
             <div className="teams-drawer-footer">
-              <button type="button" className="teams-drawer-action-btn primary">
-                Edit Member
-              </button>
-              <button type="button" className="teams-drawer-action-btn">
-                Send Reset Link
-              </button>
-              <button type="button" className="teams-drawer-action-btn destructive">
-                {member.is_active ? 'Deactivate' : 'Activate'}
-              </button>
+              {member.role !== 'owner' && onRemove && (
+                <button
+                  type="button"
+                  className="teams-drawer-action-btn destructive"
+                  onClick={() => onRemove(member.id)}
+                >
+                  Remove from Team
+                </button>
+              )}
+              {member.role === 'owner' && (
+                <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
+                  Team owner cannot be removed
+                </p>
+              )}
             </div>
           </>
         ) : (
@@ -244,6 +260,29 @@ export default function TeamsSection() {
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [invitePermissions, setInvitePermissions] = useState<MemberPermissions>({
+    can_view_billing: false,
+    can_manage_billing: false,
+    can_view_usage: false,
+    can_manage_team: false,
+    can_manage_settings: false,
+    can_create_events: true,
+    can_view_all_events: true,
+    can_delete_events: false,
+  });
+  const [fullOwnerPermissions, setFullOwnerPermissions] = useState(false);
+
+  // Pending invitations state
+  const [pendingInvitations, setPendingInvitations] = useState<TeamInvitation[]>([]);
+  const [loadingInvitations, setLoadingInvitations] = useState(false);
+  const [actioningInvite, setActioningInvite] = useState<string | null>(null);
+
+  // Upgrade prompt state
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeData, setUpgradeData] = useState<{ current: number; limit: number; planName: string; requiredPlan: string } | null>(null);
+
+  // Subscription check
+  const { planName, maxTeamMembers, memberCount } = useSubscription();
 
   const loadMembers = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -270,10 +309,51 @@ export default function TeamsSection() {
     setLoadingMember(false);
   }, []);
 
+  const loadInvitations = useCallback(async () => {
+    setLoadingInvitations(true);
+    const { data, error: err } = await listSentInvitations();
+    if (!err && data) {
+      setPendingInvitations(data);
+    }
+    setLoadingInvitations(false);
+  }, []);
+
+  const handleCancelInvitation = useCallback(async (invitationId: string) => {
+    setActioningInvite(invitationId);
+    const { error: err } = await cancelInvitation(invitationId);
+    if (!err) {
+      setPendingInvitations(prev => prev.filter(i => i.id !== invitationId));
+    }
+    setActioningInvite(null);
+  }, []);
+
+  const handleResendInvitation = useCallback(async (invitationId: string) => {
+    setActioningInvite(invitationId);
+    const { data, error: err } = await resendInvitation(invitationId);
+    if (!err && data) {
+      setPendingInvitations(prev => prev.map(i => i.id === invitationId ? data : i));
+    }
+    setActioningInvite(null);
+  }, []);
+
+  const handleRemoveMember = useCallback(async (memberId: string) => {
+    if (!window.confirm('Are you sure you want to remove this team member?')) return;
+    const { error: err } = await removeMember(memberId);
+    if (!err) {
+      setMembers(prev => prev.filter(m => m.id !== memberId));
+      if (selectedMemberId === memberId) {
+        setIsDrawerOpen(false);
+        setSelectedMemberId(null);
+        setSelectedMember(null);
+      }
+    }
+  }, [selectedMemberId]);
+
   // Initial fetch
   useEffect(() => {
     loadMembers(true);
-  }, [loadMembers]);
+    loadInvitations();
+  }, [loadMembers, loadInvitations]);
 
   // Load detail when member is selected
   useEffect(() => {
@@ -326,59 +406,67 @@ export default function TeamsSection() {
       return;
     }
 
-    const accessToken = localStorage.getItem('wedboarpro_session');
-    if (!accessToken) {
-      setInviteError('Not authenticated');
-      return;
-    }
-
-    let token: string;
-    try {
-      const session = JSON.parse(accessToken);
-      token = session?.access_token;
-      if (!token) {
-        setInviteError('Not authenticated');
-        return;
-      }
-    } catch {
-      setInviteError('Not authenticated');
-      return;
-    }
-
     setInviting(true);
     setInviteError(null);
     setInviteSuccess(false);
 
-    try {
-      const response = await fetch('/api/teams/invite', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ email: inviteEmail }),
-      });
+    const permissions = fullOwnerPermissions
+      ? {
+          can_view_billing: true,
+          can_manage_billing: true,
+          can_view_usage: true,
+          can_manage_team: true,
+          can_manage_settings: true,
+          can_create_events: true,
+          can_view_all_events: true,
+          can_delete_events: true,
+        }
+      : invitePermissions;
 
-      const data = await response.json();
+    const { data, error: err, limitError } = await inviteMemberWithPermissions(inviteEmail, permissions);
 
-      if (!response.ok) {
-        setInviteError(data.error || 'Failed to send invitation');
-        return;
-      }
-
-      setInviteSuccess(true);
-      setInviteEmail('');
-      // Refresh members list after successful invite
-      setTimeout(() => {
-        loadMembers(false);
-        setShowInviteModal(false);
-        setInviteSuccess(false);
-      }, 1500);
-    } catch (e: any) {
-      setInviteError(e.message || 'Failed to send invitation');
-    } finally {
+    if (limitError) {
       setInviting(false);
+      setShowInviteModal(false);
+      setUpgradeData({
+        current: limitError.current,
+        limit: limitError.limit,
+        planName: limitError.planName,
+        requiredPlan: limitError.requiredPlan,
+      });
+      setShowUpgradeModal(true);
+      return;
     }
+
+    if (err) {
+      setInviteError(err);
+      setInviting(false);
+      return;
+    }
+
+    setInviteSuccess(true);
+    setInviteEmail('');
+    setFullOwnerPermissions(false);
+    setInvitePermissions({
+      can_view_billing: false,
+      can_manage_billing: false,
+      can_view_usage: false,
+      can_manage_team: false,
+      can_manage_settings: false,
+      can_create_events: true,
+      can_view_all_events: true,
+      can_delete_events: false,
+    });
+
+    // Refresh lists after successful invite
+    setTimeout(() => {
+      loadMembers(false);
+      loadInvitations();
+      setShowInviteModal(false);
+      setInviteSuccess(false);
+    }, 1500);
+
+    setInviting(false);
   };
 
   // Filter members
@@ -635,12 +723,102 @@ export default function TeamsSection() {
         </>
       )}
 
+      {/* Pending Invitations Section */}
+      {pendingInvitations.length > 0 && (
+        <div style={{ marginTop: 32, marginBottom: 24 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: '#64748b', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Pending Invitations ({pendingInvitations.length})
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {pendingInvitations.map((invite) => {
+              const isExpired = new Date(invite.expires_at) < new Date();
+              const isActioning = actioningInvite === invite.id;
+              return (
+                <div
+                  key={invite.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '14px 16px',
+                    background: isExpired ? '#fef2f2' : '#f8fafc',
+                    border: `1px solid ${isExpired ? '#fee2e2' : '#e5e7eb'}`,
+                    borderRadius: 12,
+                    opacity: isActioning ? 0.6 : 1,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 999,
+                      background: '#e2e8f0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: '#64748b',
+                    }}>
+                      {(invite.email?.[0] || '?').toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: '#0f172a' }}>{invite.email}</div>
+                      <div style={{ fontSize: 12, color: isExpired ? '#ef4444' : '#64748b' }}>
+                        {isExpired ? 'Expired' : `Expires ${new Date(invite.expires_at).toLocaleDateString()}`}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => handleResendInvitation(invite.id)}
+                      disabled={isActioning}
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        borderRadius: 6,
+                        border: 'none',
+                        background: '#0f172a',
+                        color: '#ffffff',
+                        cursor: isActioning ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      Resend
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCancelInvitation(invite.id)}
+                      disabled={isActioning}
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        borderRadius: 6,
+                        border: '1px solid #e5e7eb',
+                        background: '#ffffff',
+                        color: '#64748b',
+                        cursor: isActioning ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Member Drawer */}
       <MemberDrawer
         member={selectedMember}
         isOpen={isDrawerOpen}
         isLoading={loadingMember}
         onClose={handleCloseDrawer}
+        onRemove={handleRemoveMember}
       />
 
       {/* Invite Modal */}
@@ -730,7 +908,8 @@ export default function TeamsSection() {
             </div>
 
             {/* Body */}
-            <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20, maxHeight: '60vh', overflowY: 'auto' }}>
+              {/* Email input */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   Email Address
@@ -743,11 +922,6 @@ export default function TeamsSection() {
                     setInviteError(null);
                   }}
                   placeholder="colleague@example.com"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleInvite();
-                    }
-                  }}
                   style={{
                     fontSize: 14,
                     fontWeight: 500,
@@ -776,6 +950,99 @@ export default function TeamsSection() {
                     Invitation sent successfully!
                   </p>
                 )}
+              </div>
+
+              {/* Permissions section */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12, display: 'block' }}>
+                    Permissions
+                  </label>
+
+                  {/* Full owner permissions checkbox */}
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 10,
+                      padding: '12px 14px',
+                      background: fullOwnerPermissions ? '#f0f9ff' : '#f8fafc',
+                      border: fullOwnerPermissions ? '1px solid #0ea5e9' : '1px solid #e2e8f0',
+                      borderRadius: 10,
+                      cursor: 'pointer',
+                      marginBottom: 12,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={fullOwnerPermissions}
+                      onChange={(e) => setFullOwnerPermissions(e.target.checked)}
+                      style={{ marginTop: 2 }}
+                    />
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>Give full owner permissions</div>
+                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                        Full access to billing, team, settings, and all features. Use for business partners or co-owners.
+                      </div>
+                    </div>
+                  </label>
+
+                  {/* Granular permissions (disabled if full owner) */}
+                  <div style={{ opacity: fullOwnerPermissions ? 0.5 : 1, pointerEvents: fullOwnerPermissions ? 'none' : 'auto' }}>
+                    {/* Billing & Account */}
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Billing & Account</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#475569', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={invitePermissions.can_view_billing} onChange={(e) => setInvitePermissions(p => ({ ...p, can_view_billing: e.target.checked }))} />
+                          View Billing <span style={{ color: '#94a3b8' }}>- See invoices and plan details</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#475569', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={invitePermissions.can_manage_billing} onChange={(e) => setInvitePermissions(p => ({ ...p, can_manage_billing: e.target.checked, can_view_billing: e.target.checked || (p.can_view_billing ?? false) }))} />
+                          Manage Billing <span style={{ color: '#94a3b8' }}>- Change plan, payment methods</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#475569', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={invitePermissions.can_view_usage} onChange={(e) => setInvitePermissions(p => ({ ...p, can_view_usage: e.target.checked }))} />
+                          View Usage <span style={{ color: '#94a3b8' }}>- See limits and consumption</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Team & Settings */}
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Team & Settings</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#475569', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={invitePermissions.can_manage_team} onChange={(e) => setInvitePermissions(p => ({ ...p, can_manage_team: e.target.checked }))} />
+                          Manage Team <span style={{ color: '#94a3b8' }}>- Invite/remove team members</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#475569', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={invitePermissions.can_manage_settings} onChange={(e) => setInvitePermissions(p => ({ ...p, can_manage_settings: e.target.checked }))} />
+                          Manage Settings <span style={{ color: '#94a3b8' }}>- Edit account settings</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Events */}
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Events</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#475569', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={invitePermissions.can_create_events} onChange={(e) => setInvitePermissions(p => ({ ...p, can_create_events: e.target.checked }))} />
+                          Create Events <span style={{ color: '#94a3b8' }}>- Create new events</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#475569', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={invitePermissions.can_view_all_events} onChange={(e) => setInvitePermissions(p => ({ ...p, can_view_all_events: e.target.checked }))} />
+                          View All Events <span style={{ color: '#94a3b8' }}>- See all team events</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#475569', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={invitePermissions.can_delete_events} onChange={(e) => setInvitePermissions(p => ({ ...p, can_delete_events: e.target.checked }))} />
+                          Delete Events <span style={{ color: '#94a3b8' }}>- Permanently delete events</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -850,6 +1117,22 @@ export default function TeamsSection() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Upgrade Prompt Modal */}
+      {showUpgradeModal && upgradeData && (
+        <UpgradePromptModal
+          isOpen={showUpgradeModal}
+          onClose={() => {
+            setShowUpgradeModal(false);
+            setUpgradeData(null);
+          }}
+          feature="team members"
+          currentPlan={upgradeData.planName}
+          requiredPlan={upgradeData.requiredPlan}
+          currentUsage={upgradeData.current}
+          limit={upgradeData.limit}
+        />
       )}
     </div>
   );
