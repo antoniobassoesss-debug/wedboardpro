@@ -1,46 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import './landing-page.css';
-// Top-of-page marketing header/hero use the original CSS-based components below
-// New marketing components are used for the mid-page sections
-import { SiteHeader } from './components/marketing/SiteHeader';
-import { HeroSection as NewHeroSection } from './components/marketing/HeroSection';
-import { TrustedByStrip } from './components/marketing/TrustedByStrip';
-import { SolutionsSection } from './components/marketing/SolutionsSection';
-import { ROISection } from './components/marketing/ROISection';
-import { ResourcesSection } from './components/marketing/ResourcesSection';
-import { FinalCTASection } from './components/marketing/FinalCTASection';
-import { SiteFooter } from './components/marketing/SiteFooter';
-
-const PRIMARY_CTA_HREF = '/signup';
-const DEMO_HREF = '/demo';
-
-type NavItem = {
-  label: string;
-  href: string;
-};
-
-const NAV_ITEMS: NavItem[] = [
-  { label: 'Product', href: '#product' },
-  { label: 'Pricing', href: '#pricing' },
-  { label: 'For planners', href: '#for-planners' },
-];
 
 const MarketingHome: React.FC = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
   useEffect(() => {
-    console.log('%c HELLO FROM WEDBOARDPRO LANDING PAGE v2 ', 'background: #222; color: #bada55; font-size: 20px');
-    // Enable scrolling on landing page
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
     const root = document.getElementById('root');
-    
+
     const originalHtmlOverflow = html.style.overflow;
     const originalBodyOverflow = body.style.overflow;
     const originalBodyHeight = body.style.height;
     const originalRootPosition = root?.style.position;
     const originalRootOverflow = root?.style.overflow;
     const originalRootHeight = root?.style.height;
-    
+
     html.style.overflow = 'auto';
     body.style.overflow = 'auto';
     body.style.height = 'auto';
@@ -49,9 +31,8 @@ const MarketingHome: React.FC = () => {
       root.style.overflow = 'visible';
       root.style.height = 'auto';
     }
-    
+
     return () => {
-      // Restore original styles when component unmounts
       html.style.overflow = originalHtmlOverflow;
       body.style.overflow = originalBodyOverflow;
       body.style.height = originalBodyHeight;
@@ -64,798 +45,498 @@ const MarketingHome: React.FC = () => {
   }, []);
 
   return (
-    <div className="landing-shell">
-      <main className="landing-main">
-        {/* Use original header + hero + social proof which match landing-page.css styling */}
-        <LandingHeader />
-        <HeroSection />
-        <SocialProofStrip />
+    <div style={{ minHeight: '100vh', backgroundColor: '#ffffff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+      {/* Header */}
+      <header style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(0, 0, 0, 0.06)'
+      }}>
+        <div style={{
+          maxWidth: '1200px',
+          margin: '0 auto',
+          padding: isMobile ? '0 16px' : '0 32px',
+          height: isMobile ? '60px' : '72px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '12px', textDecoration: 'none' }}>
+            <img src="/logo/iconlogo.png" alt="WedBoardPro" style={{ width: isMobile ? '28px' : '36px', height: isMobile ? '28px' : '36px', objectFit: 'contain' }} />
+            {!isMobile && <span style={{ fontSize: '20px', fontWeight: 600, color: '#111827', letterSpacing: '-0.025em' }}>WedBoardPro</span>}
+          </Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '8px' }}>
+            <Link
+              to="/login"
+              style={{
+                padding: isMobile ? '8px 12px' : '10px 20px',
+                fontSize: isMobile ? '13px' : '14px',
+                fontWeight: 500,
+                color: '#374151',
+                textDecoration: 'none',
+                borderRadius: '8px'
+              }}
+            >
+              Log in
+            </Link>
+            <Link
+              to="/signup"
+              style={{
+                padding: isMobile ? '8px 14px' : '10px 20px',
+                fontSize: isMobile ? '13px' : '14px',
+                fontWeight: 500,
+                color: '#ffffff',
+                textDecoration: 'none',
+                borderRadius: '8px',
+                backgroundColor: '#111827'
+              }}
+            >
+              {isMobile ? 'Start trial' : 'Start free trial'}
+            </Link>
+          </div>
+        </div>
+      </header>
 
-        {/* Mid-page sections use the new marketing components */}
-        <FeatureGrid />
-        <SolutionsSection />
-        <WorkflowSection />
-        <ScreenshotsSection />
-        <ROISection />
-        <ResourcesSection />
-        <TestimonialsSection />
-        <PricingTeaser />
-        <FAQSection />
-        <FinalCTASection />
+      <main>
+        {/* Hero */}
+        <section style={{ paddingTop: isMobile ? '100px' : '180px', paddingBottom: isMobile ? '60px' : '120px' }}>
+          <div style={{ maxWidth: '1000px', margin: '0 auto', padding: isMobile ? '0 20px' : '0 32px', textAlign: 'center' }}>
+            <div style={{
+              display: 'inline-block',
+              padding: isMobile ? '5px 12px' : '6px 14px',
+              backgroundColor: '#f3f4f6',
+              borderRadius: '100px',
+              fontSize: isMobile ? '11px' : '13px',
+              fontWeight: 500,
+              color: '#4b5563',
+              marginBottom: isMobile ? '16px' : '24px'
+            }}>
+              Trusted by 500+ wedding professionals
+            </div>
+            <h1 style={{
+              fontSize: isMobile ? '32px' : 'clamp(44px, 6vw, 64px)',
+              fontWeight: 600,
+              letterSpacing: '-0.035em',
+              color: '#111827',
+              lineHeight: 1.15,
+              margin: 0
+            }}>
+              {isMobile ? (
+                <>The operating system for wedding planners</>
+              ) : (
+                <>The operating system for<br />modern wedding planners</>
+              )}
+            </h1>
+            <p style={{
+              marginTop: isMobile ? '16px' : '28px',
+              fontSize: isMobile ? '16px' : '19px',
+              color: '#6b7280',
+              maxWidth: '580px',
+              marginLeft: 'auto',
+              marginRight: 'auto',
+              lineHeight: 1.6,
+              fontWeight: 400
+            }}>
+              {isMobile
+                ? 'Centralize your workflows and manage multiple weddings from one platform.'
+                : 'Centralize your workflows, manage multiple weddings, and deliver exceptional experiences — all from one platform.'
+              }
+            </p>
+            <div style={{
+              marginTop: isMobile ? '28px' : '48px',
+              display: 'flex',
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: isMobile ? '12px' : '16px'
+            }}>
+              <Link
+                to="/signup"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  width: isMobile ? '100%' : 'auto',
+                  padding: isMobile ? '14px 24px' : '16px 28px',
+                  fontSize: '15px',
+                  fontWeight: 500,
+                  color: '#ffffff',
+                  textDecoration: 'none',
+                  borderRadius: '10px',
+                  backgroundColor: '#111827',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+                }}
+              >
+                Start free trial
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ marginLeft: '4px' }}>
+                  <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </Link>
+              <Link
+                to="/demo"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  width: isMobile ? '100%' : 'auto',
+                  padding: isMobile ? '14px 24px' : '16px 28px',
+                  fontSize: '15px',
+                  fontWeight: 500,
+                  color: '#374151',
+                  textDecoration: 'none',
+                  borderRadius: '10px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e5e7eb'
+                }}
+              >
+                Book a demo
+              </Link>
+            </div>
+            <p style={{ marginTop: isMobile ? '16px' : '20px', fontSize: isMobile ? '12px' : '13px', color: '#9ca3af' }}>
+              14-day free trial · No credit card required
+            </p>
+          </div>
+        </section>
+
+        {/* Features */}
+        <section style={{ padding: isMobile ? '48px 0' : '100px 0', backgroundColor: '#fafafa' }}>
+          <div style={{ maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '0 20px' : '0 32px' }}>
+            <div style={{ textAlign: 'center', marginBottom: isMobile ? '32px' : '64px' }}>
+              <h2 style={{ fontSize: isMobile ? '24px' : '32px', fontWeight: 600, color: '#111827', letterSpacing: '-0.025em', margin: 0 }}>
+                Everything you need
+              </h2>
+              <p style={{ marginTop: isMobile ? '12px' : '16px', fontSize: isMobile ? '15px' : '17px', color: '#6b7280', maxWidth: '500px', marginLeft: 'auto', marginRight: 'auto' }}>
+                Purpose-built tools for wedding professionals.
+              </p>
+            </div>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: isMobile ? '16px' : '24px'
+            }}>
+              <FeatureCard
+                icon={<PipelineIcon />}
+                title="Project Pipeline"
+                description="Visualize every wedding from first inquiry to final delivery."
+                isMobile={isMobile}
+              />
+              <FeatureCard
+                icon={<LayoutIcon />}
+                title="Layout Maker"
+                description="Design floor plans and seating with drag-and-drop."
+                isMobile={isMobile}
+              />
+              <FeatureCard
+                icon={<CalendarIcon />}
+                title="Team Calendar"
+                description="Unified view of all events and team availability."
+                isMobile={isMobile}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Social Proof - Hidden on mobile for cleaner experience */}
+        {!isMobile && (
+          <section style={{ padding: '80px 0', borderBottom: '1px solid #f3f4f6' }}>
+            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 32px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '48px', flexWrap: 'wrap', opacity: 0.6 }}>
+                <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 500 }}>TRUSTED BY TEAMS AT</span>
+                {['Lisbon & Co.', 'Amalfi Events', 'Nordic Weddings', 'Sunset Venues'].map((name) => (
+                  <span key={name} style={{ fontSize: '15px', color: '#374151', fontWeight: 500 }}>{name}</span>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Pricing */}
+        <section style={{ padding: isMobile ? '48px 0' : '120px 0' }}>
+          <div style={{ maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '0 20px' : '0 32px' }}>
+            <div style={{ textAlign: 'center', marginBottom: isMobile ? '32px' : '64px' }}>
+              <h2 style={{ fontSize: isMobile ? '24px' : '32px', fontWeight: 600, color: '#111827', letterSpacing: '-0.025em', margin: 0 }}>
+                Transparent pricing
+              </h2>
+              <p style={{ marginTop: isMobile ? '12px' : '16px', fontSize: isMobile ? '15px' : '17px', color: '#6b7280' }}>
+                {isMobile ? 'Upgrade or downgrade anytime.' : 'Choose the plan that fits your business. Upgrade or downgrade anytime.'}
+              </p>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: isMobile ? '16px' : '24px',
+              maxWidth: '1000px',
+              margin: '0 auto'
+            }}>
+              {/* On mobile, show Professional first (most popular) */}
+              {isMobile ? (
+                <>
+                  <PricingCard
+                    name="Professional"
+                    price={59}
+                    description="For growing studios"
+                    features={['Unlimited projects', '5 team members', 'Advanced analytics', 'Priority support']}
+                    popular
+                    isMobile={isMobile}
+                  />
+                  <PricingCard
+                    name="Starter"
+                    price={29}
+                    description="For independent planners"
+                    features={['Up to 10 active projects', '2 team members', 'Core planning tools']}
+                    isMobile={isMobile}
+                  />
+                  <PricingCard
+                    name="Enterprise"
+                    price={149}
+                    description="For established agencies"
+                    features={['Unlimited everything', 'Unlimited team members', 'API access', 'Dedicated manager']}
+                    isMobile={isMobile}
+                  />
+                </>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
+                  <PricingCard
+                    name="Starter"
+                    price={29}
+                    description="For independent planners"
+                    features={['Up to 10 active projects', '2 team members', 'Core planning tools', 'Email support']}
+                    isMobile={isMobile}
+                  />
+                  <PricingCard
+                    name="Professional"
+                    price={59}
+                    description="For growing studios"
+                    features={['Unlimited projects', '5 team members', 'Advanced analytics', 'Priority support', 'Custom branding']}
+                    popular
+                    isMobile={isMobile}
+                  />
+                  <PricingCard
+                    name="Enterprise"
+                    price={149}
+                    description="For established agencies"
+                    features={['Unlimited everything', 'Unlimited team members', 'API access', 'Dedicated account manager', 'Custom integrations']}
+                    isMobile={isMobile}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* CTA */}
+        <section style={{ padding: isMobile ? '48px 0' : '100px 0', backgroundColor: '#111827' }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto', padding: isMobile ? '0 20px' : '0 32px', textAlign: 'center' }}>
+            <h2 style={{ fontSize: isMobile ? '24px' : '36px', fontWeight: 600, color: '#ffffff', letterSpacing: '-0.025em', margin: 0 }}>
+              Ready to streamline your business?
+            </h2>
+            <p style={{ marginTop: isMobile ? '12px' : '20px', fontSize: isMobile ? '15px' : '17px', color: '#9ca3af', maxWidth: '500px', marginLeft: 'auto', marginRight: 'auto' }}>
+              Join hundreds of wedding professionals who have made the switch.
+            </p>
+            <div style={{ marginTop: isMobile ? '24px' : '40px' }}>
+              <Link
+                to="/signup"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  width: isMobile ? '100%' : 'auto',
+                  padding: isMobile ? '14px 28px' : '16px 32px',
+                  fontSize: '15px',
+                  fontWeight: 500,
+                  color: '#111827',
+                  textDecoration: 'none',
+                  borderRadius: '10px',
+                  backgroundColor: '#ffffff'
+                }}
+              >
+                Get started for free
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </Link>
+            </div>
+          </div>
+        </section>
       </main>
-      <SiteFooter />
+
+      {/* Footer */}
+      <footer style={{ backgroundColor: '#ffffff', borderTop: '1px solid #f3f4f6' }}>
+        <div style={{
+          maxWidth: '1200px',
+          margin: '0 auto',
+          padding: isMobile ? '24px 20px' : '40px 32px',
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: 'center',
+          justifyContent: isMobile ? 'center' : 'space-between',
+          gap: isMobile ? '20px' : '24px',
+          textAlign: isMobile ? 'center' : 'left'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img src="/logo/iconlogo.png" alt="WedBoardPro" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
+            <span style={{ fontSize: '15px', fontWeight: 600, color: '#111827' }}>WedBoardPro</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '20px' : '32px', fontSize: '14px' }}>
+            <Link to="/privacy" style={{ color: '#6b7280', textDecoration: 'none' }}>Privacy</Link>
+            <Link to="/terms" style={{ color: '#6b7280', textDecoration: 'none' }}>Terms</Link>
+            <Link to="/contact" style={{ color: '#6b7280', textDecoration: 'none' }}>Contact</Link>
+          </div>
+          <p style={{ fontSize: isMobile ? '12px' : '14px', color: '#9ca3af', margin: 0 }}>
+            © {new Date().getFullYear()} WedBoardPro
+          </p>
+        </div>
+      </footer>
     </div>
   );
 };
 
-export default MarketingHome;
+const PipelineIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
+  </svg>
+);
 
-/* ----------------------------- Header / Nav ----------------------------- */
+const LayoutIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <line x1="3" y1="9" x2="21" y2="9" />
+    <line x1="9" y1="21" x2="9" y2="9" />
+  </svg>
+);
 
-const LandingHeader: React.FC = () => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+const CalendarIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+);
 
-  const handleAnchorClick = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!href.startsWith('#')) return;
-    event.preventDefault();
-    const targetId = href.slice(1);
-    const el = document.getElementById(targetId);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setIsMobileMenuOpen(false);
-    }
-  };
-
-  return (
-    <header className="landing-header">
-      <div className="landing-header-inner">
-        <Link to="/" className="landing-logo">
-          <img src="/logo/iconlogo.png" alt="WedBoardPro" className="landing-logo-mark" />
-          <span className="landing-logo-text">WedBoardPro</span>
-        </Link>
-
-        <nav className="landing-nav" aria-label="Main">
-          {NAV_ITEMS.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              onClick={handleAnchorClick(item.href)}
-              className={item.label === 'Pricing' ? 'landing-nav-link landing-nav-link-pricing' : 'landing-nav-link'}
-            >
-              {item.label}
-            </a>
-          ))}
-          <Link to="/login" className="landing-nav-login">
-            Log in
-          </Link>
-        </nav>
-
-        <div className="landing-header-right">
-          <p className="landing-header-microcopy">14-day free trial · No credit card</p>
-          <div className="landing-header-cta">
-            <Link to={PRIMARY_CTA_HREF} className="landing-btn-primary">
-              Start Free Trial
-            </Link>
-          </div>
-          <button
-            type="button"
-            className="landing-menu-toggle"
-            aria-label="Toggle navigation menu"
-            aria-expanded={isMobileMenuOpen}
-            aria-controls="landing-mobile-nav"
-            onClick={() => setIsMobileMenuOpen((open) => !open)}
-          >
-            <span className="landing-menu-toggle-bar" />
-          </button>
-        </div>
-      </div>
-
-      <div
-        id="landing-mobile-nav"
-        className={`landing-mobile-nav ${isMobileMenuOpen ? 'open' : ''}`}
-        aria-label="Mobile navigation"
-      >
-        <nav className="landing-mobile-nav-inner">
-          <div className="landing-mobile-nav-links">
-            {NAV_ITEMS.map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                onClick={handleAnchorClick(item.href)}
-                className="landing-mobile-link"
-              >
-                {item.label}
-              </a>
-            ))}
-            <Link to="/login" className="landing-mobile-link landing-mobile-login">
-              Log in
-            </Link>
-          </div>
-          <div className="landing-mobile-cta">
-            <Link to={PRIMARY_CTA_HREF} className="landing-btn-primary landing-btn-full">
-              Start Free Trial
-            </Link>
-          </div>
-        </nav>
-      </div>
-    </header>
-  );
-};
-
-/* ------------------------------ Hero Section ---------------------------- */
-
-const HeroSection: React.FC = () => {
-  return (
-    <section id="for-planners" className="landing-section">
-      <div className="landing-hero">
-        <div className="landing-hero-left">
-          <h1 className="landing-hero-title">
-            The all‑in‑one platform for modern wedding planners
-          </h1>
-
-          <div className="landing-hero-buttons">
-            <Link to={PRIMARY_CTA_HREF} className="landing-btn-primary">
-              Start Free Trial
-            </Link>
-            <Link to={DEMO_HREF} className="landing-btn-ghost">
-              <span className="play">▶</span>
-              <span>Watch 2‑min tour</span>
-            </Link>
-          </div>
-        </div>
-
-        <div className="landing-hero-right">
-          <div className="landing-mock-card">
-            <div className="landing-mock-glow" />
-            <div className="landing-mock-inner">
-              <div className="landing-mock-header">
-                <div className="landing-mock-dots">
-                  <span className="landing-mock-dot" />
-                  <span className="landing-mock-dot" />
-                  <span className="landing-mock-dot" />
-                </div>
-                <span>João &amp; Marta – 20/09/2026</span>
-              </div>
-
-              <div className="landing-mock-body">
-                <div className="landing-mock-sidebar">
-                  <p className="landing-mock-sidebar-title">Events</p>
-                  {['Lisbon rooftop', 'Country estate', 'Beach ceremony'].map((name, idx) => (
-                    <div
-                      key={name}
-                      className={
-                        'landing-mock-event' + (idx === 0 ? ' main' : '')
-                      }
-                    >
-                      <p className="landing-mock-event-title">{name}</p>
-                      <p className="landing-mock-event-sub">
-                        Sept {20 + idx}, 2026 · {idx === 0 ? 'On track' : 'Planning'}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="landing-mock-stages">
-                  <div className="landing-mock-header" style={{ marginBottom: 4 }}>
-                    <span className="landing-mock-sidebar-title">Project pipeline</span>
-                    <span className="landing-mock-pill">72% on track</span>
-                  </div>
-
-                  {[
-                    { label: 'Vision & style', progress: 100 },
-                    { label: 'Venue & date', progress: 80 },
-                    { label: 'Vendors & contracts', progress: 60 },
-                    { label: 'Logistics & timeline', progress: 30 },
-                  ].map((stage) => (
-                    <div key={stage.label} className="landing-mock-stage">
-                      <div>
-                        <p className="landing-mock-stage-title">{stage.label}</p>
-                        <p className="landing-mock-stage-sub">
-                          {stage.progress === 100 ? 'Completed' : `${stage.progress}% in progress`}
-                        </p>
-                      </div>
-                      <div className="landing-mock-progress">
-                        <div
-                          className="landing-mock-progress-bar"
-                          style={{ width: `${Math.max(18, stage.progress)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
-const MicroBenefit: React.FC<{ title: string; description: string }> = ({ title, description }) => (
-  <div className="landing-microcard">
-    <div className="landing-micro-icon">✓</div>
+const FeatureCard: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  isMobile: boolean;
+}> = ({ icon, title, description, isMobile }) => (
+  <div style={{
+    borderRadius: '12px',
+    backgroundColor: '#ffffff',
+    padding: isMobile ? '20px' : '32px',
+    border: '1px solid #e5e7eb',
+    display: isMobile ? 'flex' : 'block',
+    alignItems: isMobile ? 'flex-start' : undefined,
+    gap: isMobile ? '16px' : undefined
+  }}>
+    <div style={{
+      width: isMobile ? '40px' : '48px',
+      height: isMobile ? '40px' : '48px',
+      minWidth: isMobile ? '40px' : '48px',
+      borderRadius: '10px',
+      backgroundColor: '#f3f4f6',
+      color: '#374151',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: isMobile ? 0 : '20px'
+    }}>
+      {icon}
+    </div>
     <div>
-      <div className="landing-micro-title">{title}</div>
-      <div className="landing-micro-text">{description}</div>
+      <h3 style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: 600, color: '#111827', marginBottom: '6px', marginTop: 0 }}>{title}</h3>
+      <p style={{ fontSize: isMobile ? '14px' : '15px', color: '#6b7280', lineHeight: 1.5, margin: 0 }}>{description}</p>
     </div>
   </div>
 );
 
-/* --------------------------- Social Proof Strip ------------------------- */
-
-const SocialProofStrip: React.FC = () => {
-  return (
-    <section className="landing-section">
-      <div className="landing-strip">
-        <div>
-          <strong>Trusted by wedding planners across Europe.</strong>{' '}
-          <span>★ 4.9 / 5 average satisfaction</span>
-        </div>
-        <div className="landing-strip-logos">
-          {['Lisbon & Co.', 'Amalfi Events', 'Nordic Weddings', 'Sunset Venues'].map((name) => (
-            <div key={name} className="landing-strip-logo">
-              {name}
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-};
-
-/* ------------------------ Key Outcomes / Features ----------------------- */
-
-const FeatureGrid: React.FC = () => {
-  const items = [
-    {
-      title: 'Project Pipeline',
-      description: 'Track each wedding from first brief to post‑event follow‑up in one timeline.',
-    },
-    {
-      title: 'Quote Maker',
-      description: 'Generate beautiful, accurate proposals in minutes using your own templates.',
-    },
-    {
-      title: 'Smart Calendar',
-      description: 'See all event dates, tasks and team workload in a single, color‑coded view.',
-    },
-  ];
-
-  return (
-    <section id="product" className="landing-section">
-      <div className="landing-section-header">
-        <div>
-          <p className="landing-section-eyebrow">Designed for real planners</p>
-          <h2 className="landing-section-title">
-            Less chaos. More calm, profitable weddings.
-          </h2>
-        </div>
-        <p className="landing-section-subtitle">
-          WedBoardPro replaces scattered spreadsheets, WhatsApp threads and paper notebooks with a
-          single workspace the whole team can rely on.
-        </p>
-      </div>
-
-      <div className="landing-grid-3">
-        {items.map((item) => (
-          <article key={item.title} className="landing-card">
-            <div className="landing-card-kicker">{item.title[0]}</div>
-            <h3 className="landing-card-title">{item.title}</h3>
-            <p className="landing-card-text">{item.description}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-};
-
-/* --------------------------- Workflow Section --------------------------- */
-
-const WorkflowSection: React.FC = () => {
-  const steps = [
-    {
-      title: 'Plan the event',
-      description:
-        'Create a project, define stages and tasks, and connect budgets, vendors and documents.',
-      detail: 'Stage cards, task checklists and client details in one project.',
-    },
-    {
-      title: 'Share the details',
-      description:
-        'Send quotes, timelines and checklists with a single link so clients and vendors stay aligned.',
-      detail: 'Share timelines, PDFs and vendor info with branded, read‑only views.',
-    },
-    {
-      title: 'Deliver the day',
-      description:
-        'Use a clear day‑of view with timings, owners and notes to run the wedding calmly.',
-      detail: 'Switch to a focused, hour‑by‑hour view the team can follow on the day.',
-    },
-  ];
-
-  return (
-    <section className="landing-section">
-      <div className="landing-section-header">
-        <div>
-          <p className="landing-section-eyebrow">Workflow</p>
-          <h2 className="landing-section-title">
-            A simple flow from enquiry to sparkler exit.
-          </h2>
-        </div>
-        <p className="landing-section-subtitle">
-          Every wedding follows the same backbone: plan, share, deliver. WedBoardPro keeps each step
-          organised so nothing slips through the cracks.
-        </p>
-      </div>
-
-      <ol className="landing-workflow-grid">
-        {steps.map((step, index) => (
-          <li key={step.title} className="landing-card">
-            <div className="landing-workflow-step-number">{index + 1}</div>
-            <h3 className="landing-card-title">{step.title}</h3>
-            <p className="landing-card-text">{step.description}</p>
-            <div className="landing-workflow-pill">{step.detail}</div>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-};
-
-/* ------------------------- Deep Product Sections ------------------------ */
-
-const ScreenshotsSection: React.FC = () => {
-  return (
-    <section className="landing-section">
-      <div className="landing-two-col">
-        <MockPipelineCard />
-        <div>
-          <p className="landing-section-eyebrow">Project Pipeline</p>
-          <h3 className="landing-section-title">
-            See every wedding’s status in a single, live board.
-          </h3>
-          <p className="landing-section-subtitle">
-            Each event has clear stages from “Vision & Style” to “Post‑event follow‑up”. Tasks,
-            documents and budgets live inside the same view so you never wonder what’s next.
-          </p>
-          <ul className="landing-card-text" style={{ marginTop: 12, listStyle: 'disc', paddingLeft: 18 }}>
-            <li>Spot risky events early with overdue stages and blocked tasks.</li>
-            <li>Keep your team aligned with shared checklists and owners per stage.</li>
-            <li>Scroll back through the activity log to see who changed what, and when.</li>
-          </ul>
-        </div>
-      </div>
-
-      <div className="landing-two-col" style={{ marginTop: 40 }}>
-        <div>
-          <p className="landing-section-eyebrow">Quote Maker & Budget</p>
-          <h3 className="landing-section-title">
-            Professional proposals that clients approve faster.
-          </h3>
-          <p className="landing-section-subtitle">
-            Build line‑item quotes from your own services library, apply markups and taxes, and keep
-            budget vs. actuals in sync automatically as you book vendors.
-          </p>
-          <ul className="landing-card-text" style={{ marginTop: 12, listStyle: 'disc', paddingLeft: 18 }}>
-            <li>Reuse templates instead of rebuilding every proposal from a blank file.</li>
-            <li>Keep deposits, instalments and final payments under control.</li>
-            <li>Export branded PDFs or share a secure link clients can sign off on.</li>
-          </ul>
-        </div>
-        <MockQuotesCard />
-      </div>
-    </section>
-  );
-};
-
-const MockPipelineCard: React.FC = () => {
-  return (
-    <div className="landing-card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-        <span className="landing-card-text" style={{ fontSize: 11 }}>
-          Project Pipeline
-        </span>
-        <span className="landing-badge" style={{ backgroundColor: 'rgba(15,23,42,0.05)', color: '#0f172a' }}>
-          8 active weddings
-        </span>
-      </div>
-      <div className="landing-grid-3" style={{ gap: 10 }}>
-        {['Planning', 'In progress', 'Ready'].map((column, colIdx) => (
-          <div key={column} style={{ background: '#f8fafc', borderRadius: 16, padding: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 600 }}>{column}</span>
-              <span style={{ fontSize: 10, color: '#94a3b8' }}>{2 + colIdx} events</span>
-            </div>
-            {[1, 2].map((i) => (
-              <div
-                key={i}
-                style={{
-                  borderRadius: 14,
-                  border: '1px solid rgba(148,163,184,0.5)',
-                  padding: '6px 8px',
-                  background: '#ffffff',
-                  marginBottom: 6,
-                }}
-              >
-                <div style={{ fontSize: 11, fontWeight: 500 }}>Lisbon rooftop · {2026 + i}</div>
-                <div style={{ fontSize: 10, color: '#6b7280' }}>Stage {colIdx + 1} of 4 · 6 tasks</div>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const MockQuotesCard: React.FC = () => {
-  return (
-    <div className="landing-card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-        <span className="landing-card-text" style={{ fontSize: 11 }}>
-          Quote Maker
-        </span>
-        <span className="landing-badge">Draft · €18 400</span>
-      </div>
-      <div className="landing-two-col" style={{ gap: 12, gridTemplateColumns: '2fr 1fr' }}>
-        <div style={{ background: '#f8fafc', borderRadius: 16, padding: 10 }}>
-          {['Venue fee', 'Catering', 'Photography', 'Flowers & decor'].map((item, idx) => (
-            <div
-              key={item}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                borderRadius: 12,
-                border: '1px solid rgba(148,163,184,0.5)',
-                padding: '6px 8px',
-                background: '#ffffff',
-                marginBottom: 6,
-                fontSize: 11,
-              }}
-            >
-              <span>{item}</span>
-              <span style={{ color: '#64748b', fontSize: 10 }}>
-                € {idx === 0 ? '4 500' : idx === 1 ? '7 800' : idx === 2 ? '2 400' : '3 700'}
-              </span>
-            </div>
-          ))}
-        </div>
-        <div style={{ background: '#f8fafc', borderRadius: 16, padding: 10, fontSize: 11 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-            <span>Subtotal</span>
-            <span>€ 18 400</span>
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              color: '#64748b',
-              marginTop: 4,
-            }}
-          >
-            <span>Tax (23%)</span>
-            <span>Included</span>
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              marginTop: 8,
-              borderTop: '1px solid rgba(148,163,184,0.5)',
-              paddingTop: 6,
-              fontWeight: 600,
-            }}
-          >
-            <span>Total</span>
-            <span>€ 18 400</span>
-          </div>
-          <div
-            style={{
-              marginTop: 8,
-              borderRadius: 12,
-              border: '1px dashed rgba(16,185,129,0.8)',
-              background: '#ecfdf5',
-              padding: '6px 8px',
-              fontSize: 10,
-              color: '#166534',
-            }}
-          >
-            Client sees this with your logo and can approve in one click.
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/* -------------------------- Testimonials Section ------------------------ */
-
-const TestimonialsSection: React.FC = () => {
-  const testimonials = [
-    {
-      name: 'Carolina Alves',
-      role: 'Destination wedding planner, Lisbon',
-      quote:
-        'WedBoardPro finally gave us one place for tasks, vendors and budgets. My team knows exactly what to do every day.',
-      badge: '+10 hours saved per event',
-    },
-    {
-      name: 'Marko & Elena',
-      role: 'Boutique planning studio, Croatia',
-      quote:
-        'Before, we were drowning in spreadsheets. Now every event has a clear pipeline and our couples feel the difference.',
-      badge: 'Fewer last‑minute surprises',
-    },
-    {
-      name: 'Sofia Mendes',
-      role: 'Solo planner, Porto',
-      quote:
-        'I run 15+ weddings a year on my own. WedBoardPro keeps me calm, even on triple‑header weekends.',
-      badge: 'Single source of truth',
-    },
-  ];
-
-  return (
-    <section className="landing-section">
-      <div className="landing-section-header">
-        <div>
-          <p className="landing-section-eyebrow">Social proof</p>
-          <h2 className="landing-section-title">
-            Planners who live inside WedBoardPro.
-          </h2>
-        </div>
-      </div>
-
-      <div className="landing-testimonials-grid">
-        {testimonials.map((t) => (
-          <figure key={t.name} className="landing-testimonial">
-            <blockquote className="landing-testimonial-quote">“{t.quote}”</blockquote>
-            <figcaption className="landing-testimonial-footer">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div className="landing-avatar">
-                  {t.name
-                    .split(' ')
-                    .map((s) => s[0])
-                    .slice(0, 2)
-                    .join('')}
-                </div>
-                <div>
-                  <div className="landing-testimonial-name">{t.name}</div>
-                  <div className="landing-testimonial-role">{t.role}</div>
-                </div>
-              </div>
-              <span className="landing-badge">{t.badge}</span>
-            </figcaption>
-          </figure>
-        ))}
-      </div>
-    </section>
-  );
-};
-
-/* ---------------------------- Pricing Teaser ----------------------------- */
-
-const PRICING_PLANS = [
-  {
-    name: 'Starter',
-    price: 29,
-    description: 'For solo planners getting started',
-    features: ['Up to 10 active events', '2 team members', 'Basic budget tracking'],
-    popular: false,
-  },
-  {
-    name: 'Professional',
-    price: 59,
-    description: 'For growing studios',
-    features: ['Unlimited events', '5 team members', 'Advanced reports & analytics'],
-    popular: true,
-  },
-  {
-    name: 'Enterprise',
-    price: 149,
-    description: 'For large agencies',
-    features: ['Unlimited everything', '15 team members', 'Custom branding & API'],
-    popular: false,
-  },
-];
-
-const PricingTeaser: React.FC = () => {
-  return (
-    <section id="pricing" className="landing-section">
-      <div className="landing-section-header">
-        <div>
-          <p className="landing-section-eyebrow">Pricing</p>
-          <h2 className="landing-section-title">
-            Simple pricing for serious planners.
-          </h2>
-        </div>
-        <p className="landing-section-subtitle">
-          Start with a 14-day free trial. Upgrade only when you are ready to run your whole studio on
-          WedBoardPro.
-        </p>
-      </div>
-
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', 
-        gap: 16, 
-        maxWidth: 900,
-        margin: '0 auto'
+const PricingCard: React.FC<{
+  name: string;
+  price: number;
+  description: string;
+  features: string[];
+  popular?: boolean;
+  isMobile: boolean;
+}> = ({ name, price, description, features, popular, isMobile }) => (
+  <div style={{
+    borderRadius: '12px',
+    padding: isMobile ? '24px' : '32px',
+    backgroundColor: popular ? '#111827' : '#ffffff',
+    border: popular ? 'none' : '1px solid #e5e7eb',
+    position: 'relative'
+  }}>
+    {popular && (
+      <span style={{
+        position: 'absolute',
+        top: isMobile ? '20px' : '24px',
+        right: isMobile ? '20px' : '24px',
+        padding: '4px 10px',
+        backgroundColor: '#374151',
+        borderRadius: '4px',
+        fontSize: '11px',
+        fontWeight: 600,
+        color: '#ffffff',
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em'
       }}>
-        {PRICING_PLANS.map((plan) => (
-          <div 
-            key={plan.name}
-            className="landing-card"
-            style={{ 
-              textAlign: 'center',
-              padding: 24,
-              border: plan.popular ? '2px solid #0ea5e9' : '1px solid #e2e8f0',
-              position: 'relative',
-            }}
-          >
-            {plan.popular && (
-              <span style={{
-                position: 'absolute',
-                top: -12,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                background: '#0ea5e9',
-                color: 'white',
-                fontSize: 10,
-                fontWeight: 600,
-                padding: '4px 12px',
-                borderRadius: 999,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-              }}>
-                Most Popular
-              </span>
-            )}
-            <h3 style={{ fontSize: 18, fontWeight: 600, margin: '8px 0 4px' }}>{plan.name}</h3>
-            <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>{plan.description}</p>
-            
-            <div style={{ margin: '16px 0', display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 2 }}>
-              <span style={{ fontSize: 32, fontWeight: 700 }}>€{plan.price}</span>
-              <span style={{ fontSize: 14, color: '#64748b' }}>/mo</span>
-            </div>
-            
-            <ul style={{ listStyle: 'none', padding: 0, margin: '16px 0', fontSize: 12, color: '#475569', textAlign: 'left' }}>
-              {plan.features.map((feature) => (
-                <li key={feature} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <svg width="14" height="14" viewBox="0 0 20 20" fill="#10b981">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  {feature}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
+        Popular
+      </span>
+    )}
+    <p style={{ fontSize: isMobile ? '12px' : '13px', fontWeight: 500, color: popular ? '#9ca3af' : '#6b7280', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+      {name}
+    </p>
+    <div style={{ marginTop: isMobile ? '12px' : '16px', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+      <span style={{ fontSize: isMobile ? '36px' : '48px', fontWeight: 600, color: popular ? '#ffffff' : '#111827', letterSpacing: '-0.025em' }}>
+        €{price}
+      </span>
+      <span style={{ fontSize: isMobile ? '14px' : '15px', color: popular ? '#6b7280' : '#9ca3af' }}>/month</span>
+    </div>
+    <p style={{ fontSize: '14px', color: popular ? '#9ca3af' : '#6b7280', marginTop: '8px' }}>
+      {description}
+    </p>
+    <ul style={{ marginTop: isMobile ? '20px' : '28px', padding: 0, listStyle: 'none' }}>
+      {features.map((feature) => (
+        <li key={feature} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '14px', marginBottom: isMobile ? '10px' : '14px' }}>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0, marginTop: '1px' }}>
+            <path d="M15 4.5L6.75 12.75L3 9" stroke={popular ? '#9ca3af' : '#111827'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span style={{ color: popular ? '#d1d5db' : '#374151' }}>{feature}</span>
+        </li>
+      ))}
+    </ul>
+    <Link
+      to="/signup"
+      style={{
+        marginTop: isMobile ? '20px' : '28px',
+        display: 'block',
+        width: '100%',
+        padding: isMobile ? '12px 0' : '14px 0',
+        textAlign: 'center',
+        fontSize: '14px',
+        fontWeight: 500,
+        textDecoration: 'none',
+        borderRadius: '8px',
+        backgroundColor: popular ? '#ffffff' : '#111827',
+        color: popular ? '#111827' : '#ffffff',
+        boxSizing: 'border-box'
+      }}
+    >
+      Get started
+    </Link>
+  </div>
+);
 
-      <div style={{ textAlign: 'center', marginTop: 24 }}>
-        <Link to={PRIMARY_CTA_HREF} className="landing-btn-primary" style={{ marginRight: 12 }}>
-          Start Free Trial
-        </Link>
-        <Link to="/pricing" className="landing-btn-ghost">
-          Compare all features
-        </Link>
-      </div>
-    </section>
-  );
-};
-
-/* ------------------------------- FAQ Section ----------------------------- */
-
-const FAQ_ITEMS = [
-  {
-    question: 'Is WedBoardPro only for agencies?',
-    answer:
-      'No. We designed the workspace for both solo planners and small teams. You can start alone and add team members later.',
-  },
-  {
-    question: 'Do I need to install anything?',
-    answer:
-      'No installation required. WedBoardPro runs in the browser and works on desktop, tablet and mobile.',
-  },
-  {
-    question: 'Can I cancel anytime?',
-    answer:
-      'Yes. You can cancel your subscription at any time from your account settings. No long‑term contracts.',
-  },
-  {
-    question: 'Do you support multiple planners per account?',
-    answer:
-      'Yes. Invite planners to your team, assign them to events and tasks, and control access to budgets.',
-  },
-  {
-    question: 'What happens at the end of the trial?',
-    answer:
-      "We'll remind you before your trial ends. You can choose a paid plan or export your data if you decide not to continue.",
-  },
-  {
-    question: 'Is my client data secure?',
-    answer:
-      'We use modern cloud infrastructure, encrypted connections and regular backups to keep your data safe.',
-  },
-];
-
-const FAQSection: React.FC = () => {
-  const [openIndex, setOpenIndex] = useState<number | null>(0);
-
-  return (
-    <section className="landing-section">
-      <div className="landing-section-header">
-        <div>
-          <p className="landing-section-eyebrow">FAQ</p>
-          <h2 className="landing-section-title">
-            Questions planners ask before switching.
-          </h2>
-        </div>
-      </div>
-
-      <div className="landing-faq-grid">
-        {FAQ_ITEMS.map((item, index) => {
-          const isOpen = openIndex === index;
-          return (
-            <div key={item.question} className="landing-faq-item">
-              <button
-                type="button"
-                onClick={() => setOpenIndex(isOpen ? null : index)}
-                className="landing-faq-question-row"
-              >
-                <span className="landing-faq-question">{item.question}</span>
-                <span className="landing-faq-toggle">{isOpen ? '−' : '+'}</span>
-              </button>
-              {isOpen && <p className="landing-faq-answer">{item.answer}</p>}
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-};
-
-/* ------------------------------ Final CTA ------------------------------- */
-
-const FinalCTA: React.FC = () => {
-  return (
-    <section className="landing-section">
-      <div className="landing-final">
-        <h2 className="landing-final-title">
-          Turn your wedding chaos into a calm, repeatable workflow.
-        </h2>
-        <p className="landing-final-sub">
-          Start a free trial today or book a demo with our team of former planners.
-        </p>
-        <div className="landing-final-buttons">
-          <Link to={PRIMARY_CTA_HREF} className="landing-btn-primary">
-            Start Free Trial
-          </Link>
-          <Link to={DEMO_HREF} className="landing-btn-ghost">
-            Book a Demo
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-};
-
-/* -------------------------------- Footer -------------------------------- */
-
-const LandingFooter: React.FC = () => {
-  return (
-    <footer className="landing-footer">
-      <div className="landing-footer-inner">
-        <p>© {new Date().getFullYear()} WedBoardPro. All rights reserved.</p>
-        <div className="landing-footer-links">
-          <Link to="/privacy">Privacy</Link>
-          <Link to="/terms">Terms</Link>
-          <Link to="/contact">Contact</Link>
-        </div>
-      </div>
-    </footer>
-  );
-};
-
+export default MarketingHome;

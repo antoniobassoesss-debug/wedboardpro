@@ -12,8 +12,8 @@ const LoginPage: React.FC = () => {
   return (
     <>
       <AuthLayout
-        title="Log in to WedBoardPro"
-        subtitle="Enter your credentials to access the dashboard."
+        title="Welcome back"
+        subtitle="Enter your credentials to access your account."
       >
         <EmailPasswordForm mode="login" />
 
