@@ -40,6 +40,7 @@ export interface Shape {
   y: number;
   width: number;
   height: number;
+  rotation?: number; // Rotation in degrees (0-360)
   fill: string;
   stroke: string;
   strokeWidth: number;
@@ -65,6 +66,8 @@ export interface Shape {
   spaceMetersHeight?: number;
   pixelsPerMeter?: number;
   attachedSpaceId?: string;
+  customShape?: string;
+  customShapeScale?: number;
 }
 
 export interface TextElement {
@@ -88,6 +91,8 @@ export interface Wall {
   color?: string;
   snapToGrid?: boolean;
   snapAngle?: number;
+  originalLengthPx?: number; // Original length before scaling (for pxPerMeter derivation)
+  pxPerMeter?: number; // Computed pixels per meter for this wall on canvas
 }
 
 export interface Door {
@@ -436,6 +441,8 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
         const current = get().elements[id];
         if (!current) return;
 
+        console.log('[canvasStore] updateElement called:', id, 'updates:', updates);
+
         set((state) => {
           const el = state.elements[id];
           if (!el) return;
@@ -443,6 +450,7 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
           const clamped = clampElementToA4(updated, a4);
           state.elements[id] = { ...updated, x: clamped.x, y: clamped.y, width: clamped.width, height: clamped.height };
           state.pendingChanges = true;
+          console.log('[canvasStore] Element updated, new rotation:', state.elements[id]?.rotation);
         });
       },
 

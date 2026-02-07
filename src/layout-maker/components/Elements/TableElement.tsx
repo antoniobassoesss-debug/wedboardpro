@@ -5,11 +5,12 @@
  * Supports round, rectangular, oval, and square tables with wood-tone styling.
  */
 
-import React from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type { TableElement } from '../../types/elements';
 import { ELEMENT_COLORS, HOVER_COLOR, SELECTION_COLOR } from '../../constants';
 import { ChairRender } from './ChairElement';
 import type { ChairElement } from '../../types/elements';
+import { RotateButton } from './RotateButton';
 
 interface TableElementProps {
   element: TableElement;
@@ -22,6 +23,7 @@ interface TableElementProps {
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   onMouseDown?: (event: React.MouseEvent) => void;
+  onRotate?: (elementId: string, newRotation: number) => void;
 }
 
 export const TableRender: React.FC<TableElementProps> = ({
@@ -35,7 +37,19 @@ export const TableRender: React.FC<TableElementProps> = ({
   onMouseEnter,
   onMouseLeave,
   onMouseDown,
+  onRotate,
 }) => {
+  const [showRotateButton, setShowRotateButton] = useState(false);
+  const [pendingRotation, setPendingRotation] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (isSelected) {
+      setShowRotateButton(true);
+    } else {
+      setShowRotateButton(false);
+    }
+  }, [isSelected]);
+
   const isRound = element.type === 'table-round';
   const isOval = element.type === 'table-oval';
   const centerX = element.x + element.width / 2;
@@ -45,6 +59,33 @@ export const TableRender: React.FC<TableElementProps> = ({
   const tableFill = element.color || '#D4A373';
   const tableStroke = '#8B5A2B';
   const textColor = '#5D4037';
+
+  const handleDoubleClick = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (onDoubleClick) {
+      onDoubleClick(event);
+    }
+  }, [onDoubleClick]);
+
+  const handleRotate = useCallback(() => {
+    if (onRotate) {
+      const newRotation = ((element.rotation || 0) + 90) % 360;
+      setPendingRotation(newRotation);
+      onRotate(element.id, newRotation);
+    }
+    setTimeout(() => {
+      setShowRotateButton(false);
+      setPendingRotation(null);
+    }, 250);
+  }, [element.id, element.rotation, onRotate]);
+
+  const handleCloseRotateButton = useCallback(() => {
+    setShowRotateButton(false);
+    setPendingRotation(null);
+  }, []);
+
+  const effectiveRotation = pendingRotation !== null ? pendingRotation : (element.rotation || 0);
 
   const renderTableShape = () => {
     if (isRound) {
@@ -205,29 +246,44 @@ export const TableRender: React.FC<TableElementProps> = ({
     );
   };
 
-  return (
-    <g
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      onMouseDown={onMouseDown}
-      style={{ cursor: 'pointer' }}
-    >
-      {renderSelectionOutline()}
-      {renderHoverOutline()}
-      {renderTableShape()}
-      {renderLabel()}
-      {renderCapacityIndicator()}
+  const rotateButtonX = centerX * pixelsPerMeter;
+  const rotateButtonY = (element.y * pixelsPerMeter) - 30;
 
-      {chairs.map((chair) => (
-        <ChairRender
-          key={chair.id}
-          element={chair}
-          pixelsPerMeter={pixelsPerMeter}
+  return (
+    <>
+      <g
+        onClick={onClick}
+        onDoubleClick={handleDoubleClick}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        onMouseDown={onMouseDown}
+        style={{ cursor: 'pointer' }}
+      >
+        {renderSelectionOutline()}
+        {renderHoverOutline()}
+        {renderTableShape()}
+        {renderLabel()}
+        {renderCapacityIndicator()}
+
+        {chairs.map((chair) => (
+          <ChairRender
+            key={chair.id}
+            element={chair}
+            pixelsPerMeter={pixelsPerMeter}
+          />
+        ))}
+      </g>
+
+      {showRotateButton && (
+        <RotateButton
+          x={rotateButtonX}
+          y={rotateButtonY}
+          onRotate={handleRotate}
+          onClose={handleCloseRotateButton}
+          elementSize={{ width: element.width, height: element.height }}
         />
-      ))}
-    </g>
+      )}
+    </>
   );
 };
 

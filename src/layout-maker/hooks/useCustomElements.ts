@@ -47,10 +47,13 @@ export function useCustomElements(): UseCustomElementsReturn {
     setLocalError(null);
 
     try {
+      console.log('[useCustomElements] Fetching templates for planner:', plannerId);
       const result = await getCustomElements(plannerId);
+      console.log('[useCustomElements] Fetched templates:', result.length);
       setTemplates(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch custom elements';
+      console.error('[useCustomElements] Error:', message);
       setLocalError(message);
       setError(message);
     } finally {

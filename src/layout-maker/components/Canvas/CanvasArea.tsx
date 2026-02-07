@@ -101,12 +101,14 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
 
   const handleElementClick = useCallback(
     (elementId: string, event: React.MouseEvent) => {
+      console.log('[CanvasArea] Element clicked:', elementId);
       event.stopPropagation();
 
       if (event.shiftKey) {
         selectionStore.toggleSelection(elementId);
       } else {
         selectionStore.select(elementId);
+        console.log('[CanvasArea] Selected IDs:', selectionStore.selectedIds);
       }
 
       // Check if clicked element is a chair - open guest assignment dropdown
@@ -167,6 +169,13 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
       }
     },
     [guestDropdownChairId, guestAssignment, handleCloseGuestDropdown]
+  );
+
+  const handleElementRotate = useCallback(
+    (elementId: string, newRotation: number) => {
+      layoutStore.updateElement(elementId, { rotation: newRotation });
+    },
+    [layoutStore]
   );
 
 
@@ -565,6 +574,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
               onElementClick={handleElementClick}
               onElementHover={handleElementHover}
               onElementMouseDown={handleElementMouseDown}
+              onElementRotate={handleElementRotate}
               {...(onElementDoubleClick && { onElementDoubleClick })}
             />
           )}

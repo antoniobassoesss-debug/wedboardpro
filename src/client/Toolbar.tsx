@@ -130,10 +130,10 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange, onAddSpace,
   const [wallMakerTool, setWallMakerTool] = useState<'wall' | 'pan' | 'door'>('wall');
   const [wallMakerDoors, setWallMakerDoors] = useState<Door[]>([]);
   const [wallMakerConfig, setWallMakerConfig] = useState<WallMakerConfig>({
-    gridSize: 20,
+    gridSize: 100, // 100px = 1m, major grid (5x) = 5m
     snapToGrid: true,
     snapAngles: [0, 45, 90, 135, 180, 225, 270, 315],
-    defaultThickness: 4,
+    defaultThickness: 20, // 5x scaled for zoomed out view
     showMeasurements: true,
     showAngles: true,
     showGrid: true,

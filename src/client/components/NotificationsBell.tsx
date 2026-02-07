@@ -122,8 +122,18 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [hoveredNotificationId, setHoveredNotificationId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<ReturnType<NonNullable<typeof browserSupabaseClient>['channel']> | null>(null);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
@@ -448,6 +458,88 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
   const hasUnread = unreadCount > 0;
   const bellColor = isOpen || hasUnread ? '#14B8A6' : '#6B7280';
 
+  // Mobile modal content
+  const renderMobileModal = () => (
+    <div className="notifications-mobile-overlay" onClick={() => setIsOpen(false)}>
+      <div className="notifications-mobile-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="notifications-mobile-header">
+          <h3 className="notifications-mobile-title">Notifications</h3>
+          <button
+            type="button"
+            className="notifications-mobile-close"
+            onClick={() => setIsOpen(false)}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {unreadCount > 0 && (
+          <button
+            type="button"
+            className="notifications-mobile-mark-read"
+            onClick={handleMarkAllAsRead}
+          >
+            Mark all as read
+          </button>
+        )}
+
+        <div className="notifications-mobile-list">
+          {loading ? (
+            <div className="notifications-mobile-loading">Loading...</div>
+          ) : notifications.length === 0 ? (
+            <div className="notifications-mobile-empty">
+              <EmptyBellIcon />
+              <p>No notifications yet</p>
+              <span>You'll be notified when someone assigns you a task</span>
+            </div>
+          ) : (
+            notifications.map((notification) => {
+              const { taskTitle, projectName, isTeamInvitation } = parseNotificationMessage(notification.message, notification.type);
+              const isUnread = !notification.is_read;
+
+              return (
+                <div
+                  key={notification.id}
+                  className={`notifications-mobile-item ${isUnread ? 'unread' : ''}`}
+                  onClick={() => handleNotificationClick(notification)}
+                >
+                  <div className="notifications-mobile-item-icon">
+                    {isTeamInvitation || notification.type === 'team_invitation' ? (
+                      <UsersIcon />
+                    ) : (
+                      <TaskIcon />
+                    )}
+                  </div>
+                  <div className="notifications-mobile-item-content">
+                    <div className="notifications-mobile-item-title">{notification.title}</div>
+                    <div className="notifications-mobile-item-message">
+                      {isTeamInvitation ? `Team: ${taskTitle}` : taskTitle}
+                    </div>
+                    {projectName && !isTeamInvitation && (
+                      <div className="notifications-mobile-item-project">in {projectName}</div>
+                    )}
+                    <div className="notifications-mobile-item-time">{formatTimeAgo(notification.created_at)}</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="notifications-mobile-dismiss"
+                    onClick={(e) => handleDismiss(notification.id, e)}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className={className} style={{ position: 'relative' }} ref={dropdownRef}>
       <button
@@ -477,7 +569,7 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
         )}
       </button>
 
-      {isOpen && (
+      {isOpen && (isMobile ? renderMobileModal() : (
         <div
           style={{
             position: 'absolute',
@@ -770,7 +862,7 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
             )}
           </div>
         </div>
-      )}
+      ))}
     </div>
   );
 };

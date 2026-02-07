@@ -8874,6 +8874,116 @@ app.post('/api/crm/deals/:id/won', express.json(), async (req, res) => {
   }
 });
 
+// POST /api/crm/deals/import - Bulk import deals from CSV
+app.post('/api/crm/deals/import', express.json(), async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabaseServiceClient();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase service client unavailable' });
+    }
+
+    const { deals, start_row = 0 } = req.body;
+
+    if (!Array.isArray(deals) || deals.length === 0) {
+      return res.status(400).json({ error: 'deals array is required' });
+    }
+
+    const results: { imported: number; errors: Array<{ row: number; error: string }> } = {
+      imported: 0,
+      errors: [],
+    };
+
+    for (let i = 0; i < deals.length; i++) {
+      const dealInput = deals[i];
+      const rowNumber = start_row + i + 1;
+
+      try {
+        const {
+          pipelineId,
+          stageId,
+          title,
+          primaryFirstName,
+          primaryLastName,
+          partnerFirstName,
+          partnerLastName,
+          email,
+          phone,
+          weddingDate,
+          valueCents,
+          priority = 'medium',
+          nextAction,
+        } = dealInput;
+
+        if (!pipelineId || !stageId || !title) {
+          results.errors.push({ row: rowNumber, error: 'Missing required fields: pipelineId, stageId, title' });
+          continue;
+        }
+
+        let contactId: string | null = null;
+
+        if (primaryFirstName || primaryLastName || email || phone) {
+          const { data: contact, error: contactError } = await supabase
+            .from('crm_contacts')
+            .insert({
+              account_id: user.id,
+              primary_first_name: primaryFirstName || null,
+              primary_last_name: primaryLastName || null,
+              partner_first_name: partnerFirstName || null,
+              partner_last_name: partnerLastName || null,
+              email: email || null,
+              phone: phone || null,
+            })
+            .select()
+            .single();
+
+          if (contactError) {
+            results.errors.push({ row: rowNumber, error: `Failed to create contact: ${contactError.message}` });
+            continue;
+          }
+          contactId = contact.id;
+        }
+
+        const { data: deal, error: dealError } = await supabase
+          .from('crm_deals')
+          .insert({
+            account_id: user.id,
+            pipeline_id: pipelineId,
+            stage_id: stageId,
+            primary_contact_id: contactId,
+            title,
+            wedding_date: weddingDate || null,
+            value_cents: valueCents || null,
+            currency: 'EUR',
+            priority,
+            next_action: nextAction || null,
+            owner_id: user.id,
+          })
+          .select()
+          .single();
+
+        if (dealError) {
+          results.errors.push({ row: rowNumber, error: `Failed to create deal: ${dealError.message}` });
+          continue;
+        }
+
+        results.imported++;
+      } catch (err: any) {
+        results.errors.push({ row: rowNumber, error: err?.message || 'Unknown error' });
+      }
+    }
+
+    res.json(results);
+  } catch (error: any) {
+    console.error('[POST /api/crm/deals/import] Error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to import deals' });
+  }
+});
+
 // ============================================================================
 // ELECTRICAL MODULE - PDF Export
 // ============================================================================

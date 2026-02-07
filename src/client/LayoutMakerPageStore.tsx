@@ -27,6 +27,7 @@ import ZoomControls from './components/ZoomControls';
 import { useCanvasStore } from '../layout-maker/store/canvasStore';
 import { useAutoSync } from '../layout-maker/hooks/useAutoSync';
 import { ElementLibrary } from '../layout-maker/components/Sidebar/ElementLibrary';
+import { ElementPlacementModal } from '../layout-maker/components/Sidebar/ElementPlacementModal';
 import { RoundTableModal } from '../layout-maker/components/Sidebar/RoundTableModal';
 import { RectangularTableModal } from '../layout-maker/components/Sidebar/RectangularTableModal';
 import { SquareTableModal } from '../layout-maker/components/Sidebar/SquareTableModal';
@@ -234,6 +235,11 @@ const LayoutMakerPageStore: React.FC = () => {
   const [ovalTableModalOpen, setOvalTableModalOpen] = useState(false);
   const [customElementModalOpen, setCustomElementModalOpen] = useState(false);
   const [editingCustomTemplate, setEditingCustomTemplate] = useState<CustomElementTemplate | null>(null);
+  const [placementModalOpen, setPlacementModalOpen] = useState(false);
+  const [placementElementType, setPlacementElementType] = useState<ElementType>('chair');
+  const [placementElementLabel, setPlacementElementLabel] = useState('Chair');
+  const [placementElementWidth, setPlacementElementWidth] = useState(0.45);
+  const [placementElementHeight, setPlacementElementHeight] = useState(0.45);
 
   const { templates: customTemplates, fetchTemplates, saveTemplate, updateTemplate, deleteTemplate } = useCustomElements();
   const plannerId = 'current-user';
@@ -269,14 +275,6 @@ const LayoutMakerPageStore: React.FC = () => {
     setEditingCustomTemplate(null);
   }, [editingCustomTemplate, saveTemplate, updateTemplate, plannerId]);
 
-  const [workflowPositions, setWorkflowPositions] = useState<Record<string, { x: number; y: number }>>(() => {
-    try {
-      const stored = localStorage.getItem('workflow-positions');
-      if (stored) return JSON.parse(stored);
-    } catch {}
-    return {};
-  });
-
   // Store access
   const initializeProject = useCanvasStore((s) => s.initializeProject);
   const storeSupabaseLayoutId = useCanvasStore((s) => s.supabaseLayoutId);
@@ -287,20 +285,151 @@ const LayoutMakerPageStore: React.FC = () => {
   const a4Bounds = useCanvasStore((s) => s.a4Bounds);
   const wallScale = useCanvasStore((s) => s.wallScale);
 
+  // Add custom shape directly to canvas without saving to library
+  const handleAddCustomToCanvas = useCallback((templateData: Omit<CustomElementTemplate, 'id' | 'plannerId' | 'createdAt' | 'updatedAt'>) => {
+    const PIXELS_PER_METER = 100;
+
+    // Generate a unique ID for this unsaved custom shape
+    const tempTemplateId = uuidv4();
+    const elementId = uuidv4();
+
+    // Convert dimensions from meters to pixels
+    const widthPx = templateData.width * PIXELS_PER_METER;
+    const heightPx = templateData.height * PIXELS_PER_METER;
+
+    // Calculate center position of the canvas
+    const centerX = a4Bounds
+      ? a4Bounds.x + (a4Bounds.width / 2) - (widthPx / 2)
+      : 200;
+    const centerY = a4Bounds
+      ? a4Bounds.y + (a4Bounds.height / 2) - (heightPx / 2)
+      : 200;
+
+    // Store original path in meters + scale factor for proper rendering
+    addElement({
+      id: elementId,
+      type: `custom-${tempTemplateId}` as "rectangle",
+      x: centerX,
+      y: centerY,
+      width: widthPx,
+      height: heightPx,
+      rotation: 0,
+      customShape: templateData.svgPath,
+      customShapeScale: PIXELS_PER_METER,
+      label: templateData.name,
+      fill: '#ffffff',
+      stroke: '#374151',
+      strokeWidth: 1.5,
+    } as any);
+
+    setCustomElementModalOpen(false);
+    setEditingCustomTemplate(null);
+  }, [addElement, a4Bounds]);
+
+  const handleOpenPlacementModal = useCallback((type: ElementType) => {
+    console.log('[LayoutMakerPageStore] handleOpenPlacementModal called with type:', type);
+    const elementConfigs: Record<string, { label: string; width: number; height: number }> = {
+      'chair': { label: 'Chair', width: 0.45, height: 0.45 },
+      'bench': { label: 'Bench', width: 1.5, height: 0.5 },
+      'lounge': { label: 'Lounge', width: 2, height: 0.8 },
+    };
+
+    const config = elementConfigs[type];
+    console.log('[LayoutMakerPageStore] Config found:', config);
+    if (config) {
+      console.log('[LayoutMakerPageStore] Setting state and opening modal...');
+      setPlacementElementType(type);
+      setPlacementElementLabel(config.label);
+      setPlacementElementWidth(config.width);
+      setPlacementElementHeight(config.height);
+      setPlacementModalOpen(true);
+      setShowElementLibrary(false);
+      console.log('[LayoutMakerPageStore] placementModalOpen should be:', true);
+    }
+  }, []);
+
+  useEffect(() => {
+    console.log('[LayoutMakerPageStore] placementModalOpen changed to:', placementModalOpen);
+  }, [placementModalOpen]);
+
+  useEffect(() => {
+    console.log('[LayoutMakerPageStore] placementElementType changed to:', placementElementType);
+  }, [placementElementType]);
+
+  const handlePlaceElements = useCallback((elements: Array<{
+    type: ElementType;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    zIndex: number;
+    groupId: string | null;
+    parentId: string | null;
+    locked: boolean;
+    visible: boolean;
+    label: string;
+    notes: string;
+    color: string | null;
+  }>) => {
+    elements.forEach((element) => {
+      const id = uuidv4();
+      addElement({
+        id,
+        type: element.type as any,
+        x: element.x,
+        y: element.y,
+        width: element.width,
+        height: element.height,
+        rotation: element.rotation,
+        label: element.label,
+        color: element.color,
+      } as any);
+    });
+    setPlacementModalOpen(false);
+  }, [addElement]);
+
+  const [workflowPositions, setWorkflowPositions] = useState<Record<string, { x: number; y: number }>>(() => {
+    try {
+      const stored = localStorage.getItem('workflow-positions');
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return {};
+  });
+
   const handleSelectCustomTemplate = useCallback((template: CustomElementTemplate) => {
+    const PIXELS_PER_METER = 100;
     const id = uuidv4();
+
+    // Convert dimensions from meters to pixels
+    const widthPx = template.width * PIXELS_PER_METER;
+    const heightPx = template.height * PIXELS_PER_METER;
+
+    // Calculate center position of the canvas
+    const centerX = a4Bounds
+      ? a4Bounds.x + (a4Bounds.width / 2) - (widthPx / 2)
+      : 200;
+    const centerY = a4Bounds
+      ? a4Bounds.y + (a4Bounds.height / 2) - (heightPx / 2)
+      : 200;
+
+    // Store original path in meters + scale factor for proper rendering
     addElement({
       id,
       type: `custom-${template.id}` as "rectangle",
-      x: 5,
-      y: 5,
-      width: template.width,
-      height: template.height,
+      x: centerX,
+      y: centerY,
+      width: widthPx,
+      height: heightPx,
       rotation: 0,
       customShape: template.svgPath,
+      customShapeScale: PIXELS_PER_METER,
       label: template.name,
+      fill: '#ffffff',
+      stroke: '#374151',
+      strokeWidth: 1.5,
     } as any);
-  }, [addElement]);
+  }, [addElement, a4Bounds]);
 
   const gridCanvasRef = useRef<{
     addSpace: (width: number, height: number) => void;
@@ -663,7 +792,8 @@ const LayoutMakerPageStore: React.FC = () => {
     const { diameter, unit, seats, quantity } = data;
 
     const diameterInMeters = unit === 'cm' ? diameter / 100 : diameter;
-    const PIXELS_PER_METER = 100;
+    // Use wall scale if available, otherwise default to 100
+    const PIXELS_PER_METER = wallScale?.pxPerMeter || 100;
     const tableSizePx = diameterInMeters * PIXELS_PER_METER;
     const spacingPx = 60;
 
@@ -702,8 +832,9 @@ const LayoutMakerPageStore: React.FC = () => {
       });
 
       const chairIds: string[] = [];
-      const chairSizePx = 0.45 * PIXELS_PER_METER;
-      const chairRadius = (tableSizePx / 2) + 10;
+      const ppm = wallScale?.pxPerMeter || 100;
+      const chairSizePx = 0.45 * ppm;
+      const chairRadius = (tableSizePx / 2) + (0.1 * ppm);
 
       for (let j = 0; j < seats; j++) {
         const angle = (j / seats) * Math.PI * 2 - Math.PI / 2;
@@ -752,7 +883,8 @@ const LayoutMakerPageStore: React.FC = () => {
 
     const widthInMeters = unit === 'cm' ? width / 100 : width;
     const heightInMeters = unit === 'cm' ? height / 100 : height;
-    const PIXELS_PER_METER = 100;
+    // Use wall scale if available, otherwise default to 100
+    const PIXELS_PER_METER = wallScale?.pxPerMeter || 100;
     const tableWidthPx = widthInMeters * PIXELS_PER_METER;
     const tableHeightPx = heightInMeters * PIXELS_PER_METER;
     const spacingPx = 60;
@@ -793,8 +925,9 @@ const LayoutMakerPageStore: React.FC = () => {
       });
 
       const chairIds: string[] = [];
-      const chairSizePx = 0.45 * PIXELS_PER_METER;
-      const chairOffset = 12;
+      const ppm = wallScale?.pxPerMeter || 100;
+      const chairSizePx = 0.45 * ppm;
+      const chairOffset = 0.12 * ppm;
 
       const seatsPerSide = Math.floor(seats / 2);
       const extraOnTop = seats % 2;
@@ -857,7 +990,8 @@ const LayoutMakerPageStore: React.FC = () => {
     const { size, unit, seats, quantity } = data;
 
     const sizeInMeters = unit === 'cm' ? size / 100 : size;
-    const PIXELS_PER_METER = 100;
+    // Use wall scale if available, otherwise default to 100
+    const PIXELS_PER_METER = wallScale?.pxPerMeter || 100;
     const tableSizePx = sizeInMeters * PIXELS_PER_METER;
     const spacingPx = 60;
 
@@ -896,49 +1030,71 @@ const LayoutMakerPageStore: React.FC = () => {
       });
 
       const chairIds: string[] = [];
-      const chairSizePx = 0.45 * PIXELS_PER_METER;
-      const chairOffset = 12;
-      const tableHalfSize = tableSizePx / 2;
-      const seatsPerSide = Math.floor(seats / 4);
+      const ppm = wallScale?.pxPerMeter || 100;
+      const chairSizePx = 0.45 * ppm;
+      const chairOffset = 0.12 * ppm;
 
-      for (let j = 0; j < seats; j++) {
-        const side = Math.floor(j / seatsPerSide);
+      // Distribute seats across 4 sides (top, bottom, right, left)
+      const baseSeatsPerSide = Math.floor(seats / 4);
+      const extraSeats = seats % 4;
+      // Distribute extra seats: top gets first extra, bottom gets second, right gets third, left gets fourth
+      const seatsOnSide = [
+        baseSeatsPerSide + (extraSeats > 0 ? 1 : 0), // top
+        baseSeatsPerSide + (extraSeats > 1 ? 1 : 0), // bottom
+        baseSeatsPerSide + (extraSeats > 2 ? 1 : 0), // right
+        baseSeatsPerSide + (extraSeats > 3 ? 1 : 0), // left
+      ];
 
-        let chairX = 0;
-        let chairY = 0;
+      let seatIndex = 0;
+      for (let side = 0; side < 4; side++) {
+        const seatsThisSide = seatsOnSide[side] ?? 0;
+        for (let k = 0; k < seatsThisSide; k++) {
+          let chairX = 0;
+          let chairY = 0;
 
-        if (side === 0) {
-          chairX = tableX + tableHalfSize - chairSizePx / 2;
-          chairY = tableY - chairOffset - chairSizePx / 2;
-        } else if (side === 1) {
-          chairX = tableX + tableHalfSize - chairSizePx / 2;
-          chairY = tableY + tableSizePx + chairOffset + chairSizePx / 2;
-        } else if (side === 2) {
-          chairX = tableX + tableSizePx + chairOffset + chairSizePx / 2;
-          chairY = tableY + tableHalfSize - chairSizePx / 2;
-        } else if (side === 3) {
-          chairX = tableX - chairOffset - chairSizePx / 2;
-          chairY = tableY + tableHalfSize - chairSizePx / 2;
+          // Calculate position along the side (0 to 1)
+          const positionAlongSide = seatsThisSide > 1
+            ? k / (seatsThisSide - 1)
+            : 0.5;
+
+          if (side === 0) {
+            // Top side - chairs above the table, distributed horizontally
+            chairX = tableX + positionAlongSide * (tableSizePx - chairSizePx);
+            chairY = tableY - chairOffset - chairSizePx / 2;
+          } else if (side === 1) {
+            // Bottom side - chairs below the table, distributed horizontally
+            chairX = tableX + positionAlongSide * (tableSizePx - chairSizePx);
+            chairY = tableY + tableSizePx + chairOffset - chairSizePx / 2;
+          } else if (side === 2) {
+            // Right side - chairs to the right of table, distributed vertically
+            chairX = tableX + tableSizePx + chairOffset - chairSizePx / 2;
+            chairY = tableY + positionAlongSide * (tableSizePx - chairSizePx);
+          } else if (side === 3) {
+            // Left side - chairs to the left of table, distributed vertically
+            chairX = tableX - chairOffset - chairSizePx / 2;
+            chairY = tableY + positionAlongSide * (tableSizePx - chairSizePx);
+          }
+
+          const chairId = addElement({
+            type: 'circle' as const,
+            x: chairX,
+            y: chairY,
+            width: chairSizePx,
+            height: chairSizePx,
+            fill: '#FFFFFF',
+            stroke: '#999999',
+            strokeWidth: 1,
+            chairData: {
+              parentTableId: tableId,
+              seatIndex: seatIndex,
+              assignedGuestId: null,
+              assignedGuestName: null,
+              dietaryType: null,
+            },
+          });
+          chairIds.push(chairId);
+          seatIndex++;
         }
-
-        const chairId = addElement({
-          type: 'circle' as const,
-          x: chairX,
-          y: chairY,
-          width: chairSizePx,
-          height: chairSizePx,
-          fill: '#FFFFFF',
-          stroke: '#999999',
-          strokeWidth: 1,
-          chairData: {
-            parentTableId: tableId,
-            seatIndex: j,
-            assignedGuestId: null,
-            assignedGuestName: null,
-            dietaryType: null,
-          },
-        });
-        chairIds.push(chairId);
       }
 
       const updateElement = useCanvasStore.getState().updateElement;
@@ -1283,11 +1439,6 @@ const LayoutMakerPageStore: React.FC = () => {
           {...(eventInfo !== null ? { eventInfo } : {})}
         />
 
-        {/* Sync Status Indicator */}
-        <div style={{ position: 'fixed', top: '12px', right: '200px', pointerEvents: 'auto', zIndex: 10001 }}>
-          <SyncStatusIndicator />
-        </div>
-
         {!isWorkflowOpen && (
           <>
             <Toolbar
@@ -1469,6 +1620,7 @@ const LayoutMakerPageStore: React.FC = () => {
                       onSelectCustomTemplate={handleSelectCustomTemplate}
                       onEditCustomTemplate={handleEditCustomTemplate}
                       onDeleteCustomTemplate={handleDeleteCustomTemplate}
+                      onOpenPlacementModal={handleOpenPlacementModal}
                       customTemplates={customTemplates}
                     />
                   </div>
@@ -1533,6 +1685,27 @@ const LayoutMakerPageStore: React.FC = () => {
         isOpen={ovalTableModalOpen}
         onClose={() => setOvalTableModalOpen(false)}
         onSubmit={handleOvalTableSubmit}
+      />
+
+      <CustomElementModal
+        isOpen={customElementModalOpen}
+        onClose={() => {
+          setCustomElementModalOpen(false);
+          setEditingCustomTemplate(null);
+        }}
+        onSave={handleSaveCustomTemplate}
+        onAddToCanvas={handleAddCustomToCanvas}
+        editTemplate={editingCustomTemplate}
+      />
+
+      <ElementPlacementModal
+        isOpen={placementModalOpen}
+        onClose={() => setPlacementModalOpen(false)}
+        onPlaceElements={handlePlaceElements}
+        elementType={placementElementType}
+        elementLabel={placementElementLabel}
+        defaultWidth={placementElementWidth}
+        defaultHeight={placementElementHeight}
       />
 
       {showElectricalDashboard && (

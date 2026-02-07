@@ -2,6 +2,7 @@
  * Custom Elements List
  *
  * Grid display of saved custom element templates.
+ * Matches the simple, clean style of ElementCard.
  */
 
 import React, { useState } from 'react';
@@ -15,13 +16,6 @@ interface CustomElementsListProps {
   onEdit: (template: CustomElementTemplate) => void;
   onDelete: (template: CustomElementTemplate) => void;
 }
-
-const formatMeters = (value: number): string => {
-  if (value >= 1) {
-    return `${value.toFixed(2)}m`;
-  }
-  return `${(value * 100).toFixed(0)}cm`;
-};
 
 export const CustomElementsList: React.FC<CustomElementsListProps> = ({
   templates,
@@ -43,164 +37,269 @@ export const CustomElementsList: React.FC<CustomElementsListProps> = ({
     }
   };
 
-  if (templates.length === 0) {
-    return (
-      <div className="p-4">
-        <div
-          onClick={onCreateNew}
-          className="flex flex-col items-center justify-center p-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all"
-        >
-          <div className="w-12 h-12 mb-3 flex items-center justify-center bg-white rounded-full border border-gray-200 shadow-sm">
-            <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </div>
-          <h4 className="text-sm font-medium text-gray-900 mb-1">Create Custom Element</h4>
-          <p className="text-xs text-gray-500 text-center">
-            Design your own custom shapes and save them for reuse
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-4">
-      <div className="grid grid-cols-2 gap-3">
-        {templates.map((template) => {
-          const svgPath = verticesToSvgPath(template.vertices, true);
-          const scale = 40 / Math.max(template.width, template.height, 0.1);
-          const viewBoxWidth = template.width * scale;
-          const viewBoxHeight = template.height * scale;
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: '8px',
+    }}>
+      {templates.map((template) => {
+        const svgPath = verticesToSvgPath(template.vertices, true, template.curves);
+        const maxDim = Math.max(template.width, template.height, 0.1);
+        const scale = 36 / maxDim;
+        const viewBoxWidth = template.width * scale;
+        const viewBoxHeight = template.height * scale;
 
-          return (
-            <div
-              key={template.id}
-              className="group relative bg-white rounded-lg border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer overflow-hidden"
-              onClick={() => onSelect(template)}
+        return (
+          <button
+            key={template.id}
+            onClick={() => onSelect(template)}
+            style={{
+              position: 'relative',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '8px',
+              background: '#ffffff',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              width: '100%',
+              aspectRatio: '1',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#3b82f6';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.15)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#e5e7eb';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+            title={template.name}
+          >
+            <svg
+              width="40"
+              height="40"
+              viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
+              preserveAspectRatio="xMidYMid meet"
+              style={{ marginBottom: '4px' }}
             >
-              <div className="aspect-square p-3 flex items-center justify-center bg-gray-50">
-                <svg
-                  width="100%"
-                  height="100%"
-                  viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
-                  preserveAspectRatio="xMidYMid meet"
-                >
-                  <path
-                    d={svgPath}
-                    fill="rgba(59, 130, 246, 0.15)"
-                    stroke="#3b82f6"
-                    strokeWidth="1"
-                  />
-                </svg>
-              </div>
-
-              <div className="px-3 py-2 border-t border-gray-100">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-900 truncate">
-                    {template.name}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-gray-500">
-                    {formatMeters(template.width)} × {formatMeters(template.height)}
-                  </span>
-                  <span className="text-xs text-gray-400">•</span>
-                  <span className="text-xs text-gray-500">
-                    {template.vertices.length} pts
-                  </span>
-                </div>
-              </div>
-
-              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEdit(template);
-                  }}
-                  className="p-1.5 bg-white rounded-md border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors"
-                  title="Edit"
-                >
-                  <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDeleteConfirm(template);
-                  }}
-                  className="p-1.5 bg-white rounded-md border border-gray-200 shadow-sm hover:bg-red-50 transition-colors"
-                  title="Delete"
-                >
-                  <svg className="w-3.5 h-3.5 text-gray-500 hover:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          );
-        })}
-
-        <div
-          onClick={onCreateNew}
-          className="flex flex-col items-center justify-center p-4 bg-gray-50 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all"
-        >
-          <div className="w-8 h-8 mb-2 flex items-center justify-center bg-white rounded-full border border-gray-200 shadow-sm">
-            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <path
+                d={svgPath}
+                fill="none"
+                stroke="#1a1a1a"
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
             </svg>
-          </div>
-          <span className="text-xs font-medium text-gray-600">New Element</span>
-        </div>
-      </div>
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 500,
+              color: '#475569',
+              textAlign: 'center',
+              lineHeight: 1.2,
+              maxWidth: '100%',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              {template.name}
+            </span>
 
+            {/* Edit/Delete buttons on hover */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '4px',
+                right: '4px',
+                display: 'flex',
+                gap: '2px',
+                opacity: 0,
+                transition: 'opacity 0.15s ease',
+              }}
+              className="custom-element-actions"
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(template);
+                }}
+                style={{
+                  padding: '4px',
+                  background: '#f8fafc',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Edit"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteConfirm(template);
+                }}
+                style={{
+                  padding: '4px',
+                  background: '#f8fafc',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Delete"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+            </div>
+          </button>
+        );
+      })}
+
+      {/* Create New Button */}
+      <button
+        onClick={onCreateNew}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '8px',
+          background: '#f8fafc',
+          border: '1px dashed #cbd5e1',
+          borderRadius: '8px',
+          cursor: 'pointer',
+          transition: 'all 0.15s ease',
+          width: '100%',
+          aspectRatio: '1',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = '#3b82f6';
+          e.currentTarget.style.background = '#eff6ff';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = '#cbd5e1';
+          e.currentTarget.style.background = '#f8fafc';
+        }}
+        title="Create new custom element"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        <span style={{
+          fontSize: '11px',
+          fontWeight: 500,
+          color: '#64748b',
+          marginTop: '4px',
+          textAlign: 'center',
+        }}>
+          New
+        </span>
+      </button>
+
+      {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm mx-4">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 flex items-center justify-center bg-red-100 rounded-full">
-                <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 50,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(0, 0, 0, 0.4)',
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '12px',
+            padding: '20px',
+            maxWidth: '320px',
+            margin: '16px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#fef2f2',
+                borderRadius: '8px',
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2">
+                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Delete "{deleteConfirm.name}"?</h3>
-                <p className="text-sm text-gray-500">This action cannot be undone.</p>
+                <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#111827', margin: 0 }}>
+                  Delete "{deleteConfirm.name}"?
+                </h3>
+                <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
+                  This cannot be undone.
+                </p>
               </div>
             </div>
-            <p className="text-sm text-gray-600 mb-6">
-              Are you sure you want to delete this custom element? All saved copies will be affected.
-            </p>
-            <div className="flex gap-3">
+            <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 onClick={() => setDeleteConfirm(null)}
                 disabled={deleteLoading}
-                className="flex-1 px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors disabled:opacity-50"
+                style={{
+                  flex: 1,
+                  padding: '8px 16px',
+                  background: '#f3f4f6',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: '#374151',
+                  cursor: 'pointer',
+                }}
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDelete(deleteConfirm)}
                 disabled={deleteLoading}
-                className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{
+                  flex: 1,
+                  padding: '8px 16px',
+                  background: '#dc2626',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  opacity: deleteLoading ? 0.5 : 1,
+                }}
               >
-                {deleteLoading ? (
-                  <>
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Deleting...
-                  </>
-                ) : (
-                  'Delete'
-                )}
+                {deleteLoading ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* CSS for hover effects */}
+      <style>{`
+        button:hover .custom-element-actions {
+          opacity: 1 !important;
+        }
+      `}</style>
     </div>
   );
 };

@@ -87,9 +87,14 @@ const getWallsBoundingBox = (wallsList: Wall[]): WallBounds | null => {
 };
 
 const derivePxPerMeterFromWalls = (wallsList: Wall[]): number | null => {
-  // Try to find a wall with length info to derive scale
+  // Try to find a wall with pxPerMeter or length info to derive scale
   for (const wall of wallsList) {
-    const originalLengthPx = wall.length;
+    // First check if pxPerMeter is directly stored on the wall
+    if ((wall as any).pxPerMeter && (wall as any).pxPerMeter > 0) {
+      return (wall as any).pxPerMeter;
+    }
+    // Fall back to calculating from original length
+    const originalLengthPx = (wall as any).originalLengthPx || wall.length;
     if (originalLengthPx && originalLengthPx > 0) {
       const originalMeters = originalLengthPx / WALLMAKER_PIXELS_PER_METER;
       if (originalMeters > 0) {
@@ -1046,6 +1051,7 @@ const GridCanvas = forwardRef<{
     const layoutCenterY = (minY + maxY) / 2;
     const canvasCenterX = a4Dimensions.a4X + a4Dimensions.a4WidthPx / 2;
     const canvasCenterY = a4Dimensions.a4Y + a4Dimensions.a4HeightPx / 2;
+    const computedPpm = uniformScale * WALLMAKER_PIXELS_PER_METER;
     const scaledWalls: Wall[] = newWalls.map(wall => {
       const translatedStartX = wall.startX - layoutCenterX;
       const translatedStartY = wall.startY - layoutCenterY;
@@ -1055,6 +1061,10 @@ const GridCanvas = forwardRef<{
       const scaledStartY = translatedStartY * uniformScale;
       const scaledEndX = translatedEndX * uniformScale;
       const scaledEndY = translatedEndY * uniformScale;
+      // Calculate original length if not set
+      const origLength = wall.length || Math.sqrt(
+        Math.pow(wall.endX - wall.startX, 2) + Math.pow(wall.endY - wall.startY, 2)
+      );
       return {
         ...wall,
         startX: scaledStartX + canvasCenterX,
@@ -1062,10 +1072,11 @@ const GridCanvas = forwardRef<{
         endX: scaledEndX + canvasCenterX,
         endY: scaledEndY + canvasCenterY,
         thickness: wall.thickness * uniformScale,
-      };
+        originalLengthPx: origLength, // Store original length for derivation
+        pxPerMeter: computedPpm, // Store computed scale on each wall
+      } as Wall;
     });
     const scaledBounds = getWallsBoundingBox(scaledWalls);
-    const computedPpm = uniformScale * WALLMAKER_PIXELS_PER_METER;
     console.log('[addWalls] scaling info:', {
       wallLayoutSize: { width: wallLayoutWidth, height: wallLayoutHeight },
       uniformScale,

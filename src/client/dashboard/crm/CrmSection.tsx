@@ -29,6 +29,7 @@ import {
   type ListDealsFilters,
   type CrmViewPreset,
 } from '../../api/crmApi';
+import ImportDealsModal from './ImportDealsModal';
 import './crm.css';
 
 function useIsMobile() {
@@ -724,6 +725,7 @@ export default function CrmSection() {
   const [metricsLoading, setMetricsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isNewDealOpen, setIsNewDealOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
 
   // Filters
@@ -831,6 +833,11 @@ export default function CrmSection() {
     if (data) setDeals((prev) => [...prev, data]);
   };
 
+  const handleImportSuccess = (count: number) => {
+    alert(`Successfully imported ${count} deals`);
+    loadData(filters);
+  };
+
   const handleResetFilters = () => {
     setSearchQuery(''); setFilterStageIds([]); setFilterOwnerId('');
     setFilterMinValue(''); setFilterMaxValue(''); setFilterWeddingFrom(''); setFilterWeddingTo('');
@@ -903,9 +910,9 @@ export default function CrmSection() {
       {/* Header */}
       <div className="crm-header">
         <div className="crm-header-right">
-          <select 
-            className="crm-view-select" 
-            value={activeView} 
+          <select
+            className="crm-view-select"
+            value={activeView}
             onChange={(e) => handleViewChange(e.target.value as CrmViewPreset)}
             style={{
               borderRadius: 999,
@@ -943,6 +950,9 @@ export default function CrmSection() {
           >
             {CRM_VIEW_PRESETS.map((v) => (<option key={v.id} value={v.id}>{v.label}</option>))}
           </select>
+          <button type="button" className="crm-import-btn" onClick={() => setIsImportOpen(true)} style={{ marginRight: 8, background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }}>
+            Import
+          </button>
           <button type="button" className="crm-new-deal-btn" onClick={() => setIsNewDealOpen(true)}>+ New deal</button>
         </div>
       </div>
@@ -1077,6 +1087,14 @@ export default function CrmSection() {
       ))}
 
       <NewDealModal isOpen={isNewDealOpen} stages={stages} pipelineId={pipeline?.id || ''} onClose={() => setIsNewDealOpen(false)} onSubmit={handleCreateDeal} />
+      {isImportOpen && pipeline && stages.length > 0 && (
+        <ImportDealsModal
+          pipelineId={pipeline.id}
+          stageId={stages[0]?.id || ''}
+          onClose={() => setIsImportOpen(false)}
+          onSuccess={handleImportSuccess}
+        />
+      )}
       <DealDrawer dealId={selectedDealId} onClose={() => setSelectedDealId(null)} onDealUpdated={() => loadData(filters)} stages={stages} />
       {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onLogActivity={handleContextLogActivity} onMarkLost={handleContextMarkLost} onMarkWon={handleContextMarkWon} />}
       {isMobile && !selectedDealId && (

@@ -86,7 +86,7 @@ const WallMaker: React.FC<WallMakerProps> = ({
   
   // Pan and zoom state
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(0.2); // Start zoomed out 5x for easier big space drawing
 
   // Save state to history
   const saveToHistory = useCallback((newWalls: Wall[]) => {
@@ -731,7 +731,7 @@ const WallMaker: React.FC<WallMakerProps> = ({
             d={`M ${gridSizePx} 0 L 0 0 0 ${gridSizePx}`}
             fill="none"
             stroke="#d0d0d0"
-            strokeWidth="0.5"
+            strokeWidth="2.5"
             opacity="0.5"
           />
         </pattern>
@@ -747,7 +747,7 @@ const WallMaker: React.FC<WallMakerProps> = ({
             d={`M ${majorGridSizePx} 0 L 0 0 0 ${majorGridSizePx}`}
             fill="none"
             stroke="#b0b0b0"
-            strokeWidth="1"
+            strokeWidth="5"
             opacity="0.6"
           />
         </pattern>
@@ -847,8 +847,8 @@ const WallMaker: React.FC<WallMakerProps> = ({
             {config.showMeasurements && (
               <text
                 x={(wall.startX + wall.endX) / 2}
-                y={(wall.startY + wall.endY) / 2 - 10}
-                fontSize="12"
+                y={(wall.startY + wall.endY) / 2 - 50}
+                fontSize="60"
                 fill="#666666"
                 textAnchor="middle"
                 pointerEvents="none"
@@ -858,9 +858,9 @@ const WallMaker: React.FC<WallMakerProps> = ({
             )}
             {config.showAngles && wall.angle !== undefined && (
               <text
-                x={wall.endX + 10}
+                x={wall.endX + 50}
                 y={wall.endY}
-                fontSize="10"
+                fontSize="50"
                 fill="#999999"
                 pointerEvents="none"
               >
@@ -870,7 +870,7 @@ const WallMaker: React.FC<WallMakerProps> = ({
           </g>
         );
       }
-      
+
       // Wall without doors - render normally
       return (
         <g key={wall.id}>
@@ -889,8 +889,8 @@ const WallMaker: React.FC<WallMakerProps> = ({
           {config.showMeasurements && (
             <text
               x={(wall.startX + wall.endX) / 2}
-              y={(wall.startY + wall.endY) / 2 - 10}
-              fontSize="12"
+              y={(wall.startY + wall.endY) / 2 - 50}
+              fontSize="60"
               fill="#666666"
               textAnchor="middle"
               pointerEvents="none"
@@ -900,9 +900,9 @@ const WallMaker: React.FC<WallMakerProps> = ({
           )}
           {config.showAngles && wall.angle !== undefined && (
             <text
-              x={wall.endX + 10}
+              x={wall.endX + 50}
               y={wall.endY}
-              fontSize="10"
+              fontSize="50"
               fill="#999999"
               pointerEvents="none"
             >
@@ -930,16 +930,16 @@ const WallMaker: React.FC<WallMakerProps> = ({
           x2={currentEnd.x}
           y2={currentEnd.y}
           stroke={isSnapped ? '#27ae60' : '#3498db'}
-          strokeWidth={config.defaultThickness}
+          strokeWidth={config.defaultThickness * 5}
           strokeLinecap="round"
-          strokeDasharray="5,5"
+          strokeDasharray="25,25"
           opacity={0.5}
         />
         {config.showMeasurements && (
           <text
             x={(currentStart.x + currentEnd.x) / 2}
-            y={(currentStart.y + currentEnd.y) / 2 - 10}
-            fontSize="12"
+            y={(currentStart.y + currentEnd.y) / 2 - 50}
+            fontSize="60"
             fill={isSnapped ? '#27ae60' : '#3498db'}
             textAnchor="middle"
             fontWeight="bold"
@@ -951,9 +951,9 @@ const WallMaker: React.FC<WallMakerProps> = ({
         )}
         {config.showAngles && (
           <text
-            x={currentEnd.x + 10}
+            x={currentEnd.x + 50}
             y={currentEnd.y}
-            fontSize="10"
+            fontSize="50"
             fill={isSnapped ? '#27ae60' : '#3498db'}
             fontWeight="bold"
             pointerEvents="none"
@@ -1039,7 +1039,7 @@ const WallMaker: React.FC<WallMakerProps> = ({
             x2={doorEndX}
             y2={doorEndY}
             stroke="#ffffff"
-            strokeWidth={wall.thickness + 4}
+            strokeWidth={wall.thickness + 20}
             strokeLinecap="round"
             opacity="1"
           />
@@ -1048,7 +1048,7 @@ const WallMaker: React.FC<WallMakerProps> = ({
             d={`M ${arcStartX} ${arcStartY} A ${radius} ${radius} 0 ${largeArcFlag} ${sweepFlag} ${arcEndX} ${arcEndY}`}
             fill="none"
             stroke="#000000"
-            strokeWidth="4"
+            strokeWidth="20"
             strokeLinecap="round"
             opacity="0.6"
           />
@@ -1059,17 +1059,17 @@ const WallMaker: React.FC<WallMakerProps> = ({
             x2={doorEndX}
             y2={doorEndY}
             stroke="#000000"
-            strokeWidth="3"
+            strokeWidth="15"
             strokeLinecap="round"
           />
           {/* Hinge point indicator */}
           <circle
             cx={hingePoint.x}
             cy={hingePoint.y}
-            r="3"
+            r="15"
             fill="#000000"
             stroke="#ffffff"
-            strokeWidth="1.5"
+            strokeWidth="7.5"
             opacity="0.8"
           />
         </g>
@@ -1100,9 +1100,9 @@ const WallMaker: React.FC<WallMakerProps> = ({
           x2={endX}
           y2={endY}
           stroke="#ffffff"
-          strokeWidth={wall.thickness + 4}
+          strokeWidth={wall.thickness + 20}
           strokeLinecap="round"
-          strokeDasharray="5,5"
+          strokeDasharray="25,25"
           opacity="0.7"
         />
         {/* Preview door frame */}
@@ -1112,37 +1112,37 @@ const WallMaker: React.FC<WallMakerProps> = ({
           x2={endX}
           y2={endY}
           stroke="#000000"
-          strokeWidth="3"
+          strokeWidth="15"
           strokeLinecap="round"
-          strokeDasharray="5,5"
+          strokeDasharray="25,25"
           opacity="0.5"
         />
         {/* Preview hinge point */}
         <circle
           cx={startX}
           cy={startY}
-          r="5"
+          r="25"
           fill="#000000"
           stroke="#ffffff"
-          strokeWidth="2"
+          strokeWidth="10"
           opacity="0.8"
         />
         {/* Preview end point */}
         <circle
           cx={endX}
           cy={endY}
-          r="5"
+          r="25"
           fill="#000000"
           stroke="#ffffff"
-          strokeWidth="2"
+          strokeWidth="10"
           opacity="0.8"
         />
         {/* Preview width indicator */}
         {doorWidth > 0 && (
           <text
             x={(startX + endX) / 2}
-            y={(startY + endY) / 2 - 10}
-            fontSize="11"
+            y={(startY + endY) / 2 - 50}
+            fontSize="55"
             fill="#000000"
             textAnchor="middle"
             opacity="0.6"
@@ -1219,7 +1219,7 @@ const WallMaker: React.FC<WallMakerProps> = ({
                 d={`M ${arcStartX} ${arcStartY} A ${radius} ${radius} 0 ${largeArcFlag} ${sweepFlag} ${arcEndX} ${arcEndY}`}
                 fill="none"
                 stroke="#000000"
-                strokeWidth={isHovered ? '5' : '4'}
+                strokeWidth={isHovered ? '25' : '20'}
                 strokeLinecap="round"
                 opacity={isHovered ? '0.8' : '0.6'}
                 style={{ cursor: 'pointer' }}
@@ -1227,7 +1227,7 @@ const WallMaker: React.FC<WallMakerProps> = ({
               <text
                 x={labelX}
                 y={labelY}
-                fontSize="14"
+                fontSize="70"
                 fill="#000000"
                 textAnchor="middle"
                 dominantBaseline="middle"
@@ -1243,10 +1243,10 @@ const WallMaker: React.FC<WallMakerProps> = ({
         <circle
           cx={hingeX}
           cy={hingeY}
-          r="4"
+          r="20"
           fill="#000000"
           stroke="#ffffff"
-          strokeWidth="1.5"
+          strokeWidth="7.5"
           opacity="0.9"
         />
       </g>
@@ -1264,10 +1264,10 @@ const WallMaker: React.FC<WallMakerProps> = ({
           key="snap-highlight"
           cx={snapHighlight.x}
           cy={snapHighlight.y}
-          r={6}
+          r={30}
           fill="#27ae60"
           stroke="#ffffff"
-          strokeWidth={2}
+          strokeWidth={10}
           opacity={0.9}
           pointerEvents="none"
         />
@@ -1282,10 +1282,10 @@ const WallMaker: React.FC<WallMakerProps> = ({
           key={`endpoint-start-${wall.id}`}
           cx={wall.startX}
           cy={wall.startY}
-          r={4}
+          r={20}
           fill={isStartSelected ? '#3498db' : '#2c3e50'}
           stroke="#ffffff"
-          strokeWidth={1.5}
+          strokeWidth={7.5}
           opacity={0.8}
           pointerEvents="none"
         />
@@ -1295,10 +1295,10 @@ const WallMaker: React.FC<WallMakerProps> = ({
           key={`endpoint-end-${wall.id}`}
           cx={wall.endX}
           cy={wall.endY}
-          r={4}
+          r={20}
           fill={isStartSelected ? '#3498db' : '#2c3e50'}
           stroke="#ffffff"
-          strokeWidth={1.5}
+          strokeWidth={7.5}
           opacity={0.8}
           pointerEvents="none"
         />
@@ -1312,10 +1312,10 @@ const WallMaker: React.FC<WallMakerProps> = ({
           key="current-start"
           cx={currentStart.x}
           cy={currentStart.y}
-          r={5}
+          r={25}
           fill="#3498db"
           stroke="#ffffff"
-          strokeWidth={2}
+          strokeWidth={10}
           opacity={1}
           pointerEvents="none"
         />
@@ -1330,10 +1330,10 @@ const WallMaker: React.FC<WallMakerProps> = ({
           key="current-end"
           cx={currentEnd.x}
           cy={currentEnd.y}
-          r={isSnapped ? 6 : 5}
+          r={isSnapped ? 30 : 25}
           fill={isSnapped ? '#27ae60' : '#3498db'}
           stroke="#ffffff"
-          strokeWidth={2}
+          strokeWidth={10}
           opacity={0.7}
           pointerEvents="none"
         />

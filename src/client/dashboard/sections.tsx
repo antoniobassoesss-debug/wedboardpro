@@ -150,27 +150,6 @@ export const WorkSection: React.FC = () => {
           position: 'relative',
         }}
       >
-        {isMobile && (
-          <div className="work-mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>Events ({events.length})</div>
-            <button
-              type="button"
-              onClick={() => setIsNewProjectOpen(true)}
-              style={{
-                borderRadius: 999,
-                padding: '8px 14px',
-                border: 'none',
-                background: '#0f172a',
-                color: '#ffffff',
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-            >
-              + New
-            </button>
-          </div>
-        )}
 
         {/* Events list */}
         <div
@@ -278,7 +257,7 @@ export const WorkSection: React.FC = () => {
           style={{
             position: 'fixed',
             bottom: 24,
-            right: 24,
+            left: 20,
             width: 56,
             height: 56,
             borderRadius: '50%',

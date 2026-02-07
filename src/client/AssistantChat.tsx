@@ -113,25 +113,8 @@ const AssistantChat: React.FC<AssistantChatProps> = ({ initialOpen = false }) =>
             boxShadow: '0 10px 30px rgba(15,23,42,0.20)',
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
           }}
         >
-          <span
-            style={{
-              width: 18,
-              height: 18,
-              borderRadius: '999px',
-              background: '#111111',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              fontSize: 10,
-              fontWeight: 700,
-            }}
-          >
-            AI
-          </span>
           AI Assistant
         </button>
       </div>

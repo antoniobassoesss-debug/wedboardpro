@@ -29,7 +29,7 @@ export const DecorationElementComponent: React.FC<DecorationElementProps> = ({
   const centerX = element.x + element.width / 2;
   const centerY = element.y + element.height / 2;
 
-  if (element.type === 'arch' && element.customShape) {
+  if (element.customShape) {
     return (
       <g
         transform={`rotate(${element.rotation}, ${centerX}, ${centerY})`}

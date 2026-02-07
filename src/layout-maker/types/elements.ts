@@ -189,6 +189,15 @@ export interface DecorationElement extends BaseElement {
 }
 
 /**
+ * Curve control for custom element edges
+ */
+export type CurveControl =
+  | null // Straight line
+  | { type: 'bezier'; point: Point } // Custom bezier curve
+  | { type: 'arc'; direction: 1 | -1 } // Perfect semicircle (1 = left, -1 = right)
+  | Point; // Legacy format (bezier control point)
+
+/**
  * Custom Element Template (saved in database)
  */
 export interface CustomElementTemplate {
@@ -199,6 +208,7 @@ export interface CustomElementTemplate {
   width: number;
   height: number;
   vertices: Point[];
+  curves?: CurveControl[]; // Curve data for each edge
   createdAt: string;
   updatedAt: string;
 }

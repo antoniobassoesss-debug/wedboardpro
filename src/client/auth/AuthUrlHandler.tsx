@@ -34,8 +34,7 @@ const AuthUrlHandler: React.FC = () => {
 
     const alreadyHasAppSession = !!window.localStorage.getItem('wedboarpro_session');
     const mightHaveSupabaseSession =
-      // common return points
-      url.pathname === '/' ||
+      // common return points (NOT the landing page - that's just the home page)
       url.pathname === '/login' ||
       url.pathname === '/signup' ||
       // if a next param is present, we want to continue the flow

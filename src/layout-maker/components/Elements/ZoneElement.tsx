@@ -7,9 +7,10 @@
  * - Label in center
  */
 
-import React from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type { ZoneElement } from '../../types/elements';
 import { getZoneColor, HOVER_COLOR, SELECTION_COLOR } from '../../constants';
+import { RotateButton } from './RotateButton';
 
 interface ZoneElementProps {
   element: ZoneElement;
@@ -21,6 +22,7 @@ interface ZoneElementProps {
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   onMouseDown?: (event: React.MouseEvent) => void;
+  onRotate?: (elementId: string, newRotation: number) => void;
 }
 
 export const ZoneRender: React.FC<ZoneElementProps> = ({
@@ -33,7 +35,19 @@ export const ZoneRender: React.FC<ZoneElementProps> = ({
   onMouseEnter,
   onMouseLeave,
   onMouseDown,
+  onRotate,
 }) => {
+  const [showRotateButton, setShowRotateButton] = useState(false);
+  const [pendingRotation, setPendingRotation] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (isSelected) {
+      setShowRotateButton(true);
+    } else {
+      setShowRotateButton(false);
+    }
+  }, [isSelected]);
+
   const colors = element.fillColor
     ? { fill: element.fillColor, stroke: element.borderColor || '#333333', opacity: 0.3 }
     : getZoneColor(element.type);
@@ -55,6 +69,25 @@ export const ZoneRender: React.FC<ZoneElementProps> = ({
   const height = element.height * pixelsPerMeter;
   const centerX = x + width / 2;
   const centerY = y + height / 2;
+
+  const handleRotate = useCallback(() => {
+    if (onRotate) {
+      const newRotation = ((element.rotation || 0) + 90) % 360;
+      setPendingRotation(newRotation);
+      onRotate(element.id, newRotation);
+    }
+    setTimeout(() => {
+      setShowRotateButton(false);
+      setPendingRotation(null);
+    }, 250);
+  }, [element.id, element.rotation, onRotate]);
+
+  const handleCloseRotateButton = useCallback(() => {
+    setShowRotateButton(false);
+    setPendingRotation(null);
+  }, []);
+
+  const effectiveRotation = pendingRotation !== null ? pendingRotation : (element.rotation || 0);
 
   const renderOutline = () => {
     if (!isSelected && !isHovered) return null;
@@ -78,57 +111,73 @@ export const ZoneRender: React.FC<ZoneElementProps> = ({
     );
   };
 
+  const rotateButtonX = centerX;
+  const rotateButtonY = y - 30;
+
   return (
-    <g
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      onMouseDown={onMouseDown}
-      style={{ cursor: 'pointer' }}
-    >
-      {renderOutline()}
+    <>
+      <g
+        transform={`rotate(${effectiveRotation}, ${centerX}, ${centerY})`}
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        onMouseDown={onMouseDown}
+        style={{ cursor: 'pointer' }}
+      >
+        {renderOutline()}
 
-      <rect
-        x={x}
-        y={y}
-        width={width}
-        height={height}
-        fill={colors.fill}
-        fillOpacity={colors.opacity}
-        stroke={colors.stroke}
-        strokeWidth={2}
-        strokeDasharray={strokeDasharray}
-        rx={4}
-      />
+        <rect
+          x={x}
+          y={y}
+          width={width}
+          height={height}
+          fill={colors.fill}
+          fillOpacity={colors.opacity}
+          stroke={colors.stroke}
+          strokeWidth={2}
+          strokeDasharray={strokeDasharray}
+          rx={4}
+        />
 
-      {element.label && (
-        <>
-          <text
-            x={x + 12}
-            y={y + 20}
-            fill={colors.stroke}
-            fontSize={12}
-            fontWeight={500}
-            style={{ pointerEvents: 'none', userSelect: 'none' }}
-          >
-            {element.label}
-          </text>
-          {element.estimatedCapacity && (
+        {element.label && (
+          <>
             <text
               x={x + 12}
-              y={y + 36}
+              y={y + 20}
               fill={colors.stroke}
-              fontSize={10}
-              opacity={0.7}
+              fontSize={12}
+              fontWeight={500}
               style={{ pointerEvents: 'none', userSelect: 'none' }}
             >
-              ~{element.estimatedCapacity} guests
+              {element.label}
             </text>
-          )}
-        </>
+            {element.estimatedCapacity && (
+              <text
+                x={x + 12}
+                y={y + 36}
+                fill={colors.stroke}
+                fontSize={10}
+                opacity={0.7}
+                style={{ pointerEvents: 'none', userSelect: 'none' }}
+              >
+                ~{element.estimatedCapacity} guests
+              </text>
+            )}
+          </>
+        )}
+      </g>
+
+      {showRotateButton && (
+        <RotateButton
+          x={rotateButtonX}
+          y={rotateButtonY}
+          onRotate={handleRotate}
+          onClose={handleCloseRotateButton}
+          elementSize={{ width: element.width, height: element.height }}
+        />
       )}
-    </g>
+    </>
   );
 };
 

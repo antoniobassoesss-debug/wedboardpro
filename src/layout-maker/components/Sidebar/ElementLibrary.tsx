@@ -21,12 +21,13 @@ interface ElementLibraryProps {
   onSelectCustomTemplate: (template: CustomElementTemplate) => void;
   onEditCustomTemplate: (template: CustomElementTemplate) => void;
   onDeleteCustomTemplate: (template: CustomElementTemplate) => void;
+  onOpenPlacementModal?: (type: ElementType) => void;
   customTemplates?: CustomElementTemplate[];
   className?: string;
   compact?: boolean;
 }
 
-type CategoryKey = 'tables' | 'seating' | 'entertainment' | 'service' | 'decor';
+type CategoryKey = 'tables' | 'seating' | 'entertainment' | 'service' | 'decor' | 'custom';
 
 interface CategoryConfig {
   name: string;
@@ -64,6 +65,11 @@ const CATEGORY_ICONS: Record<CategoryKey, React.ReactNode> = {
       <circle cx="12" cy="12" r="6" stroke="#1a1a1a" strokeWidth="1.5" />
     </svg>
   ),
+  custom: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <path d="M12 3l2.5 5 5.5 1-4 4 1 5.5-5-2.5-5 2.5 1-5.5-4-4 5.5-1L12 3z" stroke="#1a1a1a" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  ),
 };
 
 export const ElementLibrary: React.FC<ElementLibraryProps> = ({
@@ -73,6 +79,7 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
   onSelectCustomTemplate,
   onEditCustomTemplate,
   onDeleteCustomTemplate,
+  onOpenPlacementModal,
   customTemplates = [],
   className = '',
   compact = false,
@@ -109,6 +116,11 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
         icon: CATEGORY_ICONS.decor,
         elements: ['flower-arrangement', 'arch', 'photo-booth'],
       },
+      custom: {
+        name: 'Custom',
+        icon: CATEGORY_ICONS.custom,
+        elements: [], // Custom uses templates instead of predefined elements
+      },
     }),
     []
   );
@@ -128,7 +140,7 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value);
     if (value && expandedCategories.size === 0) {
-      setExpandedCategories(new Set(['tables', 'seating', 'entertainment', 'service', 'decor']));
+      setExpandedCategories(new Set(['tables', 'seating', 'entertainment', 'service', 'decor', 'custom']));
     }
     if (!value) {
       setExpandedCategories(new Set(['tables']));
@@ -144,9 +156,20 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
 
   const handleOpenConfig = useCallback(
     (type: ElementType) => {
-      onOpenConfigModal(type);
+      console.log('[ElementLibrary] handleOpenConfig called with type:', type);
+      const placementTypes: ElementType[] = ['chair', 'bench', 'lounge'];
+      console.log('[ElementLibrary] Is placement type?', placementTypes.includes(type));
+      console.log('[ElementLibrary] onOpenPlacementModal exists?', !!onOpenPlacementModal);
+      
+      if (placementTypes.includes(type) && onOpenPlacementModal) {
+        console.log('[ElementLibrary] Calling onOpenPlacementModal');
+        onOpenPlacementModal(type);
+      } else {
+        console.log('[ElementLibrary] Calling onOpenConfigModal');
+        onOpenConfigModal(type);
+      }
     },
-    [onOpenConfigModal]
+    [onOpenConfigModal, onOpenPlacementModal]
   );
 
   const filterElements = useCallback(
@@ -170,9 +193,10 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
   );
 
   const filteredCustomTemplates = useMemo(() => {
-    if (!search.trim()) return customTemplates;
+    const templates = customTemplates || [];
+    if (!search.trim()) return templates;
     const searchLower = search.toLowerCase();
-    return customTemplates.filter(
+    return templates.filter(
       (t) =>
         t.name.toLowerCase().includes(searchLower) ||
         t.svgPath.toLowerCase().includes(searchLower)
@@ -188,9 +212,13 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
       entertainment: null,
       service: null,
       decor: null,
+      custom: null,
     };
 
     for (const [key, config] of Object.entries(categories) as [CategoryKey, CategoryConfig][]) {
+      // Skip custom category - it's handled separately with template search
+      if (key === 'custom') continue;
+
       const filteredElements = filterElements(config.elements);
       if (filteredElements.length > 0) {
         filtered[key] = {
@@ -221,13 +249,15 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
 
   if (compact) {
     const templates = customTemplates || [];
+    const compactCategories: CategoryKey[] = ['tables', 'seating', 'entertainment', 'service', 'decor', 'custom'];
 
     return (
       <div className="flex flex-col h-full" style={{ width: '100%' }}>
         <div className="flex items-center gap-2 p-3 border-b overflow-x-auto" style={{ touchAction: 'pan-x' }}>
-          {(['tables', 'seating', 'entertainment', 'electrical', 'decor'] as CategoryKey[]).map((key) => {
+          {compactCategories.map((key) => {
             const config = categories[key];
             const isActive = expandedCategories.has(key);
+            const isCustom = key === 'custom';
             return (
               <button
                 key={key}
@@ -240,8 +270,8 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
                 style={{ touchAction: 'manipulation' }}
               >
                 <span className="flex items-center gap-1">
-                  <span className="w-4 h-4">{config.icon}</span>
-                  {config.name}
+                  <span className="w-4 h-4">{isCustom ? CATEGORY_ICONS.custom : config?.icon}</span>
+                  {isCustom ? 'Custom' : config?.name}
                 </span>
               </button>
             );
@@ -249,96 +279,130 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-3">
-          <div className="grid grid-cols-3 gap-2">
-            {Array.from(expandedCategories).flatMap((key) => {
-              const config = categories[key];
-              return config.elements.map((type) => {
-                const defaults = ELEMENT_DEFAULTS[type as keyof typeof ELEMENT_DEFAULTS];
-                return (
-                  <button
-                    key={type}
-                    onClick={() => handleOpenConfig(type)}
-                    className="flex flex-col items-center justify-center p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-500 hover:shadow-md transition-all active:scale-95"
-                    style={{ touchAction: 'manipulation' }}
-                  >
-                    <span className="w-10 h-10 mb-1 flex items-center justify-center">
-                      {type === 'table-round' ? (
-                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                          <circle cx="16" cy="16" r="12" stroke="#374151" strokeWidth="1.5" />
-                          <circle cx="16" cy="10" r="2" fill="#374151" />
-                          <circle cx="21.39" cy="12" r="2" fill="#374151" />
-                          <circle cx="22.63" cy="18" r="2" fill="#374151" />
-                          <circle cx="16" cy="22" r="2" fill="#374151" />
-                          <circle cx="9.37" cy="18" r="2" fill="#374151" />
-                          <circle cx="7.37" cy="12" r="2" fill="#374151" />
-                        </svg>
-                      ) : type === 'table-rectangular' ? (
-                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                          <rect x="4" y="10" width="24" height="14" rx="2" stroke="#374151" strokeWidth="1.5" />
-                          <circle cx="9" cy="17" r="1.5" fill="#374151" />
-                          <circle cx="14" cy="17" r="1.5" fill="#374151" />
-                          <circle cx="19" cy="17" r="1.5" fill="#374151" />
-                          <circle cx="23" cy="17" r="1.5" fill="#374151" />
-                        </svg>
-                      ) : type === 'table-oval' ? (
-                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                          <ellipse cx="16" cy="16" rx="14" ry="9" stroke="#374151" strokeWidth="1.5" />
-                        </svg>
-                      ) : type === 'chair' ? (
-                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                          <circle cx="16" cy="16" r="6" stroke="#374151" strokeWidth="1.5" />
-                        </svg>
-                      ) : type === 'dance-floor' ? (
-                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                          <rect x="4" y="4" width="24" height="24" rx="2" stroke="#374151" strokeWidth="1.5" strokeDasharray="4 2" />
-                        </svg>
-                      ) : type === 'stage' ? (
-                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                          <rect x="4" y="8" width="24" height="18" rx="1" stroke="#374151" strokeWidth="1.5" />
-                        </svg>
-                      ) : (
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                          <rect x="3" y="3" width="18" height="18" rx="2" stroke="#374151" strokeWidth="1.5" />
-                        </svg>
-                      )}
-                    </span>
-                    <span className="text-xs text-gray-600 truncate w-full text-center">
-                      {defaults?.label || type}
-                    </span>
-                  </button>
-                );
-              });
-            })}
-          </div>
+          {/* Show regular category elements */}
+          {Array.from(expandedCategories).filter(k => k !== 'custom').length > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              {Array.from(expandedCategories).filter(k => k !== 'custom').flatMap((key) => {
+                const config = categories[key];
+                if (!config) return [];
+                return config.elements.map((type) => {
+                  const defaults = ELEMENT_DEFAULTS[type as keyof typeof ELEMENT_DEFAULTS];
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => {
+                        console.log('[ElementLibrary] Button clicked for type:', type);
+                        handleOpenConfig(type);
+                      }}
+                      className="flex flex-col items-center justify-center p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-500 hover:shadow-md transition-all active:scale-95"
+                      style={{ touchAction: 'manipulation' }}
+                    >
+                      <span className="w-10 h-10 mb-1 flex items-center justify-center">
+                        {type === 'table-round' ? (
+                          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                            <circle cx="16" cy="16" r="12" stroke="#374151" strokeWidth="1.5" />
+                            <circle cx="16" cy="10" r="2" fill="#374151" />
+                            <circle cx="21.39" cy="12" r="2" fill="#374151" />
+                            <circle cx="22.63" cy="18" r="2" fill="#374151" />
+                            <circle cx="16" cy="22" r="2" fill="#374151" />
+                            <circle cx="9.37" cy="18" r="2" fill="#374151" />
+                            <circle cx="7.37" cy="12" r="2" fill="#374151" />
+                          </svg>
+                        ) : type === 'table-rectangular' ? (
+                          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                            <rect x="4" y="10" width="24" height="14" rx="2" stroke="#374151" strokeWidth="1.5" />
+                            <circle cx="9" cy="17" r="1.5" fill="#374151" />
+                            <circle cx="14" cy="17" r="1.5" fill="#374151" />
+                            <circle cx="19" cy="17" r="1.5" fill="#374151" />
+                            <circle cx="23" cy="17" r="1.5" fill="#374151" />
+                          </svg>
+                        ) : type === 'table-oval' ? (
+                          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                            <ellipse cx="16" cy="16" rx="14" ry="9" stroke="#374151" strokeWidth="1.5" />
+                          </svg>
+                        ) : type === 'chair' ? (
+                          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                            <circle cx="16" cy="16" r="6" stroke="#374151" strokeWidth="1.5" />
+                          </svg>
+                        ) : type === 'dance-floor' ? (
+                          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                            <rect x="4" y="4" width="24" height="24" rx="2" stroke="#374151" strokeWidth="1.5" strokeDasharray="4 2" />
+                          </svg>
+                        ) : type === 'stage' ? (
+                          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                            <rect x="4" y="8" width="24" height="18" rx="1" stroke="#374151" strokeWidth="1.5" />
+                          </svg>
+                        ) : (
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                            <rect x="3" y="3" width="18" height="18" rx="2" stroke="#374151" strokeWidth="1.5" />
+                          </svg>
+                        )}
+                      </span>
+                      <span className="text-xs text-gray-600 truncate w-full text-center">
+                        {defaults?.label || type}
+                      </span>
+                    </button>
+                  );
+                });
+              })}
+            </div>
+          )}
 
-          {!search && templates.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              <div className="flex items-center justify-between px-2 mb-2">
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Custom
-                </span>
+          {/* Show custom elements when custom category is selected */}
+          {expandedCategories.has('custom') && (
+            <div className={Array.from(expandedCategories).filter(k => k !== 'custom').length > 0 ? 'mt-3 pt-3 border-t border-gray-100' : ''}>
+              <div style={{
+                marginBottom: '8px',
+                padding: '0 4px',
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '8px',
+                }}>
+                  <div style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '6px',
+                    background: '#e0e7ff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <span style={{ color: '#4f46e5', display: 'flex', transform: 'scale(0.75)' }}>
+                      {CATEGORY_ICONS.custom}
+                    </span>
+                  </div>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#1e293b',
+                  }}>
+                    Custom Elements
+                  </span>
+                  <span style={{
+                    marginLeft: 'auto',
+                    fontSize: '10px',
+                    padding: '2px 6px',
+                    background: '#e0e7ff',
+                    color: '#4f46e5',
+                    borderRadius: '6px',
+                    fontWeight: 500,
+                  }}>
+                    {templates.length}
+                  </span>
+                </div>
               </div>
               <CustomElementsList
                 templates={templates}
                 onSelect={onSelectCustomTemplate}
-                onCreateNew={onOpenElementMaker}
+                onCreateNew={() => {
+                  onOpenElementMaker?.();
+                }}
                 onEdit={onEditCustomTemplate}
                 onDelete={onDeleteCustomTemplate}
               />
-            </div>
-          )}
-
-          {!search && templates.length === 0 && (
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              <button
-                onClick={onOpenElementMaker}
-                className="w-full flex flex-col items-center justify-center p-4 bg-gray-50 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all"
-              >
-                <svg className="w-6 h-6 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                <span className="text-xs font-medium text-gray-600">Create Custom Element</span>
-              </button>
             </div>
           )}
         </div>
@@ -446,36 +510,99 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
         )}
 
         {!search && (
-          <div className="mt-2 pt-2 border-t border-gray-100">
-            <div className="flex items-center justify-between px-2 mb-2">
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Custom
+          <div style={{ marginBottom: '6px' }}>
+            <button
+              onClick={() => toggleCategory('custom')}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 12px',
+                background: expandedCategories.has('custom') ? '#f8fafc' : 'transparent',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.18s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (!expandedCategories.has('custom')) {
+                  e.currentTarget.style.background = '#f8fafc';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!expandedCategories.has('custom')) {
+                  e.currentTarget.style.background = 'transparent';
+                }
+              }}
+            >
+              <div style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '8px',
+                background: expandedCategories.has('custom') ? '#e0e7ff' : '#f1f5f9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.18s ease',
+              }}>
+                <span style={{ color: expandedCategories.has('custom') ? '#4f46e5' : '#64748b', display: 'flex', transform: 'scale(0.85)' }}>
+                  {CATEGORY_ICONS.custom}
+                </span>
+              </div>
+              <span style={{
+                flex: 1,
+                fontSize: '13px',
+                fontWeight: 500,
+                color: expandedCategories.has('custom') ? '#1e293b' : '#475569',
+                textAlign: 'left',
+                transition: 'color 0.18s ease',
+              }}>Custom</span>
+              <span style={{
+                fontSize: '11px',
+                padding: '3px 8px',
+                background: expandedCategories.has('custom') ? '#e0e7ff' : '#f1f5f9',
+                color: expandedCategories.has('custom') ? '#4f46e5' : '#64748b',
+                borderRadius: '8px',
+                fontWeight: 500,
+                transition: 'all 0.18s ease',
+              }}>
+                {(customTemplates || []).length}
               </span>
-            </div>
-            <CustomElementsList
-              templates={customTemplates || []}
-              onSelect={onSelectCustomTemplate}
-              onCreateNew={onOpenElementMaker}
-              onEdit={onEditCustomTemplate}
-              onDelete={onDeleteCustomTemplate}
-            />
-          </div>
-        )}
+              <svg
+                style={{
+                  width: '14px',
+                  height: '14px',
+                  color: expandedCategories.has('custom') ? '#4f46e5' : '#94a3b8',
+                  transition: 'all 0.2s ease',
+                  transform: expandedCategories.has('custom') ? 'rotate(90deg)' : 'rotate(0deg)',
+                }}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
 
-        {search && filteredCustomTemplates.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-gray-100">
-            <div className="flex items-center justify-between px-2 mb-2">
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Custom Results ({filteredCustomTemplates.length})
-              </span>
-            </div>
-            <CustomElementsList
-              templates={filteredCustomTemplates}
-              onSelect={onSelectCustomTemplate}
-              onCreateNew={onOpenElementMaker}
-              onEdit={onEditCustomTemplate}
-              onDelete={onDeleteCustomTemplate}
-            />
+            {expandedCategories.has('custom') && (
+              <div style={{
+                padding: '8px 4px 4px',
+                overflow: 'hidden',
+                animation: 'slideDown 0.2s ease',
+              }}>
+                <CustomElementsList
+                  templates={customTemplates || []}
+                  onSelect={onSelectCustomTemplate}
+                  onCreateNew={() => {
+                    onOpenElementMaker?.();
+                  }}
+                  onEdit={onEditCustomTemplate}
+                  onDelete={onDeleteCustomTemplate}
+                />
+              </div>
+            )}
           </div>
         )}
 

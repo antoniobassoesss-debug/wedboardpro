@@ -12,9 +12,12 @@ import { ElementLibrary } from './Sidebar/ElementLibrary';
 import { PropertiesPanel } from './Sidebar/PropertiesPanel';
 import { ImportWizard } from './FloorPlanImport';
 import { ExportWizard } from './Export';
+import { CustomElementModal } from './Sidebar/CustomElementModal';
+import { ElementPlacementModal } from './Sidebar/ElementPlacementModal';
 import { useLayoutStore, useViewportStore, useUIStore, useSelectionStore } from '../stores';
-import type { Layout, Wall, TableElement, ChairElement, FloorPlanBackground } from '../types';
+import type { Layout, Wall, TableElement, ChairElement, FloorPlanBackground, ElementType } from '../types';
 import type { MeasurementUnit } from '../types/layout';
+import type { CustomElementTemplate } from '../types/elements';
 import { v4 as uuidv4 } from 'uuid';
 
 interface TestChecklist {
@@ -216,6 +219,22 @@ export const Phase5TestPage: React.FC = () => {
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [showExportWizard, setShowExportWizard] = useState(false);
   const [floorPlanCount, setFloorPlanCount] = useState(0);
+  const [customElementModalOpen, setCustomElementModalOpen] = useState(false);
+  const [editingCustomTemplate, setEditingCustomTemplate] = useState<CustomElementTemplate | null>(null);
+  const [placementModalOpen, setPlacementModalOpen] = useState(false);
+  const [placementElementType, setPlacementElementType] = useState<ElementType>('chair');
+  const [placementElementLabel, setPlacementElementLabel] = useState('Chair');
+  const [placementElementWidth, setPlacementElementWidth] = useState(0.45);
+  const [placementElementHeight, setPlacementElementHeight] = useState(0.45);
+
+  useEffect(() => {
+    console.log('[Phase5TestPage] customElementModalOpen changed to:', customElementModalOpen);
+  }, [customElementModalOpen]);
+
+  useEffect(() => {
+    console.log('[Phase5TestPage] placementModalOpen changed to:', placementModalOpen);
+  }, [placementModalOpen]);
+
   const [checklists, setChecklists] = useState<TestChecklist[]>([
     {
       name: 'Floor Plan Import',
@@ -318,6 +337,49 @@ export const Phase5TestPage: React.FC = () => {
     updateChecklist('Export', 'Export wizard opens', true);
   }, [updateChecklist]);
 
+  const handleOpenPlacementModal = useCallback((type: ElementType) => {
+    console.log('[Phase5TestPage] handleOpenPlacementModal called with type:', type);
+    const elementConfigs: Record<string, { label: string; width: number; height: number }> = {
+      'chair': { label: 'Chair', width: 0.45, height: 0.45 },
+      'bench': { label: 'Bench', width: 1.5, height: 0.5 },
+      'lounge': { label: 'Lounge', width: 2, height: 0.8 },
+    };
+
+    const config = elementConfigs[type];
+    console.log('[Phase5TestPage] config found:', config);
+    if (config) {
+      setPlacementElementType(type);
+      setPlacementElementLabel(config.label);
+      setPlacementElementWidth(config.width);
+      setPlacementElementHeight(config.height);
+      console.log('[Phase5TestPage] Before setPlacementModalOpen(true)');
+      setPlacementModalOpen(true);
+      console.log('[Phase5TestPage] After setPlacementModalOpen(true)');
+    }
+  }, []);
+
+  const handlePlaceElements = useCallback((elements: Array<{
+    type: ElementType;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    zIndex: number;
+    groupId: string | null;
+    parentId: string | null;
+    locked: boolean;
+    visible: boolean;
+    label: string;
+    notes: string;
+    color: string | null;
+  }>) => {
+    elements.forEach((element) => {
+      layoutStore.addElement(element);
+    });
+    setPlacementModalOpen(false);
+  }, [layoutStore]);
+
   const getProgressColor = (items: { passed: boolean }[]) => {
     const passed = items.filter((i) => i.passed).length;
     const total = items.length;
@@ -371,10 +433,16 @@ export const Phase5TestPage: React.FC = () => {
           <ElementLibrary
             onSelectElement={(type) => console.log('Selected:', type)}
             onOpenConfigModal={(type) => console.log('Config:', type)}
-            onOpenElementMaker={() => console.log('Open element maker')}
+            onOpenElementMaker={() => {
+              console.log('[Phase5TestPage] onOpenElementMaker called');
+              console.log('[Phase5TestPage] Before setCustomElementModalOpen(true)');
+              setCustomElementModalOpen(true);
+              console.log('[Phase5TestPage] After setCustomElementModalOpen(true)');
+            }}
             onSelectCustomTemplate={(template) => console.log('Select custom:', template)}
             onEditCustomTemplate={(template) => console.log('Edit custom:', template)}
             onDeleteCustomTemplate={(template) => console.log('Delete custom:', template)}
+            onOpenPlacementModal={handleOpenPlacementModal}
             customTemplates={[]}
           />
         </div>
@@ -461,6 +529,29 @@ export const Phase5TestPage: React.FC = () => {
           onExport={handleExport}
         />
       )}
+
+      <CustomElementModal
+        isOpen={customElementModalOpen}
+        onClose={() => {
+          setCustomElementModalOpen(false);
+          setEditingCustomTemplate(null);
+        }}
+        onSave={(template) => {
+          console.log('Save custom template:', template);
+          setCustomElementModalOpen(false);
+        }}
+        editTemplate={editingCustomTemplate}
+      />
+
+      <ElementPlacementModal
+        isOpen={placementModalOpen}
+        onClose={() => setPlacementModalOpen(false)}
+        onPlaceElements={handlePlaceElements}
+        elementType={placementElementType}
+        elementLabel={placementElementLabel}
+        defaultWidth={placementElementWidth}
+        defaultHeight={placementElementHeight}
+      />
     </div>
   );
 };

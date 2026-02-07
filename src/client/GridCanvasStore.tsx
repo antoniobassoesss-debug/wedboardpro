@@ -70,7 +70,12 @@ const getWallsBoundingBox = (wallsList: Wall[]): WallBounds | null => {
 
 const derivePxPerMeterFromWalls = (wallsList: Wall[]): number | null => {
   for (const wall of wallsList) {
-    const originalLengthPx = wall.length;
+    // First check if pxPerMeter is directly stored on the wall
+    if (wall.pxPerMeter && wall.pxPerMeter > 0) {
+      return wall.pxPerMeter;
+    }
+    // Fall back to calculating from original length
+    const originalLengthPx = wall.originalLengthPx || wall.length;
     if (originalLengthPx && originalLengthPx > 0) {
       const originalMeters = originalLengthPx / WALLMAKER_PIXELS_PER_METER;
       if (originalMeters > 0) {
@@ -120,7 +125,11 @@ const GridCanvasStore = forwardRef<{
   // Store state - direct access with proper typing
   const a4Bounds = useCanvasStore((s) => s.a4Bounds);
   const viewBox = useCanvasStore((s) => s.viewBox);
-  const elements = useCanvasStore(useShallow((s) => s.elementOrder.map((id) => s.elements[id]).filter(Boolean) as Shape[]));
+  // Get elements - read directly to ensure fresh data after updates
+  const storeState = useCanvasStore();
+  const elements = useMemo(() => {
+    return storeState.elementOrder.map((id) => storeState.elements[id]).filter(Boolean) as Shape[];
+  }, [storeState.elementOrder, storeState.elements]);
   const walls = useCanvasStore(useShallow((s) => s.wallOrder.map((id) => s.walls[id]).filter(Boolean) as Wall[]));
   const doors = useCanvasStore(useShallow((s) => s.doorOrder.map((id) => s.doors[id]).filter(Boolean) as Door[]));
   const powerPoints = useCanvasStore(useShallow((s) => s.powerPointOrder.map((id) => s.powerPoints[id]).filter(Boolean) as PowerPoint[]));
@@ -179,6 +188,7 @@ const GridCanvasStore = forwardRef<{
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [selectedPowerPointId, setSelectedPowerPointId] = useState<string | null>(null);
   const [isElectricalDrawerOpen, setIsElectricalDrawerOpen] = useState(false);
+  const [, forceUpdate] = useState(0); // Used to force re-render after rotation
   const selectedPowerPoint = powerPoints.find(p => p.id === selectedPowerPointId) || null;
 
   // Guest assignment state
@@ -219,10 +229,19 @@ const GridCanvasStore = forwardRef<{
   useEffect(() => {
     if (walls.length > 0) {
       const derivedPpm = derivePxPerMeterFromWalls(walls);
-      // Get current store value without causing re-render
+      // Get current store value and ref value without causing re-render
       const currentStoreScale = useCanvasStore.getState().wallScale;
+      const currentRefScale = wallScaleRef.current;
+
+      // Prefer: derived > existing ref > existing store > default
+      // Don't override a good ref value with the default
+      const bestPpm = derivedPpm
+        || (currentRefScale?.pxPerMeter && currentRefScale.pxPerMeter !== WALLMAKER_PIXELS_PER_METER ? currentRefScale.pxPerMeter : null)
+        || currentStoreScale?.pxPerMeter
+        || WALLMAKER_PIXELS_PER_METER;
+
       const scaleInfo = {
-        pxPerMeter: derivedPpm || currentStoreScale?.pxPerMeter || WALLMAKER_PIXELS_PER_METER,
+        pxPerMeter: bestPpm,
         bounds: getWallsBoundingBox(walls)
       };
       wallScaleRef.current = scaleInfo;
@@ -769,10 +788,28 @@ const GridCanvasStore = forwardRef<{
       const widthMeters = parsedWidthMeters > 0 ? parsedWidthMeters : (presetMeters > 0 ? presetMeters : 0);
       const heightMeters = parsedHeightMeters > 0 ? parsedHeightMeters : 0;
 
-      if ((chosenSpace || wallScaleRef.current) && (widthMeters > 0 || heightMeters > 0)) {
+      // Get current walls from store to derive pxPerMeter if needed
+      const storeState = useCanvasStore.getState();
+      const currentWalls = storeState.wallOrder.map((id) => storeState.walls[id]).filter(Boolean) as Wall[];
+      const derivedFromWalls = currentWalls.length > 0 ? derivePxPerMeterFromWalls(currentWalls) : null;
+      const wallPpm = wallScaleRef.current?.pxPerMeter || derivedFromWalls;
+
+      console.log('[addTable] scale info:', {
+        wallScaleRefPpm: wallScaleRef.current?.pxPerMeter,
+        derivedFromWalls,
+        wallPpm,
+        wallCount: currentWalls.length,
+        firstWallPpm: (currentWalls[0] as any)?.pxPerMeter,
+        widthMeters,
+        heightMeters,
+        chosenSpace: chosenSpace?.id,
+      });
+
+      if ((chosenSpace || wallPpm) && (widthMeters > 0 || heightMeters > 0)) {
         const ppm = chosenSpace
           ? (chosenSpace.pixelsPerMeter || Math.min(chosenSpace.width / Math.max(0.0001, chosenSpace.spaceMetersWidth), chosenSpace.height / Math.max(0.0001, chosenSpace.spaceMetersHeight)))
-          : wallScaleRef.current!.pxPerMeter;
+          : wallPpm!;
+        console.log('[addTable] using ppm:', ppm, 'for table size:', widthMeters, 'x', heightMeters, '=', widthMeters * ppm, 'x', heightMeters * ppm, 'px');
         if (ppm && ppm > 0) {
           const resolvedWidthMeters = widthMeters > 0 ? widthMeters : (heightMeters > 0 ? heightMeters : 0);
           const resolvedHeightMeters = heightMeters > 0 ? heightMeters : (widthMeters > 0 ? widthMeters : 0);
@@ -887,11 +924,16 @@ const GridCanvasStore = forwardRef<{
     const canvasCenterX = propA4Dimensions.a4X + propA4Dimensions.a4WidthPx / 2;
     const canvasCenterY = propA4Dimensions.a4Y + propA4Dimensions.a4HeightPx / 2;
 
+    const computedPpm = uniformScale * WALLMAKER_PIXELS_PER_METER;
     const scaledWalls: Wall[] = newWalls.map(wall => {
       const translatedStartX = wall.startX - layoutCenterX;
       const translatedStartY = wall.startY - layoutCenterY;
       const translatedEndX = wall.endX - layoutCenterX;
       const translatedEndY = wall.endY - layoutCenterY;
+      // Calculate original length if not set
+      const origLength = wall.length || Math.sqrt(
+        Math.pow(wall.endX - wall.startX, 2) + Math.pow(wall.endY - wall.startY, 2)
+      );
       return {
         ...wall,
         startX: translatedStartX * uniformScale + canvasCenterX,
@@ -899,13 +941,22 @@ const GridCanvasStore = forwardRef<{
         endX: translatedEndX * uniformScale + canvasCenterX,
         endY: translatedEndY * uniformScale + canvasCenterY,
         thickness: wall.thickness * uniformScale,
+        originalLengthPx: origLength, // Store original length for derivation
+        pxPerMeter: computedPpm, // Store computed scale on each wall
       };
     });
 
     const scaledBounds = getWallsBoundingBox(scaledWalls);
-    const computedWallScale = { pxPerMeter: uniformScale * WALLMAKER_PIXELS_PER_METER, bounds: scaledBounds };
+    const computedWallScale = { pxPerMeter: computedPpm, bounds: scaledBounds };
     wallScaleRef.current = computedWallScale;
     setWallScale(computedWallScale);
+    console.log('[addWalls] computed scale:', {
+      originalWallSize: { width: wallLayoutWidth, height: wallLayoutHeight },
+      uniformScale,
+      computedPpm,
+      scaledBounds,
+      firstWallPpm: scaledWalls[0]?.pxPerMeter,
+    });
 
     const scaledDoors: Door[] = newDoors.map(door => ({
       ...door,
@@ -1080,65 +1131,117 @@ const GridCanvasStore = forwardRef<{
             <path key={path.id} d={path.d} stroke={path.stroke} strokeWidth={path.strokeWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />
           ))}
           {elements.map((shape) => {
-            if (shape.type === 'image' && shape.imageUrl) {
+            // Custom shapes with SVG path
+            if (shape.customShape) {
+              // The path is in meters centered at (0,0)
+              // We need to: 1) translate to position, 2) scale from meters to pixels
+              const scale = shape.customShapeScale || 100; // PIXELS_PER_METER
+              const centerX = shape.x + shape.width / 2;
+              const centerY = shape.y + shape.height / 2;
+
               return (
-                <image
+                <g
                   key={shape.id}
-                  href={shape.imageUrl}
-                  x={shape.x}
-                  y={shape.y}
-                  width={shape.width}
-                  height={shape.height}
-                  preserveAspectRatio="none"
+                  transform={`translate(${centerX}, ${centerY}) rotate(${shape.rotation || 0}) scale(${scale})`}
                   style={{ cursor: activeTool === 'select' ? 'move' : 'default' }}
                   onMouseDown={(e) => handleShapeMouseDown(e, shape.id)}
-                />
+                >
+                  <path
+                    d={shape.customShape}
+                    fill={shape.fill || '#ffffff'}
+                    stroke={selectedShapeId === shape.id ? '#3b82f6' : (shape.stroke || '#374151')}
+                    strokeWidth={(selectedShapeId === shape.id ? 2 : (shape.strokeWidth || 1.5)) / scale}
+                  />
+                </g>
+              );
+            }
+            // Calculate rotation transform for all shapes
+            const centerX = shape.x + shape.width / 2;
+            const centerY = shape.y + shape.height / 2;
+            const rotation = shape.rotation || 0;
+            const rotationTransform = rotation ? `rotate(${rotation}, ${centerX}, ${centerY})` : undefined;
+
+            // Debug: log rotation for selected shape
+            if (shape.id === selectedShapeId && rotation > 0) {
+              console.log('[Render] Shape rotation:', shape.id, rotation, 'transform:', rotationTransform);
+            }
+
+            if (shape.type === 'image' && shape.imageUrl) {
+              return (
+                <g key={shape.id} transform={rotationTransform}>
+                  <image
+                    href={shape.imageUrl}
+                    x={shape.x}
+                    y={shape.y}
+                    width={shape.width}
+                    height={shape.height}
+                    preserveAspectRatio="none"
+                    style={{ cursor: activeTool === 'select' ? 'move' : 'default' }}
+                    onMouseDown={(e) => handleShapeMouseDown(e, shape.id)}
+                  />
+                  {/* Selection border for images */}
+                  {selectedShapeId === shape.id && (
+                    <rect
+                      x={shape.x}
+                      y={shape.y}
+                      width={shape.width}
+                      height={shape.height}
+                      fill="none"
+                      stroke="#3b82f6"
+                      strokeWidth={2}
+                      strokeDasharray="4 2"
+                    />
+                  )}
+                </g>
               );
             }
             if (shape.type === 'circle') {
               return (
-                <circle
-                  key={shape.id}
-                  cx={shape.x + shape.width / 2}
-                  cy={shape.y + shape.height / 2}
-                  r={shape.width / 2}
-                  fill={shape.fill}
-                  stroke={selectedShapeId === shape.id ? '#3b82f6' : shape.stroke}
-                  strokeWidth={selectedShapeId === shape.id ? 2 : shape.strokeWidth}
-                  style={{ cursor: activeTool === 'select' ? 'move' : 'default' }}
-                  onMouseDown={(e) => handleShapeMouseDown(e, shape.id)}
-                />
+                <g key={shape.id} transform={rotationTransform}>
+                  <circle
+                    cx={centerX}
+                    cy={centerY}
+                    r={shape.width / 2}
+                    fill={shape.fill}
+                    stroke={selectedShapeId === shape.id ? '#3b82f6' : shape.stroke}
+                    strokeWidth={selectedShapeId === shape.id ? 2 : shape.strokeWidth}
+                    style={{ cursor: activeTool === 'select' ? 'move' : 'default' }}
+                    onMouseDown={(e) => handleShapeMouseDown(e, shape.id)}
+                  />
+                </g>
               );
             }
             if (shape.tableData?.type === 'table-oval') {
               return (
-                <ellipse
-                  key={shape.id}
-                  cx={shape.x + shape.width / 2}
-                  cy={shape.y + shape.height / 2}
-                  rx={shape.width / 2}
-                  ry={shape.height / 2}
+                <g key={shape.id} transform={rotationTransform}>
+                  <ellipse
+                    cx={centerX}
+                    cy={centerY}
+                    rx={shape.width / 2}
+                    ry={shape.height / 2}
+                    fill={shape.fill}
+                    stroke={selectedShapeId === shape.id ? '#3b82f6' : shape.stroke}
+                    strokeWidth={selectedShapeId === shape.id ? 2 : shape.strokeWidth}
+                    style={{ cursor: activeTool === 'select' ? 'move' : 'default' }}
+                    onMouseDown={(e) => handleShapeMouseDown(e, shape.id)}
+                  />
+                </g>
+              );
+            }
+            return (
+              <g key={shape.id} transform={rotationTransform}>
+                <rect
+                  x={shape.x}
+                  y={shape.y}
+                  width={shape.width}
+                  height={shape.height}
                   fill={shape.fill}
                   stroke={selectedShapeId === shape.id ? '#3b82f6' : shape.stroke}
                   strokeWidth={selectedShapeId === shape.id ? 2 : shape.strokeWidth}
                   style={{ cursor: activeTool === 'select' ? 'move' : 'default' }}
                   onMouseDown={(e) => handleShapeMouseDown(e, shape.id)}
                 />
-              );
-            }
-            return (
-              <rect
-                key={shape.id}
-                x={shape.x}
-                y={shape.y}
-                width={shape.width}
-                height={shape.height}
-                fill={shape.fill}
-                stroke={selectedShapeId === shape.id ? '#3b82f6' : shape.stroke}
-                strokeWidth={selectedShapeId === shape.id ? 2 : shape.strokeWidth}
-                style={{ cursor: activeTool === 'select' ? 'move' : 'default' }}
-                onMouseDown={(e) => handleShapeMouseDown(e, shape.id)}
-              />
+              </g>
             );
           })}
           {textElements.map((el) => (
@@ -1190,6 +1293,132 @@ const GridCanvasStore = forwardRef<{
           onClose={handleCloseGuestDropdown}
         />
       )}
+
+      {/* Rotate Button - appears when element is selected */}
+      {selectedShapeId && activeTool === 'select' && (() => {
+        const selectedShape = elements.find(e => e.id === selectedShapeId);
+        if (!selectedShape || selectedShape.chairData) return null; // Don't show for chairs
+
+        const svg = svgRef.current;
+        if (!svg) return null;
+        const rect = svg.getBoundingClientRect();
+
+        // Convert shape center to screen coordinates
+        const shapeCenterX = selectedShape.x + selectedShape.width / 2;
+        const shapeCenterY = selectedShape.y + selectedShape.height / 2;
+        const screenX = rect.left + ((shapeCenterX - viewBoxState.x) / viewBoxState.width) * rect.width;
+        const screenY = rect.top + ((shapeCenterY - viewBoxState.y) / viewBoxState.height) * rect.height;
+
+        // Position button above the element
+        const buttonY = rect.top + ((selectedShape.y - viewBoxState.y) / viewBoxState.height) * rect.height - 50;
+
+        return (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              // Get fresh data from store
+              const store = useCanvasStore.getState();
+              const storeElement = store.elements[selectedShapeId];
+              if (!storeElement) return;
+
+              const currentRotation = storeElement.rotation || 0;
+              const newRotation = (currentRotation + 90) % 360;
+              console.log('[RotateButton] Rotating element:', selectedShapeId, 'from', currentRotation, 'to', newRotation);
+
+              // Update the main element's rotation
+              updateElement(selectedShapeId, { rotation: newRotation });
+
+              // If this is a table with chairs, rotate the chairs around the table center
+              if (storeElement.tableData) {
+                const tableCenterX = storeElement.x + storeElement.width / 2;
+                const tableCenterY = storeElement.y + storeElement.height / 2;
+
+                // Find all chairs attached to this table
+                const attachedChairs = Object.values(store.elements).filter(
+                  (el) => el.chairData?.parentTableId === selectedShapeId
+                );
+
+                // Rotate each chair 90 degrees around the table center
+                attachedChairs.forEach((chair) => {
+                  const chairCenterX = chair.x + chair.width / 2;
+                  const chairCenterY = chair.y + chair.height / 2;
+
+                  // Translate to origin (table center)
+                  const relX = chairCenterX - tableCenterX;
+                  const relY = chairCenterY - tableCenterY;
+
+                  // Rotate 90 degrees clockwise: (x, y) -> (y, -x)
+                  const rotatedX = relY;
+                  const rotatedY = -relX;
+
+                  // Translate back and adjust for chair size
+                  const newChairX = tableCenterX + rotatedX - chair.width / 2;
+                  const newChairY = tableCenterY + rotatedY - chair.height / 2;
+
+                  // Update chair position and rotation
+                  const chairRotation = (chair.rotation || 0) + 90;
+                  updateElement(chair.id, {
+                    x: newChairX,
+                    y: newChairY,
+                    rotation: chairRotation % 360,
+                  });
+                });
+
+                console.log('[RotateButton] Rotated', attachedChairs.length, 'chairs with table');
+              }
+
+              // Force re-render to show updated rotation
+              forceUpdate(n => n + 1);
+            }}
+            style={{
+              position: 'fixed',
+              left: screenX,
+              top: Math.max(buttonY, rect.top + 10),
+              transform: 'translateX(-50%)',
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              background: 'white',
+              border: '2px solid #e5e7eb',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#3b82f6';
+              e.currentTarget.style.borderColor = '#3b82f6';
+              const svg = e.currentTarget.querySelector('svg');
+              if (svg) svg.style.stroke = 'white';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'white';
+              e.currentTarget.style.borderColor = '#e5e7eb';
+              const svg = e.currentTarget.querySelector('svg');
+              if (svg) svg.style.stroke = '#6b7280';
+            }}
+            title="Rotate 90°"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#6b7280"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ transition: 'stroke 0.15s ease' }}
+            >
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+            </svg>
+          </button>
+        );
+      })()}
     </div>
   );
 });

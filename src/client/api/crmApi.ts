@@ -679,3 +679,193 @@ export function formatWeddingDate(dateStr: string | null | undefined): string {
   return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+// ===== Deal Import Types =====
+
+export interface DealCreate {
+  pipelineId: string;
+  stageId: string;
+  title: string;
+  primaryFirstName?: string;
+  primaryLastName?: string;
+  partnerFirstName?: string;
+  partnerLastName?: string;
+  email?: string;
+  phone?: string;
+  weddingDate?: string;
+  valueCents?: number;
+  priority?: DealPriority;
+  nextAction?: string;
+}
+
+export interface ImportResult {
+  imported: number;
+  errors: Array<{ row: number; error: string }>;
+}
+
+// ===== Deal Import Functions =====
+
+export function parseCSV(csvText: string): { headers: string[]; rows: string[][] } {
+  const lines = csvText.split('\n').filter((line) => line.trim());
+  if (lines.length === 0) return { headers: [], rows: [] };
+
+  const parseRow = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  const headers = parseRow(lines[0]);
+  const rows = lines.slice(1).map(parseRow);
+
+  return { headers, rows };
+}
+
+export function mapRowToDeal(
+  row: string[],
+  headers: string[],
+  columnMapping: Record<string, number>,
+  pipelineId: string,
+  stageId: string
+): DealCreate | null {
+  const getValue = (field: string): string | undefined => {
+    const idx = columnMapping[field];
+    if (idx === undefined || idx < 0 || idx >= row.length) return undefined;
+    return row[idx] || undefined;
+  };
+
+  const title = getValue('title');
+  if (!title || title.length < 2) return null;
+
+  const priorityValue = getValue('priority')?.toLowerCase();
+  const priority: DealPriority = ['low', 'high'].includes(priorityValue || '') ? (priorityValue as DealPriority) : 'medium';
+
+  let valueCents: number | undefined;
+  const valueStr = getValue('value_cents');
+  if (valueStr) {
+    const cleaned = valueStr.replace(/[^0-9.,]/g, '').replace(',', '.');
+    const parsed = parseFloat(cleaned);
+    if (!isNaN(parsed) && parsed > 0) {
+      valueCents = Math.round(parsed * 100);
+    }
+  }
+
+  return {
+    pipelineId,
+    stageId,
+    title: title,
+    primaryFirstName: getValue('primary_first_name') || undefined,
+    primaryLastName: getValue('primary_last_name') || undefined,
+    partnerFirstName: getValue('partner_first_name') || undefined,
+    partnerLastName: getValue('partner_last_name') || undefined,
+    email: getValue('email') || undefined,
+    phone: getValue('phone') || undefined,
+    weddingDate: getValue('wedding_date') || undefined,
+    valueCents,
+    priority,
+    nextAction: getValue('next_action') || undefined,
+  };
+}
+
+export function generateDealsCSVTemplate(): string {
+  const headers = [
+    'title',
+    'primary_first_name',
+    'primary_last_name',
+    'partner_first_name',
+    'partner_last_name',
+    'email',
+    'phone',
+    'wedding_date',
+    'value_cents',
+    'priority',
+    'next_action',
+  ];
+
+  const exampleRow = [
+    'Smith Wedding',
+    'John',
+    'Smith',
+    'Jane',
+    'Doe',
+    'john.smith@email.com',
+    '+39 333 1234567',
+    '2025-06-15',
+    '15000',
+    'medium',
+    'Schedule discovery call',
+  ];
+
+  return headers.join(',') + '\n' + exampleRow.join(',');
+}
+
+export async function importDeals(
+  deals: DealCreate[],
+  onProgress?: (progress: number) => void
+): Promise<Result<ImportResult>> {
+  try {
+    const token = await getValidAccessToken();
+    if (!token) return { data: null, error: 'Not authenticated' };
+
+    const chunkSize = 50;
+    const chunks = [];
+    for (let i = 0; i < deals.length; i += chunkSize) {
+      chunks.push(deals.slice(i, i + chunkSize));
+    }
+
+    let totalImported = 0;
+    const allErrors: Array<{ row: number; error: string }> = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const startRow = i * chunkSize;
+
+      const res = await fetch('/api/crm/deals/import', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ deals: chunk, start_row: startRow }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        chunk.forEach((_, idx) => {
+          allErrors.push({ row: startRow + idx + 1, error: body.error || 'Import failed' });
+        });
+      } else {
+        const data = await res.json();
+        totalImported += data.imported || 0;
+        if (data.errors) {
+          allErrors.push(...data.errors);
+        }
+      }
+
+      onProgress?.(Math.round(((i + 1) / chunks.length) * 100));
+    }
+
+    return { data: { imported: totalImported, errors: allErrors }, error: null };
+  } catch (err: any) {
+    return { data: null, error: err?.message || 'Failed to import deals' };
+  }
+}
+

@@ -548,9 +548,25 @@ const TodoPage: React.FC = () => {
 
       {/* FAB for mobile */}
       {isMobile && (
-        <button type="button" className="todo-fab" onClick={() => setShowModal(true)} aria-label="Add new task">
-          <PlusIcon />
-        </button>
+        <>
+          <button type="button" className="todo-fab" onClick={() => setShowModal(true)} aria-label="Add new task">
+            <PlusIcon />
+          </button>
+          <button
+            type="button"
+            className="todo-sidebar-menu-btn-mobile"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('wbp:toggle-mobile-menu'));
+            }}
+            aria-label="Open menu"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+        </>
       )}
     </div>
   );
@@ -1226,8 +1242,23 @@ const TaskCreateModal: React.FC<{
           </button>
         </div>
       </div>
+      <MobileFabButtons />
     </div>
   );
-};
+}
+
+// Mobile FAB and menu button
+const MobileFabButtons = () => (
+  <button
+    type="button"
+    className="todo-fab"
+    onClick={() => {}}
+    aria-label="Add task"
+  >
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  </button>
+);
 
 export default TodoPage;

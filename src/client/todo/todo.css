@@ -504,7 +504,7 @@
   .todo-fab {
     position: fixed;
     bottom: 24px;
-    right: 24px;
+    left: 20px;
     width: 56px;
     height: 56px;
     border-radius: 50%;
@@ -528,6 +528,32 @@
     height: 24px;
     color: #fff;
   }
-}
 
+  /* Mobile Task Item Styles */
+  .todo-list {
+    padding: 12px;
+  }
+
+  .task-item {
+    background: transparent;
+    border: none;
+    padding: 0;
+  }
+
+  .task-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .task-title {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .meta-row {
+    display: none;
+  }
+
+}
 

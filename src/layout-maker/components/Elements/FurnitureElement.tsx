@@ -7,9 +7,10 @@
  * - Rotation support
  */
 
-import React from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type { ServiceElement } from '../../types/elements';
 import { getServiceColor, HOVER_COLOR, SELECTION_COLOR } from '../../constants';
+import { RotateButton } from './RotateButton';
 
 interface FurnitureElementProps {
   element: ServiceElement;
@@ -21,6 +22,7 @@ interface FurnitureElementProps {
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   onMouseDown?: (event: React.MouseEvent) => void;
+  onRotate?: (elementId: string, newRotation: number) => void;
 }
 
 export const FurnitureRender: React.FC<FurnitureElementProps> = ({
@@ -33,7 +35,19 @@ export const FurnitureRender: React.FC<FurnitureElementProps> = ({
   onMouseEnter,
   onMouseLeave,
   onMouseDown,
+  onRotate,
 }) => {
+  const [showRotateButton, setShowRotateButton] = useState(false);
+  const [pendingRotation, setPendingRotation] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (isSelected) {
+      setShowRotateButton(true);
+    } else {
+      setShowRotateButton(false);
+    }
+  }, [isSelected]);
+
   const colors = element.color
     ? { fill: element.color, stroke: '#333333' }
     : getServiceColor(element.type);
@@ -44,6 +58,25 @@ export const FurnitureRender: React.FC<FurnitureElementProps> = ({
   const height = element.height * pixelsPerMeter;
   const centerX = x + width / 2;
   const centerY = y + height / 2;
+
+  const handleRotate = useCallback(() => {
+    if (onRotate) {
+      const newRotation = ((element.rotation || 0) + 90) % 360;
+      setPendingRotation(newRotation);
+      onRotate(element.id, newRotation);
+    }
+    setTimeout(() => {
+      setShowRotateButton(false);
+      setPendingRotation(null);
+    }, 250);
+  }, [element.id, element.rotation, onRotate]);
+
+  const handleCloseRotateButton = useCallback(() => {
+    setShowRotateButton(false);
+    setPendingRotation(null);
+  }, []);
+
+  const effectiveRotation = pendingRotation !== null ? pendingRotation : (element.rotation || 0);
 
   const getIcon = () => {
     switch (element.type) {
@@ -115,46 +148,61 @@ export const FurnitureRender: React.FC<FurnitureElementProps> = ({
     );
   };
 
+  const rotateButtonX = centerX;
+  const rotateButtonY = y - 30;
+
   return (
-    <g
-      transform={`rotate(${element.rotation}, ${centerX}, ${centerY})`}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      onMouseDown={onMouseDown}
-      style={{ cursor: 'pointer' }}
-    >
-      {renderOutline()}
+    <>
+      <g
+        transform={`rotate(${effectiveRotation}, ${centerX}, ${centerY})`}
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        onMouseDown={onMouseDown}
+        style={{ cursor: 'pointer' }}
+      >
+        {renderOutline()}
 
-      <rect
-        x={x}
-        y={y}
-        width={width}
-        height={height}
-        rx={4}
-        fill={colors.fill}
-        stroke={colors.stroke}
-        strokeWidth={2}
-      />
+        <rect
+          x={x}
+          y={y}
+          width={width}
+          height={height}
+          rx={4}
+          fill={colors.fill}
+          stroke={colors.stroke}
+          strokeWidth={2}
+        />
 
-      {getIcon()}
+        {getIcon()}
 
-      {element.label && (
-        <text
-          x={centerX}
-          y={centerY}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill="#FFFFFF"
-          fontSize={Math.min(width, height) * 0.3}
-          fontWeight={500}
-          style={{ pointerEvents: 'none', userSelect: 'none' }}
-        >
-          {element.label}
-        </text>
+        {element.label && (
+          <text
+            x={centerX}
+            y={centerY}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fill="#FFFFFF"
+            fontSize={Math.min(width, height) * 0.3}
+            fontWeight={500}
+            style={{ pointerEvents: 'none', userSelect: 'none' }}
+          >
+            {element.label}
+          </text>
+        )}
+      </g>
+
+      {showRotateButton && (
+        <RotateButton
+          x={rotateButtonX}
+          y={rotateButtonY}
+          onRotate={handleRotate}
+          onClose={handleCloseRotateButton}
+          elementSize={{ width: element.width, height: element.height }}
+        />
       )}
-    </g>
+    </>
   );
 };
 

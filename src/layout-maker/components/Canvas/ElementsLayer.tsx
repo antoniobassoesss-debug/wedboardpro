@@ -4,7 +4,7 @@
  * Renders all layout elements on the canvas.
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import type { Layout } from '../../types/layout';
 import { TableElement } from './TableElement';
 import { ChairElementComponent } from './ChairElement';
@@ -13,6 +13,8 @@ import { ServiceElementComponent } from './ServiceElement';
 import { DecorationElementComponent } from './DecorationElement';
 import type { TableElement as TableElementType, ChairElement as ChairElementType } from '../../../types/layout-elements';
 import { isTableElement, isChairElement, isZoneElement, isServiceElement, isDecorationElement } from '../../types/elements';
+import { RotateButton } from '../Elements/RotateButton';
+import { useSelectionStore } from '../../stores';
 
 interface ElementsLayerProps {
   layout: Layout;
@@ -20,6 +22,7 @@ interface ElementsLayerProps {
   onElementDoubleClick?: (elementId: string, event: React.MouseEvent) => void;
   onElementHover?: (elementId: string | null) => void;
   onElementMouseDown?: (elementId: string, event: React.MouseEvent) => void;
+  onElementRotate?: (elementId: string, newRotation: number) => void;
 }
 
 export const ElementsLayer: React.FC<ElementsLayerProps> = ({
@@ -28,9 +31,21 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
   onElementDoubleClick,
   onElementHover,
   onElementMouseDown,
+  onElementRotate,
 }) => {
+  const selectionStore = useSelectionStore();
+  const selectedIds = selectionStore.selectedIds;
+  console.log('[ElementsLayer] Selected IDs:', selectedIds);
+
+  const handleRotate = useCallback((elementId: string, newRotation: number) => {
+    console.log('[ElementsLayer] Rotating element:', elementId, 'to:', newRotation);
+    onElementRotate?.(elementId, newRotation);
+  }, [onElementRotate]);
+
   const renderElement = (element: (typeof layout.elements)[string]) => {
-    const handleClick = (event: React.MouseEvent) => {
+    const isSelected = selectedIds.includes(element.id);
+
+    const handleElementClick = (event: React.MouseEvent) => {
       event.stopPropagation();
       onElementClick?.(element.id, event);
     };
@@ -53,6 +68,12 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
       onElementMouseDown?.(element.id, event);
     };
 
+    const centerX = (element.x + element.width / 2);
+    const centerY = (element.y + element.height / 2);
+    const pixelsPerMeter = 100;
+    const rotateButtonX = centerX * pixelsPerMeter;
+    const rotateButtonY = (element.y * pixelsPerMeter) - 30;
+
     if (isTableElement(element)) {
       const tableElement: TableElementType = {
         id: element.id,
@@ -65,7 +86,7 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
           diameter: element.type === 'table-round' ? element.width : undefined,
           unit: 'cm',
         },
-        rotation: element.rotation,
+        rotation: element.rotation || 0,
         locked: element.locked,
         tableNumber: element.tableNumber || '',
         capacity: element.capacity,
@@ -80,17 +101,31 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
         createdAt: element.createdAt,
         updatedAt: element.updatedAt,
       };
+
       return (
-        <TableElement
-          key={element.id}
-          element={tableElement}
-          pixelsPerMeter={100}
-          onClick={handleClick}
-          onDoubleClick={handleDoubleClick}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-          onMouseDown={handleMouseDown}
-        />
+        <React.Fragment key={element.id}>
+          <TableElement
+            element={tableElement}
+            pixelsPerMeter={pixelsPerMeter}
+            isSelected={isSelected}
+            onClick={handleElementClick}
+            onDoubleClick={handleDoubleClick}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            onMouseDown={handleMouseDown}
+          />
+          {isSelected && onElementRotate && (
+            <>
+              {console.log('[ElementsLayer] TABLE RotateButton for:', element.id)}
+              <RotateButton
+              x={rotateButtonX}
+              y={rotateButtonY}
+              onRotate={() => handleRotate(element.id, ((element.rotation || 0) + 90) % 360)}
+              onClose={() => {}}
+              elementSize={{ width: element.width, height: element.height }}
+            />
+          )}
+        </React.Fragment>
       );
     }
 
@@ -102,7 +137,7 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
         y: element.y,
         width: element.width,
         height: element.height,
-        rotation: element.rotation,
+        rotation: element.rotation || 0,
         locked: element.locked,
         parentTableId: element.parentTableId,
         seatIndex: element.seatIndex,
@@ -117,8 +152,8 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
         <ChairElementComponent
           key={element.id}
           element={chairElement}
-          pixelsPerMeter={100}
-          onClick={handleClick}
+          pixelsPerMeter={pixelsPerMeter}
+          onClick={handleElementClick}
           onDoubleClick={handleDoubleClick}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
@@ -129,29 +164,49 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
 
     if (isZoneElement(element)) {
       return (
-        <ZoneElementComponent
-          key={element.id}
-          element={element}
-          onClick={handleClick}
-          onDoubleClick={handleDoubleClick}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-          onMouseDown={handleMouseDown}
-        />
+        <React.Fragment key={element.id}>
+          <ZoneElementComponent
+            element={element}
+            onClick={handleElementClick}
+            onDoubleClick={handleDoubleClick}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            onMouseDown={handleMouseDown}
+          />
+          {isSelected && onElementRotate && (
+            <RotateButton
+              x={rotateButtonX}
+              y={rotateButtonY}
+              onRotate={() => handleRotate(element.id, ((element.rotation || 0) + 90) % 360)}
+              onClose={() => {}}
+              elementSize={{ width: element.width, height: element.height }}
+            />
+          )}
+        </React.Fragment>
       );
     }
 
     if (isServiceElement(element)) {
       return (
-        <ServiceElementComponent
-          key={element.id}
-          element={element}
-          onClick={handleClick}
-          onDoubleClick={handleDoubleClick}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-          onMouseDown={handleMouseDown}
-        />
+        <React.Fragment key={element.id}>
+          <ServiceElementComponent
+            element={element}
+            onClick={handleElementClick}
+            onDoubleClick={handleDoubleClick}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            onMouseDown={handleMouseDown}
+          />
+          {isSelected && onElementRotate && (
+            <RotateButton
+              x={rotateButtonX}
+              y={rotateButtonY}
+              onRotate={() => handleRotate(element.id, ((element.rotation || 0) + 90) % 360)}
+              onClose={() => {}}
+              elementSize={{ width: element.width, height: element.height }}
+            />
+          )}
+        </React.Fragment>
       );
     }
 
@@ -160,7 +215,7 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
         <DecorationElementComponent
           key={element.id}
           element={element}
-          onClick={handleClick}
+          onClick={handleElementClick}
           onDoubleClick={handleDoubleClick}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}

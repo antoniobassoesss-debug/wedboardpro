@@ -47,14 +47,14 @@ const ZoomControls: React.FC<ZoomControlsProps> = ({
     <div
       style={{
         position: 'fixed',
-        bottom: '24px',
+        bottom: '65px',
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
         alignItems: 'center',
         gap: '4px',
         background: 'white',
-        borderRadius: '10px',
+        borderRadius: '30px',
         padding: '6px 8px',
         boxShadow: '0 2px 12px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.1)',
         zIndex: 10001,

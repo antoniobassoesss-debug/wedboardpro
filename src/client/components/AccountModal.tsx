@@ -15,6 +15,45 @@ import { useToast } from "./ui/toast";
 import SubscriptionTab from "../dashboard/SubscriptionTab";
 import UsageTab from "../dashboard/UsageTab";
 
+// Simple line icons for tabs
+const ProfileIcon = ({ active }: { active: boolean }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={active ? '#1a1a1a' : '#666'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
+  </svg>
+);
+
+const TeamIcon = ({ active }: { active: boolean }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={active ? '#1a1a1a' : '#666'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
+
+const BillingIcon = ({ active }: { active: boolean }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={active ? '#1a1a1a' : '#666'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+    <line x1="1" y1="10" x2="23" y2="10" />
+  </svg>
+);
+
+const UsageIcon = ({ active }: { active: boolean }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={active ? '#1a1a1a' : '#666'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="20" x2="18" y2="10" />
+    <line x1="12" y1="20" x2="12" y2="4" />
+    <line x1="6" y1="20" x2="6" y2="14" />
+  </svg>
+);
+
+const SettingsIcon = ({ active }: { active: boolean }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={active ? '#1a1a1a' : '#666'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+);
+
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -440,22 +479,23 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           position: "fixed",
           inset: 0,
           display: "flex",
-          alignItems: "center",
+          alignItems: isMobile ? "flex-end" : "center",
           justifyContent: "center",
-          background: "rgba(0,0,0,0.4)",
-          zIndex: 60,
+          background: "rgba(0,0,0,0.5)",
+          zIndex: isMobile ? 9999 : 60,
+          padding: isMobile ? 0 : 16,
         }}
         onClick={() => onOpenChange(false)}
       >
     <DialogContent
         style={{
           background: '#ffffff',
-          padding: isMobile ? '20px' : '32px 40px',
-          borderRadius: isMobile ? '24px 24px 0 0' : '32px',
-          boxShadow: '0 8px 30px rgba(0,0,0,0.08)',
+          padding: isMobile ? '24px' : '32px 40px',
+          borderRadius: isMobile ? '24px 24px 0 0' : '24px',
+          boxShadow: '0 8px 40px rgba(0,0,0,0.12)',
           maxWidth: isMobile ? '100%' : '700px',
           width: isMobile ? '100%' : '90vw',
-          maxHeight: isMobile ? '90vh' : '85vh',
+          maxHeight: isMobile ? '92vh' : '85vh',
           display: 'flex',
           flexDirection: 'column',
           fontFamily: "'Geist', 'Inter', sans-serif",
@@ -475,49 +515,76 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
             to { transform: translateY(0); }
           }
         `}</style>
-        <div style={{ marginBottom: isMobile ? 16 : 24 }}>
-          <h2 style={{ fontSize: isMobile ? 20 : 24, fontWeight: 700, margin: '0 0 8px 0', color: '#0c0c0c' }}>Account Settings</h2>
-          <p style={{ fontSize: isMobile ? 13 : 14, color: '#7c7c7c', margin: 0 }}>Manage your account information</p>
+        <div style={{ marginBottom: isMobile ? 20 : 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <h2 style={{ fontSize: isMobile ? 22 : 24, fontWeight: 700, margin: '0 0 6px 0', color: '#1a1a1a' }}>Account Settings</h2>
+            </div>
+            {isMobile && (
+              <button 
+                onClick={() => onOpenChange(false)}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 999,
+                  border: 'none',
+                  background: '#f5f5f5',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 20,
+                  color: '#666',
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
         </div>
 
         <div style={{ 
           display: 'flex', 
-          gap: isMobile ? 6 : 8, 
+          gap: 8, 
           marginBottom: isMobile ? 20 : 32,
           overflowX: 'auto',
           overflowY: 'hidden',
-          paddingBottom: isMobile ? 4 : 0,
+          paddingBottom: isMobile ? 8 : 0,
           marginLeft: isMobile ? -20 : 0,
           paddingLeft: isMobile ? 20 : 0,
           marginRight: isMobile ? -20 : 0,
           paddingRight: isMobile ? 20 : 0,
           flexShrink: 0,
+          WebkitOverflowScrolling: 'touch',
         }}>
           {[
-            { id: "profile", label: "Profile" },
-            { id: "team", label: "Team" },
-            { id: "billing", label: "Billing" },
-            { id: "usage", label: "Usage" },
-            { id: "preferences", label: "Prefs" },
+            { id: "profile", label: "Profile", icon: ProfileIcon },
+            { id: "team", label: "Team", icon: TeamIcon },
+            { id: "billing", label: "Billing", icon: BillingIcon },
+            { id: "usage", label: "Usage", icon: UsageIcon },
+            { id: "preferences", label: "Settings", icon: SettingsIcon },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               style={{
-                borderRadius: 999,
-                padding: isMobile ? '8px 14px' : '10px 20px',
+                borderRadius: 10,
+                padding: isMobile ? '12px 16px' : '12px 20px',
                 border: 'none',
                 cursor: 'pointer',
-                background: activeTab === tab.id ? '#0c0c0c' : 'transparent',
-                color: activeTab === tab.id ? '#fff' : '#7c7c7c',
+                background: activeTab === tab.id ? '#f5f5f5' : 'transparent',
+                color: activeTab === tab.id ? '#1a1a1a' : '#888',
                 fontWeight: 600,
-                fontSize: isMobile ? 12 : 14,
+                fontSize: isMobile ? 13 : 14,
                 transition: 'all 0.15s ease',
                 flexShrink: 0,
                 whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
               }}
             >
-              {tab.label}
+              <tab.icon active={activeTab === tab.id} />
             </button>
           ))}
         </div>
@@ -529,27 +596,29 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           paddingRight: isMobile ? 0 : '8px',
           marginRight: isMobile ? 0 : '-8px',
           minHeight: 0,
-          paddingBottom: isMobile ? 20 : 0,
+          paddingBottom: isMobile ? 40 : 0,
+          WebkitOverflowScrolling: 'touch',
         }}>
           {activeTab === "profile" && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 20 : 32, paddingBottom: isMobile ? 80 : 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 14 : 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 24 : 32, paddingBottom: isMobile ? 100 : 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 16 : 20 }}>
                 <div
                   style={{
                     position: 'relative',
-                    width: isMobile ? 72 : 64,
-                    height: isMobile ? 72 : 64,
+                    width: isMobile ? 88 : 64,
+                    height: isMobile ? 88 : 64,
                     borderRadius: 999,
                     overflow: 'hidden',
-                    background: '#ebebeb',
+                    background: '#f5f5f5',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: isMobile ? 24 : 20,
+                    fontSize: isMobile ? 28 : 20,
                     fontWeight: 700,
-                    color: '#0c0c0c',
+                    color: '#1a1a1a',
                     cursor: 'pointer',
                     flexShrink: 0,
+                    border: '2px solid #f0f0f0',
                   }}
                   onClick={() => setShowAvatarUpload(true)}
                 >
@@ -567,80 +636,103 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                     style={{
                       position: 'absolute',
                       inset: 0,
-                      background: 'rgba(0,0,0,0.6)',
+                      background: 'rgba(0,0,0,0.5)',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
                       opacity: 0,
                       transition: 'opacity 0.2s',
-                      gap: 4,
+                      gap: 2,
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
                     onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
                   >
-                    <span style={{ fontSize: isMobile ? 24 : 20 }}>📷</span>
-                    <span style={{ fontSize: isMobile ? 12 : 11, color: '#fff', fontWeight: 600 }}>
-                      {profile.avatar_url ? 'Change' : 'Upload'}
+                    <span style={{ fontSize: isMobile ? 20 : 16 }}>📷</span>
+                    <span style={{ fontSize: isMobile ? 11 : 10, color: '#fff', fontWeight: 600 }}>
+                      {profile.avatar_url ? 'Change' : 'Add'}
                     </span>
                   </div>
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <h3 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 700, margin: '0 0 4px 0', color: '#0c0c0c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <h3 style={{ fontSize: isMobile ? 20 : 18, fontWeight: 700, margin: '0 0 6px 0', color: '#1a1a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {profile.full_name || profile.email || "Your name"}
                   </h3>
-                  <p style={{ fontSize: isMobile ? 13 : 14, color: '#7c7c7c', margin: 0 }}>{profile.business_name ?? "Wedding Planner"}</p>
+                  <p style={{ fontSize: isMobile ? 14 : 14, color: '#666', margin: 0, fontWeight: 500 }}>{profile.business_name ?? "Wedding Planner"}</p>
+                  <p style={{ fontSize: isMobile ? 13 : 13, color: '#888', margin: '4px 0 0 0' }}>{profile.email}</p>
                 </div>
-
-                {profile.avatar_url && (
-                  <button
-                    onClick={handleRemoveAvatar}
-                    style={{
-                      padding: isMobile ? '8px 12' : '8px 16px',
-                      border: '1px solid #e3e3e3',
-                      borderRadius: 999,
-                      background: '#fff',
-                      fontSize: isMobile ? 12 : 13,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      color: '#dc2626',
-                      flexShrink: 0,
-                    }}
-                  >
-                    Remove
-                  </button>
-                )}
               </div>
 
-              <div style={{ height: 1, background: '#e3e3e3', margin: '0 -20px' }} />
+              {profile.avatar_url && (
+                <button
+                  onClick={handleRemoveAvatar}
+                  style={{
+                    padding: '10px 16px',
+                    border: '1px solid #e5e5e5',
+                    borderRadius: 12,
+                    background: '#fff',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    color: '#dc2626',
+                    flexShrink: 0,
+                    alignSelf: 'flex-start',
+                  }}
+                >
+                  Remove Photo
+                </button>
+              )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 16 : 20 }}>
-                {['Business Name', 'Email', 'Phone', 'Business Address'].map((label, idx) => (
+              <div style={{ height: 1, background: '#f0f0f0', margin: '0 -20px' }} />
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 20 : 20 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <label style={{ fontSize: isMobile ? 13 : 12, fontWeight: 600, color: '#1a1a1a' }}>Full Name</label>
+                  <input
+                    id="full-name"
+                    defaultValue={profile.full_name ?? ""}
+                    placeholder="Enter your full name"
+                    style={{
+                      borderRadius: 12,
+                      padding: '14px 16px',
+                      border: '1px solid #e5e5e5',
+                      background: '#fafafa',
+                      fontSize: 16,
+                      fontFamily: "'Geist', 'Inter', sans-serif",
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      transition: 'border-color 0.15s ease',
+                    }}
+                  />
+                </div>
+                {['Business Name', 'Phone', 'Business Address'].map((label) => (
                   <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <label style={{ fontSize: isMobile ? 11 : 12, fontWeight: 600, color: '#0c0c0c' }}>{label}</label>
+                    <label style={{ fontSize: isMobile ? 13 : 12, fontWeight: 600, color: '#1a1a1a' }}>{label}</label>
                     <input
                       id={label.toLowerCase().replace(' ', '-')}
-                      defaultValue={label === 'Business Name' ? profile.business_name ?? "" : label === 'Email' ? profile.email ?? "" : label === 'Phone' ? profile.phone ?? "" : profile.address ?? ""}
+                      defaultValue={label === 'Business Name' ? profile.business_name ?? "" : label === 'Phone' ? profile.phone ?? "" : profile.address ?? ""}
+                      placeholder={label === 'Phone' ? '+1 (555) 000-0000' : `Enter ${label.toLowerCase()}`}
                       style={{
-                        borderRadius: 999,
-                        padding: '12px 18px',
-                        border: '1px solid #e3e3e3',
-                        background: '#fff',
-                        fontSize: isMobile ? 16 : 14,
+                        borderRadius: 12,
+                        padding: '14px 16px',
+                        border: '1px solid #e5e5e5',
+                        background: '#fafafa',
+                        fontSize: 16,
                         fontFamily: "'Geist', 'Inter', sans-serif",
                         width: '100%',
                         boxSizing: 'border-box',
+                        transition: 'border-color 0.15s ease',
                       }}
                     />
                   </div>
                 ))}
               </div>
 
-              <div style={{ height: 1, background: '#e3e3e3', margin: isMobile ? '16px -20px' : '32px 0' }} />
+              <div style={{ height: 1, background: '#f0f0f0', margin: isMobile ? '20px -20px' : '32px 0' }} />
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <h3 style={{ fontSize: isMobile ? 13 : 14, fontWeight: 700, margin: '0 0 12px 0', color: '#0c0c0c' }}>Account Actions</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <h3 style={{ fontSize: isMobile ? 15 : 14, fontWeight: 700, margin: '0 0 4px 0', color: '#1a1a1a' }}>Account Actions</h3>
                 <button
                   onClick={async () => {
                     try {
@@ -661,22 +753,22 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                   }}
                   style={{
                     width: '100%',
-                    borderRadius: 999,
-                    padding: '14px 18px',
-                    border: '1px solid #e3e3e3',
+                    borderRadius: 12,
+                    padding: '16px 18px',
+                    border: '1px solid #fee2e2',
                     background: '#fff',
                     color: '#dc2626',
                     fontWeight: 600,
-                    fontSize: isMobile ? 14 : 14,
+                    fontSize: 15,
                     cursor: 'pointer',
-                    textAlign: 'left',
+                    textAlign: 'center',
                     fontFamily: "'Geist', 'Inter', sans-serif",
                     transition: 'all 0.15s ease',
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.borderColor = '#dc2626'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e3e3e3'; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#fef2f2'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; }}
                 >
-                  Log Out
+                  Sign Out
                 </button>
               </div>
 
@@ -689,49 +781,51 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           )}
 
           {activeTab === "team" && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 16 : 24 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 20 : 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 16 : 16 }}>
                 <div>
-                  <h3 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 700, margin: '0 0 4px 0', color: '#0c0c0c' }}>Team Members</h3>
-                  <p style={{ fontSize: isMobile ? 12 : 14, color: '#7c7c7c', margin: 0 }}>
-                    {teamInfo ? `Workspace: ${teamInfo.name}` : 'Create a team to start collaborating'}
+                  <h3 style={{ fontSize: isMobile ? 18 : 18, fontWeight: 700, margin: '0 0 6px 0', color: '#1a1a1a' }}>Team Members</h3>
+                  <p style={{ fontSize: isMobile ? 13 : 14, color: '#666', margin: 0 }}>
+                    {teamInfo ? `Workspace: ${teamInfo.name}` : 'Create a team to collaborate with others'}
                   </p>
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   <button
                     onClick={handleCreateTeamButton}
                     disabled={creatingTeam || Boolean(teamInfo)}
                     style={{
-                      borderRadius: 999,
-                      padding: '10px 18px',
-                      border: '1px solid #0c0c0c',
-                      background: teamInfo ? '#fafafa' : '#0c0c0c',
-                      color: teamInfo ? '#0c0c0c' : '#fff',
+                      borderRadius: 12,
+                      padding: '14px 20px',
+                      border: '1px solid #1a1a1a',
+                      background: teamInfo ? '#f5f5f5' : '#1a1a1a',
+                      color: teamInfo ? '#1a1a1a' : '#fff',
                       fontWeight: 600,
-                      fontSize: isMobile ? 13 : 14,
+                      fontSize: 14,
                       cursor: creatingTeam || teamInfo ? 'not-allowed' : 'pointer',
                       fontFamily: "'Geist', 'Inter', sans-serif",
                       flex: 1,
-                      minWidth: isMobile ? 'calc(50% - 4px)' : 'auto',
+                      minWidth: isMobile ? 'calc(50% - 5px)' : 'auto',
+                      transition: 'all 0.15s ease',
                     }}
                   >
-                    {creatingTeam ? 'Creating…' : 'Create Team'}
+                    {creatingTeam ? 'Creating...' : teamInfo ? 'Team Active' : 'Create Team'}
                   </button>
                   <button
                     onClick={() => teamInfo && setShowInviteModal(true)}
                     disabled={!teamInfo}
                     style={{
-                      borderRadius: 999,
-                      padding: '10px 18px',
+                      borderRadius: 12,
+                      padding: '14px 20px',
                       border: 'none',
-                      background: teamInfo ? '#0c0c0c' : '#d7d7d7',
+                      background: teamInfo ? '#1a1a1a' : '#e5e5e5',
                       color: teamInfo ? '#fff' : '#888',
                       fontWeight: 600,
-                      fontSize: isMobile ? 13 : 14,
+                      fontSize: 14,
                       cursor: teamInfo ? 'pointer' : 'not-allowed',
                       fontFamily: "'Geist', 'Inter', sans-serif",
                       flex: 1,
-                      minWidth: isMobile ? 'calc(50% - 4px)' : 'auto',
+                      minWidth: isMobile ? 'calc(50% - 5px)' : 'auto',
+                      transition: 'all 0.15s ease',
                     }}
                   >
                     Invite
@@ -740,32 +834,33 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
               </div>
 
               {teamError && (
-                <div style={{ padding: 12, borderRadius: 999, background: '#fee2e2', color: '#b91c1c', fontSize: 13, fontWeight: 500 }}>
+                <div style={{ padding: 14, borderRadius: 12, background: '#fef2f2', color: '#b91c1c', fontSize: 14, fontWeight: 500 }}>
                   {teamError}
                 </div>
               )}
 
               {teamLoading ? (
-                <div style={{ textAlign: 'center', padding: 32, color: '#7c7c7c', fontSize: 14 }}>Loading team information...</div>
+                <div style={{ textAlign: 'center', padding: 40, color: '#888', fontSize: 14 }}>Loading team information...</div>
               ) : !teamInfo ? (
-                <div style={{ border: '1px dashed #cfcfcf', borderRadius: 20, padding: 24, background: '#fafafa', textAlign: 'center', color: '#6b6b6b', fontSize: isMobile ? 13 : 14 }}>
-                  No team yet. Click "Create Team" to set up your workspace.
+                <div style={{ border: '2px dashed #e5e5e5', borderRadius: 16, padding: 32, background: '#fafafa', textAlign: 'center', color: '#666', fontSize: 14 }}>
+                  <p style={{ margin: '0 0 8px 0', fontWeight: 600 }}>No team yet</p>
+                  <p style={{ margin: 0, color: '#888' }}>Click "Create Team" to set up your workspace and start collaborating.</p>
                 </div>
               ) : null}
 
               {(inviteActionError || acceptSuccessMessage) && (
-                <div style={{ padding: 12, borderRadius: 999, background: inviteActionError ? '#fee2e2' : '#ecfdf5', color: inviteActionError ? '#b91c1c' : '#065f46', fontSize: 13, fontWeight: 500 }}>
+                <div style={{ padding: 14, borderRadius: 12, background: inviteActionError ? '#fef2f2' : '#ecfdf5', color: inviteActionError ? '#b91c1c' : '#065f46', fontSize: 14, fontWeight: 500 }}>
                   {inviteActionError || acceptSuccessMessage}
                 </div>
               )}
 
               {loadingInvites ? (
-                <div style={{ textAlign: 'center', padding: 32, color: '#7c7c7c', fontSize: 14 }}>Checking for pending invitations...</div>
+                <div style={{ textAlign: 'center', padding: 32, color: '#888', fontSize: 14 }}>Checking for pending invitations...</div>
               ) : pendingInvites.length > 0 ? (
-                <div style={{ border: '1px solid #e3e3e3', borderRadius: 20, padding: 20, background: '#fafafa', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ border: '1px solid #e5e5e5', borderRadius: 16, padding: 20, background: '#fafafa', display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
-                    <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0c0c0c' }}>Pending invitations</h4>
-                    <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#6b6b6b' }}>Accept to join the shared workspace.</p>
+                    <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1a1a1a' }}>Pending invitations</h4>
+                    <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#666' }}>Accept to join the shared workspace.</p>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {pendingInvites.map((invite) => {
@@ -774,13 +869,23 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                       const expiresAt = invite?.expires_at ? new Date(invite.expires_at) : null;
                       const expiresLabel = expiresAt ? `Expires ${expiresAt.toLocaleDateString()}` : 'Expires soon';
                       const isProcessing = acceptingToken === invite?.token;
+                      const inviterAvatar = invite?.inviter?.avatar_url || invite?.inviter?.profile?.avatar_url;
                       return (
-                        <div key={invite.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderRadius: 16, background: '#fff', border: '1px solid #e3e3e3', gap: 12, flexWrap: 'wrap' }}>
-                          <div style={{ flex: 1, minWidth: 150 }}>
-                            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#0c0c0c' }}>{teamName}</p>
-                            <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#6b6b6b' }}>Invited by {inviterEmail} · {expiresLabel}</p>
+                        <div key={invite.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderRadius: 12, background: '#fff', border: '1px solid #e5e5e5', gap: 12, flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 150 }}>
+                            <div style={{ width: 40, height: 40, borderRadius: 999, overflow: 'hidden', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#1a1a1a', flexShrink: 0 }}>
+                              {inviterAvatar ? (
+                                <img src={inviterAvatar} alt={inviterEmail} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                (inviterEmail || "U").split("@")[0].slice(0, 2).toUpperCase()
+                              )}
+                            </div>
+                            <div>
+                              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>{teamName}</p>
+                              <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#666' }}>Invited by {inviterEmail} · {expiresLabel}</p>
+                            </div>
                           </div>
-                          <button onClick={() => handleAcceptInvite(invite.token)} disabled={isProcessing} style={{ borderRadius: 999, padding: '8px 18px', border: 'none', background: isProcessing ? '#9ca3af' : '#0c0c0c', color: '#fff', fontSize: 13, fontWeight: 600, cursor: isProcessing ? 'not-allowed' : 'pointer' }}>
+                          <button onClick={() => handleAcceptInvite(invite.token)} disabled={isProcessing} style={{ borderRadius: 10, padding: '10px 20px', border: 'none', background: isProcessing ? '#9ca3af' : '#1a1a1a', color: '#fff', fontSize: 13, fontWeight: 600, cursor: isProcessing ? 'not-allowed' : 'pointer', transition: 'all 0.15s ease' }}>
                             {isProcessing ? 'Joining...' : 'Accept'}
                           </button>
                         </div>
@@ -791,27 +896,32 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
               ) : null}
 
               {teamInfo && (loadingMembers ? (
-                <div style={{ textAlign: 'center', padding: 40, color: '#7c7c7c' }}>Loading team members...</div>
+                <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>Loading team members...</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {teamMembers.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: 40, color: '#7c7c7c', fontSize: isMobile ? 13 : 14 }}>No team members yet. Click "Invite" to add someone.</div>
+                    <div style={{ textAlign: 'center', padding: 40, color: '#888', fontSize: isMobile ? 13 : 14 }}>No team members yet. Click "Invite" to add someone.</div>
                   ) : teamMembers.map((member) => {
                     const memberProfile = member.profile || member.profiles || {};
                     const memberName = member.displayName || memberProfile.full_name || memberProfile.email || "Unknown";
                     const initials = ((memberName || "U").split(" ").map((s: string) => s[0]).slice(0, 2).join("")).toUpperCase();
+                    const memberAvatar = memberProfile.avatar_url || member.avatar_url;
                     return (
-                      <div key={member.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? 12 : 16, borderRadius: 16, border: '1px solid #e3e3e3', background: '#fff', flexWrap: 'wrap', gap: 12 }}>
+                      <div key={member.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? 14 : 16, borderRadius: 14, border: '1px solid #e5e5e5', background: '#fff', flexWrap: 'wrap', gap: 12 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 150 }}>
-                          <div style={{ width: 40, height: 40, borderRadius: 999, background: '#ebebeb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#0c0c0c', flexShrink: 0 }}>
-                            {initials}
+                          <div style={{ width: 44, height: 44, borderRadius: 999, overflow: 'hidden', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#1a1a1a', flexShrink: 0 }}>
+                            {memberAvatar ? (
+                              <img src={memberAvatar} alt={memberName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              initials
+                            )}
                           </div>
                           <div style={{ minWidth: 0 }}>
-                            <p style={{ fontSize: 14, fontWeight: 600, margin: '0 0 2px 0', color: '#0c0c0c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{memberName}</p>
-                            <p style={{ fontSize: 12, color: '#7c7c7c', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{memberProfile.email || member.displayEmail}</p>
+                            <p style={{ fontSize: 14, fontWeight: 600, margin: '0 0 2px 0', color: '#1a1a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{memberName}</p>
+                            <p style={{ fontSize: 13, color: '#666', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{memberProfile.email || member.displayEmail}</p>
                           </div>
                         </div>
-                        <span style={{ borderRadius: 999, padding: '4px 12px', background: '#ebebeb', fontSize: 12, fontWeight: 600, color: '#0c0c0c', textTransform: 'capitalize', flexShrink: 0 }}>{member.role}</span>
+                        <span style={{ borderRadius: 999, padding: '6px 14px', background: '#f5f5f5', fontSize: 12, fontWeight: 600, color: '#1a1a1a', textTransform: 'capitalize', flexShrink: 0 }}>{member.role}</span>
                       </div>
                     );
                   })}
@@ -823,25 +933,25 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           {activeTab === "billing" && <SubscriptionTab onClose={() => onOpenChange(false)} />}
           {activeTab === "usage" && <UsageTab />}
           {activeTab === "preferences" && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 20 : 32 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 16 }}>
-                <h3 style={{ fontSize: isMobile ? 13 : 14, fontWeight: 700, margin: 0, color: '#0c0c0c' }}>Notifications</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 24 : 32 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 14 : 16 }}>
+                <h3 style={{ fontSize: isMobile ? 15 : 14, fontWeight: 700, margin: 0, color: '#1a1a1a' }}>Notifications</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {["Email notifications for new quotes", "Task reminders", "Client messages"].map((pref) => (
-                    <label key={pref} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? 12 : 12, borderRadius: 16, border: '1px solid #e3e3e3', background: '#fff', cursor: 'pointer', flexWrap: 'wrap', gap: 8 }}>
-                      <span style={{ fontSize: isMobile ? 13 : 14, color: '#0c0c0c' }}>{pref}</span>
-                      <input type="checkbox" defaultChecked style={{ width: 20, height: 20, cursor: 'pointer', flexShrink: 0 }} />
+                    <label key={pref} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? 14 : 12, borderRadius: 14, border: '1px solid #e5e5e5', background: '#fff', cursor: 'pointer', flexWrap: 'wrap', gap: 12 }}>
+                      <span style={{ fontSize: isMobile ? 14 : 14, color: '#1a1a1a', flex: 1 }}>{pref}</span>
+                      <input type="checkbox" defaultChecked style={{ width: 22, height: 22, cursor: 'pointer', flexShrink: 0, accentColor: '#1a1a1a' }} />
                     </label>
                   ))}
                 </div>
               </div>
 
-              <div style={{ height: 1, background: '#e3e3e3' }} />
+              <div style={{ height: 1, background: '#f0f0f0' }} />
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <h3 style={{ fontSize: isMobile ? 13 : 14, fontWeight: 700, margin: 0, color: '#0c0c0c' }}>Security</h3>
-                {['Change Password', 'Enable Two-Factor Authentication'].map((action, idx) => (
-                  <button key={action} style={{ width: '100%', borderRadius: 999, padding: '14px 18px', border: '1px solid #e3e3e3', background: '#fff', color: '#0c0c0c', fontWeight: 600, fontSize: isMobile ? 13 : 14, cursor: 'pointer', textAlign: 'left', fontFamily: "'Geist', 'Inter', sans-serif" }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <h3 style={{ fontSize: isMobile ? 15 : 14, fontWeight: 700, margin: 0, color: '#1a1a1a' }}>Security</h3>
+                {['Change Password', 'Enable Two-Factor Authentication'].map((action) => (
+                  <button key={action} style={{ width: '100%', borderRadius: 12, padding: '16px 18px', border: '1px solid #e5e5e5', background: '#fff', color: '#1a1a1a', fontWeight: 600, fontSize: 14, cursor: 'pointer', textAlign: 'left', fontFamily: "'Geist', 'Inter', sans-serif", transition: 'all 0.15s ease' }}>
                     {action}
                   </button>
                 ))}
@@ -850,22 +960,20 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           )}
         </div>
 
-        {!isMobile && <div style={{ height: 1, background: '#e3e3e3', margin: '32px -40px 0 -40px' }} />}
-
         <div style={{ 
           display: 'flex', 
           justifyContent: 'flex-end', 
           gap: 12, 
-          marginTop: isMobile ? 20 : 24,
-          paddingTop: isMobile ? 16 : 0,
-          borderTop: isMobile ? '1px solid #e3e3e3' : 'none',
+          marginTop: isMobile ? 24 : 24,
+          paddingTop: isMobile ? 20 : 0,
+          borderTop: isMobile ? '1px solid #f0f0f0' : 'none',
           flexShrink: 0,
-          paddingBottom: isMobile ? 'calc(16px + env(safe-area-inset-bottom))' : 0,
+          paddingBottom: isMobile ? 'calc(20px + env(safe-area-inset-bottom))' : 0,
         }}>
-          <button onClick={() => onOpenChange(false)} style={{ borderRadius: 999, padding: isMobile ? '14px 24px' : '10px 24px', border: '1px solid #e3e3e3', background: '#fff', color: '#0c0c0c', fontWeight: 600, fontSize: isMobile ? 14 : 14, cursor: 'pointer', fontFamily: "'Geist', 'Inter', sans-serif" }}>
+          <button onClick={() => onOpenChange(false)} style={{ borderRadius: 12, padding: isMobile ? '16px 28px' : '10px 24px', border: '1px solid #e5e5e5', background: '#fff', color: '#1a1a1a', fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: "'Geist', 'Inter', sans-serif", transition: 'all 0.15s ease' }}>
             Cancel
           </button>
-          <button onClick={() => onOpenChange(false)} style={{ borderRadius: 999, padding: isMobile ? '14px 24px' : '10px 24px', border: 'none', background: '#0c0c0c', color: '#fff', fontWeight: 600, fontSize: isMobile ? 14 : 14, cursor: 'pointer', fontFamily: "'Geist', 'Inter', sans-serif" }}>
+          <button onClick={() => onOpenChange(false)} style={{ borderRadius: 12, padding: isMobile ? '16px 28px' : '10px 24px', border: 'none', background: '#1a1a1a', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: "'Geist', 'Inter', sans-serif", transition: 'all 0.15s ease' }}>
             Save Changes
           </button>
         </div>
@@ -881,7 +989,7 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           display: "flex",
           alignItems: isMobile ? "flex-end" : "center",
           justifyContent: "center",
-          background: "rgba(0,0,0,0.4)",
+          background: "rgba(0,0,0,0.5)",
           zIndex: 70,
           padding: isMobile ? 0 : 16,
         }}
@@ -895,9 +1003,9 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
         <div
           style={{
             background: "#ffffff",
-            padding: isMobile ? '20px' : "32px",
+            padding: isMobile ? '24px' : "32px",
             borderRadius: isMobile ? '24px 24px 0 0' : "24px",
-            boxShadow: "0 8px 30px rgba(0,0,0,0.08)",
+            boxShadow: "0 8px 30px rgba(0,0,0,0.12)",
             maxWidth: isMobile ? "100%" : "480px",
             width: isMobile ? "100%" : "90vw",
             fontFamily: "'Geist', 'Inter', sans-serif",
@@ -912,16 +1020,41 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
               to { transform: translateY(0); }
             }
           `}</style>
-          <h3 style={{ fontSize: isMobile ? 18 : 20, fontWeight: 700, margin: "0 0 8px 0", color: "#0c0c0c" }}>
-            Invite Team Member
-          </h3>
-          <p style={{ fontSize: isMobile ? 13 : 14, color: "#7c7c7c", margin: "0 0 20px 0" }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <h3 style={{ fontSize: isMobile ? 20 : 20, fontWeight: 700, margin: 0, color: "#1a1a1a" }}>
+              Invite Team Member
+            </h3>
+            <button 
+              onClick={() => {
+                setShowInviteModal(false);
+                setInviteEmail("");
+                setInviteError(null);
+                setInviteSuccess(false);
+              }}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 999,
+                border: 'none',
+                background: '#f5f5f5',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 18,
+                color: '#666',
+              }}
+            >
+              ×
+            </button>
+          </div>
+          <p style={{ fontSize: isMobile ? 14 : 14, color: "#666", margin: "0 0 20px 0" }}>
             Send an invitation to join your team. They'll need to sign up if they don't have an account yet.
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <label style={{ fontSize: isMobile ? 11 : 12, fontWeight: 600, color: "#0c0c0c" }}>Email Address</label>
+              <label style={{ fontSize: isMobile ? 13 : 12, fontWeight: 600, color: "#1a1a1a" }}>Email Address</label>
               <input
                 type="email"
                 value={inviteEmail}
@@ -932,19 +1065,20 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                 }}
                 placeholder="colleague@example.com"
                 style={{
-                  borderRadius: 999,
-                  padding: "14px 18px",
-                  border: inviteError ? "1px solid #ef4444" : "1px solid #e3e3e3",
-                  background: "#fff",
-                  fontSize: isMobile ? 16 : 14,
+                  borderRadius: 12,
+                  padding: "14px 16px",
+                  border: inviteError ? "1px solid #ef4444" : "1px solid #e5e5e5",
+                  background: "#fafafa",
+                  fontSize: 16,
                   fontFamily: "'Geist', 'Inter', sans-serif",
                   width: '100%',
                   boxSizing: 'border-box',
+                  transition: 'border-color 0.15s ease',
                 }}
                 onKeyDown={(e) => { if (e.key === "Enter") handleInvite(); }}
               />
-              {inviteError && <p style={{ fontSize: 12, color: "#ef4444", margin: 0 }}>{inviteError}</p>}
-              {inviteSuccess && <p style={{ fontSize: 12, color: "#10b981", margin: 0 }}>Invitation sent successfully!</p>}
+              {inviteError && <p style={{ fontSize: 13, color: "#ef4444", margin: 0 }}>{inviteError}</p>}
+              {inviteSuccess && <p style={{ fontSize: 13, color: "#10b981", margin: 0 }}>Invitation sent successfully!</p>}
             </div>
 
             <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 8, flexWrap: 'wrap' }}>
@@ -956,16 +1090,17 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                   setInviteSuccess(false);
                 }}
                 style={{
-                  borderRadius: 999,
+                  borderRadius: 12,
                   padding: "14px 24px",
-                  border: "1px solid #e3e3e3",
+                  border: "1px solid #e5e5e5",
                   background: "#fff",
-                  color: "#0c0c0c",
+                  color: "#1a1a1a",
                   fontWeight: 600,
-                  fontSize: isMobile ? 14 : 14,
+                  fontSize: 14,
                   cursor: "pointer",
                   fontFamily: "'Geist', 'Inter', sans-serif",
                   flex: 1,
+                  minWidth: isMobile ? '100px' : 'auto',
                 }}
               >
                 Cancel
@@ -974,19 +1109,21 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
                 onClick={handleInvite}
                 disabled={inviting || !inviteEmail}
                 style={{
-                  borderRadius: 999,
+                  borderRadius: 12,
                   padding: "14px 24px",
                   border: "none",
-                  background: (inviting || !inviteEmail) ? "#9ca3af" : "#0c0c0c",
+                  background: (inviting || !inviteEmail) ? "#9ca3af" : "#1a1a1a",
                   color: "#fff",
                   fontWeight: 600,
-                  fontSize: isMobile ? 14 : 14,
+                  fontSize: 14,
                   cursor: (inviting || !inviteEmail) ? "not-allowed" : "pointer",
                   fontFamily: "'Geist', 'Inter', sans-serif",
                   flex: 1,
+                  minWidth: isMobile ? '100px' : 'auto',
+                  transition: 'all 0.15s ease',
                 }}
               >
-                {inviting ? "Sending..." : "Send"}
+                {inviting ? "Sending..." : "Send Invite"}
               </button>
             </div>
           </div>

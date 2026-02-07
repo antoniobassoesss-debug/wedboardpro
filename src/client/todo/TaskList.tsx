@@ -30,19 +30,19 @@ const TaskList: React.FC<TaskListProps> = ({
   return (
     <div className="task-list">
       {tasks.map((task) => (
-        <TaskItem
-          key={task.id}
-          task={task}
-          onToggle={onToggle}
-          onUpdateTitle={onUpdateTitle}
-          onUpdateNotes={onUpdateNotes}
-          onUpdatePriority={onUpdatePriority}
-          onUpdateDueDate={onUpdateDueDate}
-          onToggleFlag={onToggleFlag}
-          onDelete={onDelete}
-          onUpdateAssignee={onUpdateAssignee}
-          currentUserId={currentUserId}
-        />
+          <TaskItem
+            key={task.id}
+            task={task}
+            onToggle={onToggle}
+            onUpdateTitle={onUpdateTitle}
+            onUpdateNotes={onUpdateNotes}
+            onUpdatePriority={onUpdatePriority}
+            onUpdateDueDate={onUpdateDueDate}
+            onToggleFlag={onToggleFlag}
+            onDelete={onDelete || (() => {})}
+            onUpdateAssignee={onUpdateAssignee || (() => {})}
+            currentUserId={currentUserId || null}
+          />
       ))}
     </div>
   );

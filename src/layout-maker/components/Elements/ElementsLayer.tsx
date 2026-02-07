@@ -33,6 +33,7 @@ interface ElementsLayerProps {
   onElementDoubleClick?: (elementId: string, event: React.MouseEvent) => void;
   onElementHover?: (elementId: string | null) => void;
   onElementMouseDown?: (elementId: string, event: React.MouseEvent) => void;
+  onElementRotate?: (elementId: string, newRotation: number) => void;
 }
 
 export const ElementsLayer: React.FC<ElementsLayerProps> = ({
@@ -42,6 +43,7 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
   onElementDoubleClick,
   onElementHover,
   onElementMouseDown,
+  onElementRotate,
 }) => {
   const selectionStore = useSelectionStore();
   const selectedIds = selectionStore.selectedIds;
@@ -93,6 +95,13 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
       onElementMouseDown?.(id, event);
     },
     [onElementMouseDown]
+  );
+
+  const handleRotate = useCallback(
+    (id: string, newRotation: number) => {
+      onElementRotate?.(id, newRotation);
+    },
+    [onElementRotate]
   );
 
   const { tables, chairs, zones, services, decorations } = useMemo(() => {
@@ -152,6 +161,7 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
           chairs={tableChairs}
           isSelected={selected}
           isHovered={hovered}
+          onRotate={handleRotate}
           {...clickHandlers}
         />
       );
@@ -178,6 +188,7 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
           pixelsPerMeter={pixelsPerMeter}
           isSelected={selected}
           isHovered={hovered}
+          onRotate={handleRotate}
           {...clickHandlers}
         />
       );
@@ -191,6 +202,7 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
           pixelsPerMeter={pixelsPerMeter}
           isSelected={selected}
           isHovered={hovered}
+          onRotate={handleRotate}
           {...clickHandlers}
         />
       );
@@ -293,7 +305,7 @@ const DecorationRender: React.FC<DecorationRenderProps> = ({
     >
       {renderOutline()}
 
-      {element.type === 'arch' && element.customShape ? (
+      {element.customShape ? (
         <path
           d={element.customShape}
           fill={colors.fill}

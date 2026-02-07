@@ -77,13 +77,13 @@ const Sidebar: React.FC<SidebarProps> = ({ active, collapsed, onToggle, onSelect
 
   useEffect(() => {
     const handleToggleMobileMenu = () => {
-      if (isMobile && active === 'chat') {
+      if (isMobile) {
         setMobileOpen(prev => !prev);
       }
     };
     window.addEventListener('wbp:toggle-mobile-menu', handleToggleMobileMenu as EventListener);
     return () => window.removeEventListener('wbp:toggle-mobile-menu', handleToggleMobileMenu as EventListener);
-  }, [isMobile, active]);
+  }, [isMobile]);
 
   const visibleNavItems = useMemo(() => {
     return NAV_ITEMS.filter((item) => {

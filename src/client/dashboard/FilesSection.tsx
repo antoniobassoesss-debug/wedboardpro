@@ -225,6 +225,95 @@ const FilesSection: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Mobile FAB */}
+      <button
+        type="button"
+        onClick={() => {}}
+        aria-label="Add file"
+        style={{
+          display: 'none',
+          position: 'fixed',
+          bottom: '24px',
+          left: '20px',
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          background: '#0c0c0c',
+          color: '#fff',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
+          zIndex: 100,
+          border: 'none',
+          cursor: 'pointer',
+          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+        }}
+        className="files-fab"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </button>
+
+      {/* Mobile Menu Button */}
+      <button
+        type="button"
+        onClick={() => {
+          window.dispatchEvent(new CustomEvent('wbp:toggle-mobile-menu'));
+        }}
+        aria-label="Open menu"
+        style={{
+          display: 'none',
+          position: 'fixed',
+          bottom: '24px',
+          right: '20px',
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          background: '#0c0c0c',
+          color: '#fff',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
+          zIndex: 100,
+          border: 'none',
+          cursor: 'pointer',
+          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+        }}
+        className="files-menu-btn-mobile"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+
+      <style>{`
+        @media (max-width: 767px) {
+          .files-fab {
+            display: flex !important;
+          }
+          .files-fab:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+          }
+          .files-fab:active {
+            transform: scale(0.95);
+          }
+          .files-menu-btn-mobile {
+            display: flex !important;
+          }
+          .files-menu-btn-mobile:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+          }
+          .files-menu-btn-mobile:active {
+            transform: scale(0.95);
+          }
+        }
+      `}</style>
     </div>
   );
 };

@@ -25,6 +25,7 @@ export async function getCustomElements(plannerId: string): Promise<CustomElemen
     width: Number(item.width),
     height: Number(item.height),
     vertices: item.vertices as Point[],
+    curves: item.curves as (Point | null)[] | undefined,
     createdAt: item.created_at as string,
     updatedAt: item.updated_at as string,
   }));
@@ -50,6 +51,7 @@ export async function getCustomElementById(id: string): Promise<CustomElementTem
     width: Number(data.width),
     height: Number(data.height),
     vertices: data.vertices as Point[],
+    curves: data.curves as (Point | null)[] | undefined,
     createdAt: data.created_at as string,
     updatedAt: data.updated_at as string,
   };
@@ -71,6 +73,7 @@ export async function saveCustomElement(
       width: element.width,
       height: element.height,
       vertices: element.vertices,
+      curves: element.curves,
     })
     .select()
     .single();
@@ -88,6 +91,7 @@ export async function saveCustomElement(
     width: Number(data.width),
     height: Number(data.height),
     vertices: data.vertices as Point[],
+    curves: data.curves as (Point | null)[] | undefined,
     createdAt: data.created_at as string,
     updatedAt: data.updated_at as string,
   };
@@ -109,6 +113,7 @@ export async function updateCustomElement(
   if (updates.width !== undefined) updateData.width = updates.width;
   if (updates.height !== undefined) updateData.height = updates.height;
   if (updates.vertices !== undefined) updateData.vertices = updates.vertices;
+  if (updates.curves !== undefined) updateData.curves = updates.curves;
 
   const { error } = await client
     .from('custom_element_templates')
@@ -144,34 +149,42 @@ export async function isCustomElementInUse(templateId: string): Promise<boolean>
   const client = getClient();
   if (!client) return false;
 
-  const { data, error } = await client
-    .from('layout_custom_element_instances')
-    .select('id', { count: 'exact', head: true })
-    .eq('template_id', templateId);
+  try {
+    const { data, error } = await client
+      .from('layouts')
+      .select('id', { count: 'exact', head: true })
+      .ilike('elements', `%custom-${templateId}%`);
 
-  if (error) {
-    console.error('Error checking custom element usage:', error);
+    if (error) {
+      console.error('Error checking custom element usage:', error);
+      return false;
+    }
+
+    return (data?.length ?? 0) > 0;
+  } catch {
     return false;
   }
-
-  return (data?.length ?? 0) > 0;
 }
 
 export async function getCustomElementUsageCount(templateId: string): Promise<number> {
   const client = getClient();
   if (!client) return 0;
 
-  const { data, error } = await client
-    .from('layout_custom_element_instances')
-    .select('id', { count: 'exact', head: true })
-    .eq('template_id', templateId);
+  try {
+    const { count, error } = await client
+      .from('layouts')
+      .select('id', { count: 'exact', head: true })
+      .ilike('elements', `%custom-${templateId}%`);
 
-  if (error) {
-    console.error('Error getting usage count:', error);
+    if (error) {
+      console.error('Error getting usage count:', error);
+      return 0;
+    }
+
+    return count ?? 0;
+  } catch {
     return 0;
   }
-
-  return (data?.length ?? 0);
 }
 
 export interface LayoutCustomElementInstance {
@@ -249,21 +262,64 @@ export async function deleteCustomElementInstancesByTemplate(
   return true;
 }
 
-export function verticesToSvgPath(vertices: Point[], closePath: boolean = false): string {
+type CurveControlInput =
+  | null
+  | Point
+  | { type: 'bezier'; point: Point }
+  | { type: 'arc'; direction: 1 | -1 };
+
+export function verticesToSvgPath(
+  vertices: Point[],
+  closePath: boolean = false,
+  curves?: CurveControlInput[]
+): string {
   if (vertices.length === 0) return '';
 
-  const pathData = vertices
-    .map((point, index) => {
-      const command = index === 0 ? 'M' : 'L';
-      return `${command} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
-    })
-    .join(' ');
+  // If no curves provided, use straight lines
+  if (!curves || curves.length === 0) {
+    const pathData = vertices
+      .map((point, index) => {
+        const command = index === 0 ? 'M' : 'L';
+        return `${command} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
+      })
+      .join(' ');
 
-  if (closePath) {
-    return `${pathData} Z`;
+    return closePath ? `${pathData} Z` : pathData;
   }
 
-  return pathData;
+  // Build path with curves
+  let path = `M ${vertices[0]!.x.toFixed(2)} ${vertices[0]!.y.toFixed(2)}`;
+
+  for (let i = 0; i < vertices.length; i++) {
+    const nextIdx = closePath ? (i + 1) % vertices.length : i + 1;
+    if (nextIdx >= vertices.length && !closePath) break;
+
+    const current = vertices[i]!;
+    const next = vertices[nextIdx]!;
+    const curve = curves[i];
+
+    if (!curve) {
+      // Straight line
+      path += ` L ${next.x.toFixed(2)} ${next.y.toFixed(2)}`;
+    } else if ('type' in curve) {
+      if (curve.type === 'arc') {
+        // Perfect semicircle arc
+        const dx = next.x - current.x;
+        const dy = next.y - current.y;
+        const radius = Math.sqrt(dx * dx + dy * dy) / 2;
+        const sweepFlag = curve.direction === 1 ? 0 : 1;
+        path += ` A ${radius.toFixed(2)} ${radius.toFixed(2)} 0 0 ${sweepFlag} ${next.x.toFixed(2)} ${next.y.toFixed(2)}`;
+      } else if (curve.type === 'bezier') {
+        // Quadratic bezier curve
+        path += ` Q ${curve.point.x.toFixed(2)} ${curve.point.y.toFixed(2)} ${next.x.toFixed(2)} ${next.y.toFixed(2)}`;
+      }
+    } else if ('x' in curve && 'y' in curve) {
+      // Legacy format: plain Point object (bezier control point)
+      path += ` Q ${curve.x.toFixed(2)} ${curve.y.toFixed(2)} ${next.x.toFixed(2)} ${next.y.toFixed(2)}`;
+    }
+  }
+
+  return path;
 }
 
 export function calculateBoundingBox(vertices: Point[]): { width: number; height: number; x: number; y: number } {

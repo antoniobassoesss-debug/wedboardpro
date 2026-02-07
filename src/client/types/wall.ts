@@ -12,6 +12,8 @@ export interface Wall {
   color?: string;
   snapToGrid?: boolean;
   snapAngle?: number; // Snapped angle if applicable
+  originalLengthPx?: number; // Original length before scaling (for pxPerMeter derivation)
+  pxPerMeter?: number; // Computed pixels per meter for this wall on canvas
 }
 
 export interface WallMakerConfig {

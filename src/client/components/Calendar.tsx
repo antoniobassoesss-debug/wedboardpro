@@ -808,9 +808,340 @@ const WeekView: React.FC<WeekViewProps> = ({
           </div>
         )}
 
-        <button className="wp-calendar-mobile-fab" onClick={() => handleOpenCreate(new Date().toISOString().slice(0, 10))}>
+        <button
+          className="wp-calendar-mobile-fab"
+          onClick={() => {
+            handleOpenCreate(new Date().toISOString().slice(0, 10));
+          }}
+        >
           <PlusIcon />
         </button>
+
+        {/* Mobile Event Editor Modal */}
+        {editorOpen && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: '#fff',
+              zIndex: 200,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '14px 16px',
+              borderBottom: '1px solid #e5e5e5',
+            }}>
+              <button
+                onClick={() => setEditorOpen(false)}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  cursor: 'pointer',
+                  padding: 6,
+                  marginLeft: -6,
+                }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <div style={{ fontWeight: 600, fontSize: 16 }}>
+                {editorMode === 'create' ? 'New Event' : 'Edit Event'}
+              </div>
+              <div style={{ width: 36 }} />
+            </div>
+
+            {/* Form Content */}
+            <div style={{
+              flex: 1,
+              overflow: 'auto',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14, fontWeight: 600 }}>
+                Title
+                <input
+                  value={form.title}
+                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                  placeholder="Event title"
+                  style={{
+                    borderRadius: 10,
+                    border: '1px solid #e3e3e3',
+                    padding: '10px 12px',
+                    fontSize: 16,
+                    outline: 'none',
+                  }}
+                />
+              </label>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14, fontWeight: 600 }}>
+                Description
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  placeholder="Details, notes, location…"
+                  style={{
+                    borderRadius: 10,
+                    border: '1px solid #e3e3e3',
+                    padding: '10px 12px',
+                    fontSize: 16,
+                    minHeight: 80,
+                    resize: 'vertical',
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </label>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14, fontWeight: 600 }}>
+                Start
+                <input
+                  type="datetime-local"
+                  value={form.start_at ? form.start_at.slice(0, 16) : ''}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      const newStart = new Date(e.target.value).toISOString();
+                      setForm((f) => ({
+                        ...f,
+                        start_at: newStart,
+                        end_at: new Date(f.end_at) < new Date(newStart)
+                          ? new Date(new Date(newStart).getTime() + 60 * 60 * 1000).toISOString()
+                          : f.end_at,
+                      }));
+                    }
+                  }}
+                  style={{
+                    borderRadius: 10,
+                    border: '1px solid #e3e3e3',
+                    padding: '10px 12px',
+                    fontSize: 16,
+                    outline: 'none',
+                    cursor: 'pointer',
+                    width: '100%',
+                  }}
+                />
+              </label>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14, fontWeight: 600 }}>
+                End
+                <input
+                  type="datetime-local"
+                  value={form.end_at ? form.end_at.slice(0, 16) : ''}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setForm((f) => ({
+                        ...f,
+                        end_at: new Date(e.target.value).toISOString(),
+                      }));
+                    }
+                  }}
+                  style={{
+                    borderRadius: 10,
+                    border: '1px solid #e3e3e3',
+                    padding: '10px 12px',
+                    fontSize: 16,
+                    outline: 'none',
+                    cursor: 'pointer',
+                    width: '100%',
+                  }}
+                />
+              </label>
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14, fontWeight: 600 }}>
+                  Type
+                  <select
+                    value={form.event_type}
+                    onChange={(e) => setForm((f) => ({ ...f, event_type: e.target.value }))}
+                    style={{
+                      borderRadius: 10,
+                      border: '1px solid #e3e3e3',
+                      padding: '10px 12px',
+                      fontSize: 16,
+                      background: '#fff',
+                    }}
+                  >
+                    <option value="event">Event</option>
+                    <option value="meeting">Meeting</option>
+                    <option value="task">Task</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14, fontWeight: 600 }}>
+                  Status
+                  <select
+                    value={form.status}
+                    onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as any }))}
+                    style={{
+                      borderRadius: 10,
+                      border: '1px solid #e3e3e3',
+                      padding: '10px 12px',
+                      fontSize: 16,
+                      background: '#fff',
+                    }}
+                  >
+                    <option value="planned">Planned</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="done">Done</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </label>
+              </div>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14, fontWeight: 600 }}>
+                Color
+                <EventColorPicker
+                  value={form.color}
+                  onChange={(color) => setForm((f) => ({ ...f, color }))}
+                  showAuto={true}
+                />
+              </label>
+
+              <EventSharingSection
+                currentUserId={currentUserId || accountId}
+                visibility={form.visibility}
+                sharedUserIds={sharedUserIds}
+                onVisibilityChange={(vis) => setForm((f) => ({ ...f, visibility: vis }))}
+                onSharedUsersChange={setSharedUserIds}
+              />
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, fontWeight: 600 }}>
+                <input
+                  type="checkbox"
+                  checked={form.all_day}
+                  onChange={(e) => setForm((f) => ({ ...f, all_day: e.target.checked }))}
+                  style={{ width: 18, height: 18, cursor: 'pointer' }}
+                />
+                All day
+              </label>
+
+              {editorMode === 'edit' && editingEvent && (
+                <button
+                  onClick={async () => {
+                    if (!editingEvent) return;
+                    setSaving(true);
+                    const { error } = await deleteCalendarEvent(editingEvent.id);
+                    setSaving(false);
+                    if (error) {
+                      setEditorError(error);
+                      return;
+                    }
+                    setEditorOpen(false);
+                    await fetchEvents();
+                  }}
+                  style={{
+                    borderRadius: 10,
+                    padding: '12px',
+                    border: '1px solid #fee2e2',
+                    background: '#fef2f2',
+                    color: '#dc2626',
+                    fontSize: 15,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    marginTop: 8,
+                  }}
+                >
+                  Delete Event
+                </button>
+              )}
+
+              {editorError && (
+                <div style={{ color: '#b91c1c', fontSize: 14, background: '#fee2e2', padding: 10, borderRadius: 8 }}>
+                  {editorError}
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Action Bar */}
+            <div style={{
+              padding: '14px 16px',
+              borderTop: '1px solid #e5e5e5',
+            }}>
+              <button
+                onClick={async () => {
+                  if (!form.title.trim()) {
+                    setEditorError('Title is required');
+                    return;
+                  }
+                  if (new Date(form.end_at).getTime() <= new Date(form.start_at).getTime()) {
+                    setEditorError('End time must be after start time');
+                    return;
+                  }
+                  setSaving(true);
+                  setEditorError(null);
+                  if (editorMode === 'create') {
+                    const payload: CreateCalendarEventInput = {
+                      account_id: accountId,
+                      created_by: currentUserId || accountId,
+                      title: form.title.trim(),
+                      description: form.description.trim() || null,
+                      start_at: form.start_at,
+                      end_at: form.end_at,
+                      all_day: form.all_day,
+                      event_type: form.event_type,
+                      project_id: form.project_id,
+                      status: form.status,
+                      color: form.color,
+                      visibility: form.visibility,
+                      ...(form.visibility === 'custom' && sharedUserIds.length > 0 ? { shared_user_ids: sharedUserIds } : {}),
+                    };
+                    const { error } = await createCalendarEvent(payload);
+                    if (error) {
+                      setEditorError(error);
+                      setSaving(false);
+                      return;
+                    }
+                  } else if (editingEvent) {
+                    const payload: UpdateCalendarEventInput = {
+                      currentUserId: currentUserId || accountId,
+                      title: form.title.trim(),
+                      description: form.description.trim() || null,
+                      start_at: form.start_at,
+                      end_at: form.end_at,
+                      all_day: form.all_day,
+                      event_type: form.event_type,
+                      project_id: form.project_id,
+                      status: form.status,
+                      color: form.color,
+                      visibility: form.visibility,
+                      ...(form.visibility === 'custom' && sharedUserIds.length > 0 ? { shared_user_ids: sharedUserIds } : {}),
+                    };
+                    const { error } = await updateCalendarEvent(editingEvent.id, payload);
+                    if (error) {
+                      setEditorError(error);
+                      setSaving(false);
+                      return;
+                    }
+                  }
+                  setSaving(false);
+                  setEditorOpen(false);
+                  await fetchEvents();
+                }}
+                style={{
+                  width: '100%',
+                  borderRadius: 10,
+                  padding: '12px',
+                  border: 'none',
+                  background: '#0c0c0c',
+                  color: '#fff',
+                  fontSize: 16,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   };

@@ -13,6 +13,7 @@ import { RoundTableModal } from './Sidebar/RoundTableModal';
 import { OvalTableModal } from './Sidebar/OvalTableModal';
 import { ElementConfigModal } from './Sidebar/ElementConfigModal';
 import { CustomElementModal } from './Sidebar/CustomElementModal';
+import { ElementPlacementModal } from './Sidebar/ElementPlacementModal';
 import { useLayoutStore, useViewportStore, useSelectionStore, useUIStore } from '../stores';
 import { useResponsive } from '../hooks/useMediaQuery';
 import { useCustomElements } from '../hooks/useCustomElements';
@@ -62,6 +63,11 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
   const [configInitialData, setConfigInitialData] = useState<Partial<ConfigModalData>>({});
   const [customElementModalOpen, setCustomElementModalOpen] = useState(false);
   const [editingCustomTemplate, setEditingCustomTemplate] = useState<CustomElementTemplate | null>(null);
+  const [placementModalOpen, setPlacementModalOpen] = useState(false);
+  const [placementElementType, setPlacementElementType] = useState<ElementType>('chair');
+  const [placementElementLabel, setPlacementElementLabel] = useState('Chair');
+  const [placementElementWidth, setPlacementElementWidth] = useState(0.5);
+  const [placementElementHeight, setPlacementElementHeight] = useState(0.5);
 
   const { templates: customTemplates, fetchTemplates, saveTemplate, updateTemplate, deleteTemplate } = useCustomElements();
 
@@ -131,6 +137,24 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
     setConfigInitialData({});
     setConfigModalOpen(true);
     setElementsSheetOpen(false);
+  }, []);
+
+  const handleOpenPlacementModal = useCallback((type: ElementType) => {
+    const elementConfigs: Record<string, { label: string; width: number; height: number }> = {
+      'chair': { label: 'Chair', width: 0.45, height: 0.45 },
+      'bench': { label: 'Bench', width: 1.5, height: 0.5 },
+      'lounge': { label: 'Lounge', width: 2, height: 0.8 },
+    };
+
+    const config = elementConfigs[type];
+    if (config) {
+      setPlacementElementType(type);
+      setPlacementElementLabel(config.label);
+      setPlacementElementWidth(config.width);
+      setPlacementElementHeight(config.height);
+      setPlacementModalOpen(true);
+      setElementsSheetOpen(false);
+    }
   }, []);
 
   const handleOpenRoundTableModal = useCallback((type: ElementType) => {
@@ -240,6 +264,7 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
   }, [layoutStore]);
 
   const handleOpenElementMaker = useCallback(() => {
+    console.log('[LayoutMaker] handleOpenElementMaker called');
     setEditingCustomTemplate(null);
     setCustomElementModalOpen(true);
   }, []);
@@ -265,6 +290,28 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
     setCustomElementModalOpen(false);
     setEditingCustomTemplate(null);
   }, [editingCustomTemplate, saveTemplate, updateTemplate, plannerId]);
+
+  const handlePlaceElements = useCallback((elements: Array<{
+    type: ElementType;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    zIndex: number;
+    groupId: string | null;
+    parentId: string | null;
+    locked: boolean;
+    visible: boolean;
+    label: string;
+    notes: string;
+    color: string | null;
+  }>) => {
+    elements.forEach((element) => {
+      layoutStore.addElement(element);
+    });
+    setPlacementModalOpen(false);
+  }, [layoutStore]);
 
   const handleSelectCustomTemplate = useCallback((template: CustomElementTemplate) => {
     const elementId = layoutStore.addElement({
@@ -349,6 +396,7 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
               onSelectCustomTemplate={handleSelectCustomTemplate}
               onEditCustomTemplate={handleEditCustomTemplate}
               onDeleteCustomTemplate={handleDeleteCustomTemplate}
+              onOpenPlacementModal={handleOpenPlacementModal}
               customTemplates={customTemplates}
             />
           </aside>
@@ -433,6 +481,7 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
           onSelectCustomTemplate={handleSelectCustomTemplate}
           onEditCustomTemplate={handleEditCustomTemplate}
           onDeleteCustomTemplate={handleDeleteCustomTemplate}
+          onOpenPlacementModal={handleOpenPlacementModal}
           customTemplates={customTemplates}
           compact={!isDesktop}
         />
@@ -466,6 +515,16 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
         }}
         onSave={handleSaveCustomTemplate}
         editTemplate={editingCustomTemplate}
+      />
+
+      <ElementPlacementModal
+        isOpen={placementModalOpen}
+        onClose={() => setPlacementModalOpen(false)}
+        onPlaceElements={handlePlaceElements}
+        elementType={placementElementType}
+        elementLabel={placementElementLabel}
+        defaultWidth={placementElementWidth}
+        defaultHeight={placementElementHeight}
       />
     </div>
   );

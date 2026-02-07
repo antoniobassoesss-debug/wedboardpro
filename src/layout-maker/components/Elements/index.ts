@@ -8,4 +8,5 @@ export { ChairRender, type ChairRenderProps } from './ChairElement';
 export { TableRender, type TableElementProps } from './TableElement';
 export { ZoneRender, type ZoneElementProps } from './ZoneElement';
 export { FurnitureRender, type FurnitureElementProps } from './FurnitureElement';
+export { RotateButton } from './RotateButton';
 export { ElementsLayer, type ElementsLayerProps } from './ElementsLayer';

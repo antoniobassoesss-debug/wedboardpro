@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   listSuppliers,
   type Supplier,
   type SupplierCategory,
+  type ListSuppliersFilters,
   createSupplier,
   listCustomVendorCategories,
   type CustomVendorCategory,
@@ -26,6 +27,12 @@ const PlusIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = 
   </svg>
 );
 
+const ChevronIcon: React.FC<{ expanded?: boolean; className?: string; style?: React.CSSProperties }> = ({ expanded, className, style }) => (
+  <svg className={className} style={style} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d={expanded ? "M18 15l-6-6-6 6" : "M6 9l6 6 6-6"} />
+  </svg>
+);
+
 const PRESET_CATEGORIES: { value: SupplierCategory | 'all'; label: string }[] = [
   { value: 'all', label: 'All categories' },
   { value: 'flowers', label: 'Flowers' },
@@ -43,6 +50,245 @@ const PRESET_CATEGORIES: { value: SupplierCategory | 'all'; label: string }[] = 
 interface SuppliersPageProps {
   embedded?: boolean;
 }
+
+const getCategoryColor = (category: string): { bg: string; color: string } => {
+  const colors: Record<string, { bg: string; color: string }> = {
+    flowers: { bg: '#fdf2f8', color: '#db2777' },
+    decor: { bg: '#fef3c7', color: '#d97706' },
+    catering: { bg: '#fef9c3', color: '#ca8a04' },
+    music: { bg: '#e0e7ff', color: '#4f46e5' },
+    photo: { bg: '#f0fdf4', color: '#16a34a' },
+    video: { bg: '#f0f9ff', color: '#0284c7' },
+    venue: { bg: '#fae8ff', color: '#a855f7' },
+    cake: { bg: '#fff7ed', color: '#ea580c' },
+    transport: { bg: '#f1f5f9', color: '#64748b' },
+    others: { bg: '#f5f5f5', color: '#525252' },
+  };
+  return colors[category.toLowerCase()] || { bg: '#f5f5f5', color: '#525252' };
+};
+
+const SupplierCard: React.FC<{ supplier: Supplier; isMobile: boolean }> = ({ supplier, isMobile }) => {
+  const [expanded, setExpanded] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const categoryColor = getCategoryColor(supplier.category);
+
+  useEffect(() => {
+    if (!isMobile || !expanded) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
+        setExpanded(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMobile, expanded]);
+
+  if (!isMobile) {
+    return (
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 2.2fr) repeat(5, minmax(0, 1.1fr)) 80px',
+          gap: 0,
+          padding: '10px 16px',
+          borderTop: '1px solid rgba(226,232,240,0.8)',
+          fontSize: 12,
+          alignItems: 'center',
+          background: '#ffffff',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 999,
+              background: '#020617',
+              color: '#f9fafb',
+              fontSize: 11,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {supplier.name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontWeight: 500 }}>{supplier.name}</span>
+            {supplier.company_name && <span style={{ fontSize: 11, color: '#6b7280' }}>{supplier.company_name}</span>}
+          </div>
+        </div>
+        <span style={{ textTransform: 'capitalize' }}>{supplier.category}</span>
+        <span>{supplier.location ?? '—'}</span>
+        <span>{supplier.email ?? '—'}</span>
+        <span>{supplier.phone ?? '—'}</span>
+        <span>
+          {supplier.rating_internal ? '★'.repeat(supplier.rating_internal).padEnd(5, '☆') : '—'}
+        </span>
+        <span style={{ textAlign: 'right', color: '#64748b', fontSize: 11 }}>
+          {supplier.linked_events_count ?? 0}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={cardRef}>
+      <div
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          background: expanded ? '#fff' : '#fafafa',
+          border: expanded ? '1px solid #e5e5e5' : '1px solid transparent',
+          borderRadius: 16,
+          padding: 16,
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+          marginBottom: 8,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 999,
+              background: '#020617',
+              color: '#f9fafb',
+              fontSize: 14,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 600,
+              flexShrink: 0,
+            }}
+          >
+            {supplier.name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {supplier.company_name ? (
+              <div style={{ fontSize: 15, fontWeight: 500, color: '#374151' }}>{supplier.company_name}</div>
+            ) : (
+              <div style={{ fontSize: 15, fontWeight: 600, color: '#0c0c0c' }}>{supplier.name}</div>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span
+              style={{
+                textTransform: 'capitalize',
+                fontSize: 12,
+                padding: '4px 10px',
+                background: categoryColor.bg,
+                color: categoryColor.color,
+                borderRadius: 8,
+                fontWeight: 500,
+              }}
+            >
+              {supplier.category}
+            </span>
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                background: expanded ? '#f5f5f5' : 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <ChevronIcon expanded={expanded} style={{ width: 20, height: 20, color: '#6b7280' }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {expanded && (
+        <div
+          style={{
+            background: '#fff',
+            border: '1px solid #e5e5e5',
+            borderRadius: 16,
+            padding: 16,
+            marginBottom: 8,
+            animation: 'supplierExpandIn 0.2s ease',
+          }}
+        >
+          <style>{`
+            @keyframes supplierExpandIn {
+              from { opacity: 0; transform: translateY(-8px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+          `}</style>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {supplier.location && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                </div>
+                <span style={{ fontSize: 14, color: '#374151' }}>{supplier.location}</span>
+              </div>
+            )}
+            {supplier.email && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
+                    <rect x="2" y="4" width="20" height="16" rx="2" />
+                    <path d="M22 6l-10 7L2 6" />
+                  </svg>
+                </div>
+                <span style={{ fontSize: 14, color: '#374151' }}>{supplier.email}</span>
+              </div>
+            )}
+            {supplier.phone && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
+                    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" />
+                  </svg>
+                </div>
+                <span style={{ fontSize: 14, color: '#374151' }}>{supplier.phone}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 8, borderTop: '1px solid #f3f4f6' }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+              </div>
+              <span style={{ fontSize: 14, color: '#374151' }}>
+                {supplier.rating_internal ? (
+                  <span style={{ color: '#f59e0b', fontWeight: 600 }}>
+                    {'★'.repeat(supplier.rating_internal)}
+                    <span style={{ color: '#d1d5db', fontWeight: 400 }}>{'★'.repeat(5 - supplier.rating_internal)}</span>
+                  </span>
+                ) : (
+                  'No rating'
+                )}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 8, borderTop: '1px solid #f3f4f6' }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+              </div>
+              <span style={{ fontSize: 14, color: '#374151' }}>
+                {supplier.linked_events_count ?? 0} event{supplier.linked_events_count !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
   const isMobile = useIsMobile();
@@ -80,7 +326,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
     const { data, error: err } = await listSuppliers({
       search: search.trim() || undefined,
       category: category === 'all' ? undefined : (category as SupplierCategory),
-    });
+    } as ListSuppliersFilters);
     if (err) {
       setError(err);
     } else if (data) {
@@ -99,11 +345,9 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
   useEffect(() => {
     loadSuppliers();
     loadCustomCategories();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    // Merge preset and custom categories
     const custom = customCategories.map(c => ({ value: c.category_id, label: c.label }));
     setCategories([...PRESET_CATEGORIES, ...custom]);
   }, [customCategories]);
@@ -113,7 +357,6 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
       loadSuppliers();
     }, 250);
     return () => clearTimeout(handle);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, category]);
 
   const filteredSuppliers = useMemo(() => suppliers, [suppliers]);
@@ -124,7 +367,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
     setCreating(true);
     const { data, error: err } = await createSupplier({
       name: newSupplier.name.trim(),
-      category: newSupplier.category,
+      category: newSupplier.category as SupplierCategory,
       company_name: newSupplier.company_name || null,
       email: newSupplier.email || null,
       phone: newSupplier.phone || null,
@@ -134,7 +377,6 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
     });
     setCreating(false);
     if (err) {
-      // eslint-disable-next-line no-alert
       alert(`Failed to create supplier: ${err}`);
       return;
     }
@@ -159,8 +401,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
         minHeight: '100vh',
         background: '#f8fafc',
         padding: '32px 16px',
-        fontFamily:
-          'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       };
 
   const cardStyle: React.CSSProperties = embedded
@@ -197,25 +438,8 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
               </>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => setShowCreate(true)}
-            style={{
-              borderRadius: 999,
-              border: 'none',
-              padding: '8px 16px',
-              background: '#020617',
-              color: '#f9fafb',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            + Add supplier
-          </button>
         </div>
 
-        {/* Filters row */}
         <div
           style={{
             display: 'flex',
@@ -227,7 +451,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
         >
           <input
             type="text"
-            placeholder="Search by name, email or location…"
+            placeholder="Search suppliers…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{
@@ -252,28 +476,11 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
               color: '#0f172a',
               cursor: 'pointer',
               outline: 'none',
-              transition: 'all 150ms ease',
               appearance: 'none',
               backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2394a3b8\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'%3E%3C/polyline%3E%3C/svg%3E")',
               backgroundRepeat: 'no-repeat',
               backgroundPosition: 'right 12px center',
               backgroundSize: '16px',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#cbd5e1';
-              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.04)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#e5e7eb';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = '#0f172a';
-              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.08)';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = '#e5e7eb';
-              e.currentTarget.style.boxShadow = 'none';
             }}
           >
             {categories.map((opt) => (
@@ -294,22 +501,12 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
               fontSize: 13,
               fontWeight: 600,
               cursor: 'pointer',
-              transition: 'all 150ms ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#f8fafc';
-              e.currentTarget.style.borderColor = '#cbd5e1';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#ffffff';
-              e.currentTarget.style.borderColor = '#e5e7eb';
             }}
           >
             + Create category
           </button>
         </div>
 
-        {/* Suppliers list */}
         <div
           style={{
             borderRadius: isMobile ? 16 : 20,
@@ -318,7 +515,6 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
             background: '#ffffff',
           }}
         >
-          {/* Table Header - Desktop */}
           {!isMobile && (
             <div
               style={{
@@ -350,166 +546,17 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
           )}
           {!loading && !error && filteredSuppliers.length === 0 && (
             <div style={{ padding: 16, fontSize: 13, color: '#6b7280' }}>
-              No suppliers yet. Start by adding your favorite florist or venue.
+              No suppliers found.
             </div>
           )}
 
           {!loading &&
             !error &&
             filteredSuppliers.map((s) => (
-              <div
-                key={s.id}
-                style={{
-                  display: isMobile ? 'flex' : 'grid',
-                  flexDirection: isMobile ? 'column' : undefined,
-                  gridTemplateColumns: isMobile ? undefined : 'minmax(0, 2.2fr) repeat(5, minmax(0, 1.1fr)) 80px',
-                  gap: isMobile ? 12 : 0,
-                  padding: isMobile ? 16 : '10px 16px',
-                  borderTop: '1px solid rgba(226,232,240,0.8)',
-                  fontSize: isMobile ? 14 : 12,
-                  alignItems: isMobile ? 'stretch' : 'center',
-                  background: '#ffffff',
-                  transition: 'background 0.15s ease, transform 0.12s ease',
-                }}
-              >
-                {isMobile ? (
-                  <>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 999,
-                          background: '#020617',
-                          color: '#f9fafb',
-                          fontSize: 14,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {s.name
-                          .split(' ')
-                          .map((part) => part[0])
-                          .slice(0, 2)
-                          .join('')
-                          .toUpperCase()}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 15 }}>{s.name}</div>
-                        {s.company_name && (
-                          <div style={{ fontSize: 13, color: '#6b7280' }}>{s.company_name}</div>
-                        )}
-                      </div>
-                      <span
-                        style={{
-                          textTransform: 'capitalize',
-                          fontSize: 12,
-                          padding: '4px 10px',
-                          background: '#f1f5f9',
-                          borderRadius: 999,
-                          color: '#475569',
-                        }}
-                      >
-                        {s.category}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: 8,
-                        marginTop: 4,
-                        paddingTop: 12,
-                        borderTop: '1px solid #f1f5f9',
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase' }}>Location</div>
-                        <div>{s.location ?? '—'}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase' }}>Rating</div>
-                        <div>
-                          {s.rating_internal
-                            ? '★'.repeat(s.rating_internal).padEnd(5, '☆')
-                            : '—'}
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase' }}>Email</div>
-                        <div>{s.email ?? '—'}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase' }}>Phone</div>
-                        <div>{s.phone ?? '—'}</div>
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginTop: 8,
-                        paddingTop: 12,
-                        borderTop: '1px solid #f1f5f9',
-                      }}
-                    >
-                      <span style={{ color: '#64748b', fontSize: 13 }}>
-                        {s.linked_events_count ?? 0} events
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div
-                        style={{
-                          width: 26,
-                          height: 26,
-                          borderRadius: 999,
-                          background: '#020617',
-                          color: '#f9fafb',
-                          fontSize: 11,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {s.name
-                          .split(' ')
-                          .map((part) => part[0])
-                          .slice(0, 2)
-                          .join('')
-                          .toUpperCase()}
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontWeight: 500 }}>{s.name}</span>
-                        {s.company_name && (
-                          <span style={{ fontSize: 11, color: '#6b7280' }}>{s.company_name}</span>
-                        )}
-                      </div>
-                    </div>
-                    <span style={{ textTransform: 'capitalize' }}>{s.category}</span>
-                    <span>{s.location ?? '—'}</span>
-                    <span>{s.email ?? '—'}</span>
-                    <span>{s.phone ?? '—'}</span>
-                    <span>
-                      {s.rating_internal
-                        ? '★'.repeat(s.rating_internal).padEnd(5, '☆')
-                        : '—'}
-                    </span>
-                    <span style={{ textAlign: 'right', color: '#64748b', fontSize: 11 }}>
-                      {s.linked_events_count ?? 0}
-                    </span>
-                  </>
-                )}
-              </div>
+              <SupplierCard key={s.id} supplier={s} isMobile={isMobile} />
             ))}
         </div>
 
-        {/* FAB for mobile */}
         {isMobile && (
           <button
             type="button"
@@ -517,26 +564,43 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
             style={{
               position: 'fixed',
               bottom: 24,
-              right: 24,
+              left: 20,
               width: 56,
               height: 56,
               borderRadius: '50%',
               background: '#0c0c0c',
+              color: '#fff',
               border: 'none',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
               zIndex: 100,
+              transition: 'transform 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.05)';
+              e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)';
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = 'scale(1.05)';
             }}
           >
-            <PlusIcon />
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
           </button>
         )}
       </div>
 
-      {/* Simple create modal */}
       {showCreate && (
         <div
           style={{
@@ -588,9 +652,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
                 <input
                   type="text"
                   value={newSupplier.name}
-                  onChange={(e) =>
-                    setNewSupplier((prev) => ({ ...prev, name: e.target.value }))
-                  }
+                  onChange={(e) => setNewSupplier((prev) => ({ ...prev, name: e.target.value }))}
                   required
                   style={{
                     marginTop: 4,
@@ -607,12 +669,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
                 Category
                 <select
                   value={newSupplier.category}
-                  onChange={(e) =>
-                    setNewSupplier((prev) => ({
-                      ...prev,
-                      category: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => setNewSupplier((prev) => ({ ...prev, category: e.target.value }))}
                   style={{
                     marginTop: 4,
                     width: '100%',
@@ -636,12 +693,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
                 <input
                   type="text"
                   value={newSupplier.company_name}
-                  onChange={(e) =>
-                    setNewSupplier((prev) => ({
-                      ...prev,
-                      company_name: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => setNewSupplier((prev) => ({ ...prev, company_name: e.target.value }))}
                   style={{
                     marginTop: 4,
                     width: '100%',
@@ -659,9 +711,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
                   <input
                     type="email"
                     value={newSupplier.email}
-                    onChange={(e) =>
-                      setNewSupplier((prev) => ({ ...prev, email: e.target.value }))
-                    }
+                    onChange={(e) => setNewSupplier((prev) => ({ ...prev, email: e.target.value }))}
                     style={{
                       marginTop: 4,
                       width: '100%',
@@ -677,9 +727,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
                   <input
                     type="tel"
                     value={newSupplier.phone}
-                    onChange={(e) =>
-                      setNewSupplier((prev) => ({ ...prev, phone: e.target.value }))
-                    }
+                    onChange={(e) => setNewSupplier((prev) => ({ ...prev, phone: e.target.value }))}
                     style={{
                       marginTop: 4,
                       width: '100%',
@@ -697,9 +745,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
                 <input
                   type="text"
                   value={newSupplier.location}
-                  onChange={(e) =>
-                    setNewSupplier((prev) => ({ ...prev, location: e.target.value }))
-                  }
+                  onChange={(e) => setNewSupplier((prev) => ({ ...prev, location: e.target.value }))}
                   style={{
                     marginTop: 4,
                     width: '100%',
@@ -711,39 +757,17 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
                 />
               </label>
 
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  marginTop: 4,
-                }}
-              >
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', marginTop: 4 }}>
                 <input
                   type="checkbox"
                   checked={newSupplier.private}
-                  onChange={(e) =>
-                    setNewSupplier((prev) => ({ ...prev, private: e.target.checked }))
-                  }
-                  style={{
-                    width: 16,
-                    height: 16,
-                    cursor: 'pointer',
-                  }}
+                  onChange={(e) => setNewSupplier((prev) => ({ ...prev, private: e.target.checked }))}
+                  style={{ width: 16, height: 16, cursor: 'pointer' }}
                 />
                 <span style={{ color: '#6b7280' }}>Do not share with team</span>
               </label>
 
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: 8,
-                  marginTop: 12,
-                }}
-              >
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
                 <button
                   type="button"
                   onClick={() => setShowCreate(false)}
@@ -781,12 +805,8 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
         </div>
       )}
 
-      {/* Create Category Modal */}
       {showCreateCategory && (
-        <CreateCategoryModal
-          onClose={() => setShowCreateCategory(false)}
-          onCreated={loadCustomCategories}
-        />
+        <CreateCategoryModal onClose={() => setShowCreateCategory(false)} onCreated={loadCustomCategories} />
       )}
     </div>
   );

@@ -14,9 +14,11 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { CanvasArea } from './Canvas/CanvasArea';
 import { ElementLibrary } from './Sidebar/ElementLibrary';
 import { PropertiesPanel } from './Sidebar/PropertiesPanel';
+import { CustomElementModal } from './Sidebar/CustomElementModal';
 import { useLayoutStore, useViewportStore, useUIStore, useSelectionStore, useHistoryStore } from '../stores';
 import type { Layout, Wall, TableElement, ChairElement } from '../types';
 import type { MeasurementUnit } from '../types/layout';
+import type { CustomElementTemplate } from '../types/elements';
 
 interface TestChecklist {
   name: string;
@@ -74,6 +76,9 @@ export const Phase2TestPage: React.FC = () => {
   const [tableCount, setTableCount] = useState(0);
   const [chairCount, setChairCount] = useState(0);
   const [selectedCount, setSelectedCount] = useState(0);
+  const [customElementModalOpen, setCustomElementModalOpen] = useState(false);
+  const [editingCustomTemplate, setEditingCustomTemplate] = useState<CustomElementTemplate | null>(null);
+
   const [checklists, setChecklists] = useState<TestChecklist[]>([
     {
       name: 'Element Library',
@@ -297,6 +302,7 @@ export const Phase2TestPage: React.FC = () => {
             }}
             onOpenElementMaker={() => {
               console.log('Open element maker');
+              setCustomElementModalOpen(true);
             }}
             onSelectCustomTemplate={(template) => {
               console.log('Select custom template:', template);
@@ -373,6 +379,19 @@ export const Phase2TestPage: React.FC = () => {
           })}
         </div>
       </div>
+
+      <CustomElementModal
+        isOpen={customElementModalOpen}
+        onClose={() => {
+          setCustomElementModalOpen(false);
+          setEditingCustomTemplate(null);
+        }}
+        onSave={(template) => {
+          console.log('Save custom template:', template);
+          setCustomElementModalOpen(false);
+        }}
+        editTemplate={editingCustomTemplate}
+      />
     </div>
   );
 };
