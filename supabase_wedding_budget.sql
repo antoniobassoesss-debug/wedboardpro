@@ -55,6 +55,11 @@ CREATE TABLE IF NOT EXISTS budget_categories (
   vendor_id UUID REFERENCES vendors(id) ON DELETE SET NULL,
   is_contracted BOOLEAN DEFAULT false,
 
+  -- Category Status
+  category_status TEXT DEFAULT 'planned' CHECK (
+    category_status IN ('planned', 'in_progress', 'awaiting_invoice', 'invoice_received', 'paid', 'completed')
+  ),
+
   -- Notes
   notes TEXT,
 

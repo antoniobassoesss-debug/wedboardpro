@@ -79,7 +79,7 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
     category.contracted_amount ? String(category.contracted_amount / 100) : ''
   );
   const [isContracted, setIsContracted] = useState(category.is_contracted);
-  const [categoryStatus, setCategoryStatus] = useState('planned');
+  const [categoryStatus, setCategoryStatus] = useState(category.category_status || 'planned');
   const [notes, setNotes] = useState(category.notes || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
