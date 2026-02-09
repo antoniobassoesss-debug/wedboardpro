@@ -1198,7 +1198,7 @@
 .project-tab-btn {
   border: none;
   background: transparent;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-bottom: 2px solid transparent;
   font-size: 13px;
   font-weight: 400;
@@ -1225,12 +1225,19 @@
   display: inline;
 }
 
+@media (min-width: 768px) {
+  .project-tab-btn svg {
+    display: none;
+  }
+
+  .project-tab-label {
+    display: inline;
+  }
+}
+
 @media (max-width: 767px) {
   .project-tab-btn {
-    padding: 10px 14px;
-    flex-direction: column;
-    gap: 4px;
-    font-size: 11px;
+    padding: 8px 10px;
   }
 
   .project-tab-btn svg {
@@ -1239,10 +1246,6 @@
 
   .project-tab-label {
     display: none;
-  }
-
-  .project-tab-btn.active {
-    border-bottom-width: 3px;
   }
 }
 
