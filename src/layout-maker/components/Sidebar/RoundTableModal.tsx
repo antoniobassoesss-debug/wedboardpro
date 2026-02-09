@@ -41,10 +41,11 @@ export const RoundTableModal: React.FC<RoundTableModalProps> = ({
   }, [diameter]);
 
   const handleSubmit = useCallback(() => {
+    // Always convert to cm for consistency, then pass unit as 'cm'
     const finalDiameter = unit === 'm' ? diameter * 100 : diameter;
     onSubmit({
       diameter: finalDiameter,
-      unit,
+      unit: 'cm',  // Always cm since we converted above
       seats,
       quantity,
     });

@@ -771,10 +771,22 @@ const GridCanvasStore = forwardRef<{
 
       const parseSizeString = (s: string): { widthMeters: number; heightMeters: number } => {
         if (!s || typeof s !== 'string') return { widthMeters: 0, heightMeters: 0 };
-        let normalized = s.toLowerCase().replace(/\s+/g, '').replace('×', 'x').replace(',', '.').replace(/m/g, '');
+
+        // Check if the string contains 'cm' to determine unit
+        const isCentimeters = s.toLowerCase().includes('cm');
+
+        // Normalize: lowercase, remove spaces, replace × with x, replace comma with dot
+        let normalized = s.toLowerCase().replace(/\s+/g, '').replace('×', 'x').replace(',', '.');
+        // Remove unit suffixes (cm, m)
+        normalized = normalized.replace(/cm/g, '').replace(/m/g, '');
+
         const parts = normalized.split('x').map(p => parseFloat(p)).filter(n => !isNaN(n));
-        if (parts.length === 2) return { widthMeters: parts[0] ?? 0, heightMeters: parts[1] ?? 0 };
-        if (parts.length === 1) return { widthMeters: parts[0] ?? 0, heightMeters: 0 };
+
+        // Convert to meters if input was in centimeters
+        const toMeters = (val: number) => isCentimeters ? val / 100 : val;
+
+        if (parts.length === 2) return { widthMeters: toMeters(parts[0] ?? 0), heightMeters: toMeters(parts[1] ?? 0) };
+        if (parts.length === 1) return { widthMeters: toMeters(parts[0] ?? 0), heightMeters: 0 };
         return { widthMeters: 0, heightMeters: 0 };
       };
 
