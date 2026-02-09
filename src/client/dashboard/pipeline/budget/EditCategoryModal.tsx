@@ -431,26 +431,37 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
                     <div className="budget-payments-empty">No suppliers added yet</div>
                   ) : (
                     categorySuppliers.map((cs) => (
-                      <div key={cs.supplier_id} className="budget-supplier-item">
-                        <div className="budget-supplier-main">
-                          <div className="budget-supplier-name">{cs.supplier_name}</div>
-                          <div className="budget-supplier-badges">
-                            <span className="budget-supplier-badge" style={{ color: SUPPLIER_STATUS_OPTIONS.find(o => o.value === cs.status)?.color }}>
-                              {SUPPLIER_STATUS_OPTIONS.find(o => o.value === cs.status)?.label}
-                            </span>
-                            {cs.quoted_price && (
-                              <span className="budget-supplier-quote">{formatCurrency(cs.quoted_price, currency)}</span>
-                            )}
-                            <span className="budget-supplier-invoice">{cs.invoice_status.replace('_', ' ')}</span>
+                      <div key={cs.supplier_id} className="budget-supplier-card">
+                        <div className="budget-supplier-card-left">
+                          <div className="budget-supplier-avatar">
+                            {cs.supplier_name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="budget-supplier-card-info">
+                            <div className="budget-supplier-card-name">{cs.supplier_name}</div>
+                            <div className="budget-supplier-card-badges">
+                              <span className="budget-supplier-card-badge" style={{ color: SUPPLIER_STATUS_OPTIONS.find(o => o.value === cs.status)?.color, backgroundColor: SUPPLIER_STATUS_OPTIONS.find(o => o.value === cs.status)?.bg }}>
+                                {SUPPLIER_STATUS_OPTIONS.find(o => o.value === cs.status)?.label}
+                              </span>
+                              <span className="budget-supplier-card-invoice" style={{ color: cs.invoice_status === 'invoice_paid' ? '#16a34a' : cs.invoice_status === 'no_invoice' ? '#9ca3af' : '#f59e0b' }}>
+                                {cs.invoice_status === 'no_invoice' ? 'No Invoice' : cs.invoice_status.replace('invoice_', '').replace('_', ' ')}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          className="budget-payment-remove"
-                          onClick={() => handleRemoveSupplier(cs.supplier_id)}
-                        >
-                          ×
-                        </button>
+                        <div className="budget-supplier-card-right">
+                          <div className="budget-supplier-card-amount">
+                            {cs.quoted_price ? formatCurrency(cs.quoted_price, currency) : '-'}
+                          </div>
+                          <button
+                            type="button"
+                            className="budget-supplier-card-remove"
+                            onClick={() => handleRemoveSupplier(cs.supplier_id)}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     ))
                   )}
