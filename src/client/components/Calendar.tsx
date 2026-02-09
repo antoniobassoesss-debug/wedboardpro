@@ -1791,7 +1791,8 @@ const WeekView: React.FC<WeekViewProps> = ({
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.35)',
+            background: 'rgba(15, 23, 42, 0.4)',
+            backdropFilter: 'blur(4px)',
             display: 'flex',
             justifyContent: 'flex-end',
             zIndex: 120,
@@ -1800,275 +1801,402 @@ const WeekView: React.FC<WeekViewProps> = ({
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              width: 420,
-              maxWidth: '90vw',
-              background: '#fff',
+              width: 440,
+              maxWidth: '100%',
+              background: '#ffffff',
               height: '100%',
-              padding: 20,
-              boxShadow: '-8px 0 30px rgba(0,0,0,0.12)',
+              boxShadow: '-20px 0 60px rgba(0, 0, 0, 0.15)',
               display: 'flex',
               flexDirection: 'column',
-              gap: 12,
+              overflow: 'hidden',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: '50%',
-                      background: form.color
-                        ? EVENT_COLORS[form.color]
-                        : EVENT_COLORS[form.event_type] || EVENT_COLORS.default,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div style={{ fontWeight: 700, fontSize: 16 }}>
-                    {editorMode === 'create' ? 'New Event' : 'Edit Event'}
+            {/* Header */}
+            <div style={{
+              padding: '24px 28px 20px',
+              borderBottom: '1px solid #f1f5f9',
+              background: '#fafbfc',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div
+                      style={{
+                        width: 14,
+                        height: 14,
+                        borderRadius: '50%',
+                        background: form.color
+                          ? EVENT_COLORS[form.color]
+                          : EVENT_COLORS[form.event_type] || EVENT_COLORS.default,
+                        flexShrink: 0,
+                        boxShadow: `0 2px 8px ${form.color ? EVENT_COLORS[form.color] : EVENT_COLORS[form.event_type] || EVENT_COLORS.default}40`,
+                      }}
+                    />
+                    <div style={{ fontWeight: 700, fontSize: 18, color: '#0f172a' }}>
+                      {editorMode === 'create' ? 'New Event' : 'Edit Event'}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 14, color: '#64748b', marginTop: 6, marginLeft: 26 }}>
+                    {new Date(form.start_at || Date.now()).toLocaleDateString(undefined, {
+                      weekday: 'long',
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
                   </div>
                 </div>
-                <div style={{ fontSize: 12, color: '#7c7c7c', marginTop: 4 }}>
-                  {new Date(form.start_at || Date.now()).toLocaleDateString(undefined, {
-                    weekday: 'long',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
+                <button
+                  onClick={() => setEditorOpen(false)}
+                  style={{
+                    border: 'none',
+                    background: '#f1f5f9',
+                    cursor: 'pointer',
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#64748b',
+                    transition: 'all 150ms ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#e2e8f0';
+                    e.currentTarget.style.color = '#0f172a';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#f1f5f9';
+                    e.currentTarget.style.color = '#64748b';
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Form Fields */}
+            <div style={{ padding: '20px 28px 28px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Title
+                  <input
+                    value={form.title}
+                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                    placeholder="Event title"
+                    style={{
+                      borderRadius: 12,
+                      border: '1px solid #e2e8f0',
+                      padding: '12px 14px',
+                      fontSize: 15,
+                      outline: 'none',
+                      transition: 'all 150ms ease',
+                      background: '#ffffff',
+                      color: '#0f172a',
+                      fontWeight: 500,
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#0f172a';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Description
+                  <textarea
+                    value={form.description}
+                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                    placeholder="Details, notes, location…"
+                    style={{
+                      borderRadius: 12,
+                      border: '1px solid #e2e8f0',
+                      padding: '12px 14px',
+                      fontSize: 15,
+                      minHeight: 100,
+                      resize: 'vertical',
+                      outline: 'none',
+                      transition: 'all 150ms ease',
+                      background: '#ffffff',
+                      color: '#0f172a',
+                      fontWeight: 500,
+                      fontFamily: 'inherit',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#0f172a';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Start
+                    <input
+                      type="datetime-local"
+                      value={form.start_at ? form.start_at.slice(0, 16) : ''}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          const newStart = new Date(e.target.value).toISOString();
+                          setForm((f) => ({
+                            ...f,
+                            start_at: newStart,
+                            end_at: new Date(f.end_at) < new Date(newStart) 
+                              ? new Date(new Date(newStart).getTime() + 60 * 60 * 1000).toISOString() 
+                              : f.end_at,
+                          }));
+                        }
+                      }}
+                      style={{ 
+                        borderRadius: 12, 
+                        border: '1px solid #e2e8f0', 
+                        padding: '12px 14px', 
+                        fontSize: 15,
+                        outline: 'none',
+                        cursor: 'pointer',
+                        background: '#ffffff',
+                        color: '#0f172a',
+                        fontWeight: 500,
+                        width: '100%',
+                      }}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    End
+                    <input
+                      type="datetime-local"
+                      value={form.end_at ? form.end_at.slice(0, 16) : ''}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setForm((f) => ({
+                            ...f,
+                            end_at: new Date(e.target.value).toISOString(),
+                          }));
+                        }
+                      }}
+                      style={{ 
+                        borderRadius: 12, 
+                        border: '1px solid #e2e8f0', 
+                        padding: '12px 14px', 
+                        fontSize: 15,
+                        outline: 'none',
+                        cursor: 'pointer',
+                        background: '#ffffff',
+                        color: '#0f172a',
+                        fontWeight: 500,
+                        width: '100%',
+                      }}
+                    />
+                  </label>
                 </div>
               </div>
-              <button
-                onClick={() => setEditorOpen(false)}
-                style={{
-                  border: '1px solid #e3e3e3',
-                  borderRadius: 999,
-                  padding: '6px 10px',
-                  background: '#fff',
-                  cursor: 'pointer',
-                }}
-              >
-                Close
-              </button>
-            </div>
 
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600 }}>
-              Title
-              <input
-                value={form.title}
-                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                placeholder="Event title"
-                style={{
-                  borderRadius: 12,
-                  border: '1px solid #e3e3e3',
-                  padding: '10px 12px',
-                  fontSize: 14,
-                  outline: 'none',
-                }}
-              />
-            </label>
-
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600 }}>
-              Description
-              <textarea
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="Details, notes, location…"
-                style={{
-                  borderRadius: 12,
-                  border: '1px solid #e3e3e3',
-                  padding: '10px 12px',
-                  fontSize: 14,
-                  minHeight: 80,
-                  resize: 'vertical',
-                  outline: 'none',
-                }}
-              />
-            </label>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600 }}>
-                Start
-                <input
-                  type="datetime-local"
-                  value={form.start_at ? form.start_at.slice(0, 16) : ''}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      const newStart = new Date(e.target.value).toISOString();
-                      setForm((f) => ({
-                        ...f,
-                        start_at: newStart,
-                        // Auto-adjust end time if it's before start
-                        end_at: new Date(f.end_at) < new Date(newStart) 
-                          ? new Date(new Date(newStart).getTime() + 60 * 60 * 1000).toISOString() 
-                          : f.end_at,
-                      }));
-                    }
-                  }}
-                  style={{ 
-                    borderRadius: 12, 
-                    border: '1px solid #e3e3e3', 
-                    padding: '10px 12px', 
-                    fontSize: 14,
-                    outline: 'none',
-                    cursor: 'pointer',
-                    minHeight: 42,
-                  }}
-                />
-              </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600 }}>
-                End
-                <input
-                  type="datetime-local"
-                  value={form.end_at ? form.end_at.slice(0, 16) : ''}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setForm((f) => ({
-                        ...f,
-                        end_at: new Date(e.target.value).toISOString(),
-                      }));
-                    }
-                  }}
-                  style={{ 
-                    borderRadius: 12, 
-                    border: '1px solid #e3e3e3', 
-                    padding: '10px 12px', 
-                    fontSize: 14,
-                    outline: 'none',
-                    cursor: 'pointer',
-                    minHeight: 42,
-                  }}
-                />
-              </label>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600 }}>
-                Type
-                <select
-                  value={form.event_type}
-                  onChange={(e) => setForm((f) => ({ ...f, event_type: e.target.value }))}
-                  style={{ borderRadius: 12, border: '1px solid #e3e3e3', padding: '10px 12px', fontSize: 14 }}
-                >
-                  <option value="event">Event</option>
-                  <option value="meeting">Meeting</option>
-                  <option value="task">Task</option>
-                  <option value="other">Other</option>
-                </select>
-              </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600 }}>
-                Status
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as any }))}
-                  style={{ borderRadius: 12, border: '1px solid #e3e3e3', padding: '10px 12px', fontSize: 14 }}
-                >
-                  <option value="planned">Planned</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="done">Done</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </label>
-            </div>
-
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600 }}>
-              Color
-              <EventColorPicker
-                value={form.color}
-                onChange={(color) => setForm((f) => ({ ...f, color }))}
-                showAuto={true}
-              />
-            </label>
-
-            <EventSharingSection
-              currentUserId={currentUserId || accountId}
-              visibility={form.visibility}
-              sharedUserIds={sharedUserIds}
-              onVisibilityChange={(vis) => setForm((f) => ({ ...f, visibility: vis }))}
-              onSharedUsersChange={setSharedUserIds}
-            />
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
-              <input
-                type="checkbox"
-                checked={form.all_day}
-                onChange={(e) => setForm((f) => ({ ...f, all_day: e.target.checked }))}
-              />
-              All day
-            </label>
-
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600 }}>
-              Project (placeholder)
-              <select
-                value={form.project_id ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, project_id: e.target.value || null }))}
-                style={{ borderRadius: 12, border: '1px solid #e3e3e3', padding: '10px 12px', fontSize: 14 }}
-              >
-                <option value="">No project</option>
-                <option value="project-1">Project 1</option>
-                <option value="project-2">Project 2</option>
-              </select>
-            </label>
-
-            {editorError && (
-              <div style={{ color: '#b91c1c', fontSize: 13, background: '#fee2e2', padding: 8, borderRadius: 10 }}>
-                {editorError}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Type
+                    <select
+                      value={form.event_type}
+                      onChange={(e) => setForm((f) => ({ ...f, event_type: e.target.value }))}
+                      style={{ 
+                        borderRadius: 12, 
+                        border: '1px solid #e2e8f0', 
+                        padding: '12px 14px', 
+                        fontSize: 15,
+                        background: '#ffffff',
+                        color: '#0f172a',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        outline: 'none',
+                      }}
+                    >
+                      <option value="event">Event</option>
+                      <option value="meeting">Meeting</option>
+                      <option value="task">Task</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </label>
+                </div>
+                <div>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Status
+                    <select
+                      value={form.status}
+                      onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as any }))}
+                      style={{ 
+                        borderRadius: 12, 
+                        border: '1px solid #e2e8f0', 
+                        padding: '12px 14px', 
+                        fontSize: 15,
+                        background: '#ffffff',
+                        color: '#0f172a',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        outline: 'none',
+                      }}
+                    >
+                      <option value="planned">Planned</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="done">Done</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </label>
+                </div>
               </div>
-            )}
 
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              {editorMode === 'edit' && editingEvent && (
+              <div>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Color
+                  <EventColorPicker
+                    value={form.color}
+                    onChange={(color) => setForm((f) => ({ ...f, color }))}
+                    showAuto={true}
+                  />
+                </label>
+              </div>
+
+              <EventSharingSection
+                currentUserId={currentUserId || accountId}
+                visibility={form.visibility}
+                sharedUserIds={sharedUserIds}
+                onVisibilityChange={(vis) => setForm((f) => ({ ...f, visibility: vis }))}
+                onSharedUsersChange={setSharedUserIds}
+              />
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, fontWeight: 500, color: '#0f172a', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={form.all_day}
+                  onChange={(e) => setForm((f) => ({ ...f, all_day: e.target.checked }))}
+                  style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#0f172a' }}
+                />
+                <span>All day event</span>
+              </label>
+
+              <div>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Project
+                  <select
+                    value={form.project_id ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, project_id: e.target.value || null }))}
+                    style={{ 
+                      borderRadius: 12, 
+                      border: '1px solid #e2e8f0', 
+                      padding: '12px 14px', 
+                      fontSize: 15,
+                      background: '#ffffff',
+                      color: '#0f172a',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      outline: 'none',
+                    }}
+                  >
+                    <option value="">No project</option>
+                    <option value="project-1">Project 1</option>
+                    <option value="project-2">Project 2</option>
+                  </select>
+                </label>
+              </div>
+
+              {editorError && (
+                <div style={{ 
+                  color: '#dc2626', 
+                  fontSize: 13, 
+                  background: '#fef2f2', 
+                  padding: '12px 14px', 
+                  borderRadius: 10,
+                  border: '1px solid #fee2e2',
+                  fontWeight: 500,
+                }}>
+                  {editorError}
+                </div>
+              )}
+
+              {/* Footer Actions */}
+              <div style={{ 
+                display: 'flex', 
+                gap: 10, 
+                marginTop: 8,
+                paddingTop: 20,
+                borderTop: '1px solid #f1f5f9',
+              }}>
+                {editorMode === 'edit' && editingEvent && (
+                  <button
+                    onClick={async () => {
+                      if (!editingEvent) return;
+                      setSaving(true);
+                      const { error } = await deleteCalendarEvent(editingEvent.id);
+                      setSaving(false);
+                      if (error) {
+                        setEditorError(error);
+                        return;
+                      }
+                      setEditorOpen(false);
+                      await fetchEvents();
+                    }}
+                    style={{
+                      borderRadius: 12,
+                      padding: '12px 18px',
+                      border: '1px solid #fecaca',
+                      background: '#ffffff',
+                      color: '#dc2626',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 150ms ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#fef2f2';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#ffffff';
+                    }}
+                  >
+                    Delete
+                  </button>
+                )}
+                <div style={{ flex: 1 }} />
                 <button
                   onClick={async () => {
-                    if (!editingEvent) return;
-                    setSaving(true);
-                    const { error } = await deleteCalendarEvent(editingEvent.id);
-                    setSaving(false);
-                    if (error) {
-                      setEditorError(error);
+                    if (!form.title.trim()) {
+                      setEditorError('Title is required');
                       return;
                     }
-                    setEditorOpen(false);
-                    await fetchEvents();
-                  }}
-                  style={{
-                    borderRadius: 999,
-                    padding: '10px 14px',
-                    border: '1px solid #e3e3e3',
-                    background: '#fff',
-                    color: '#0c0c0c',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Delete
-                </button>
-              )}
-              <div style={{ flex: 1 }} />
-              <button
-                onClick={async () => {
-                  if (!form.title.trim()) {
-                    setEditorError('Title is required');
-                    return;
-                  }
-                  if (new Date(form.end_at).getTime() <= new Date(form.start_at).getTime()) {
-                    setEditorError('End time must be after start time');
-                    return;
-                  }
-                  setSaving(true);
-                  setEditorError(null);
-                  if (editorMode === 'create') {
-                    const payload: CreateCalendarEventInput = {
-                      account_id: accountId,
-                      created_by: currentUserId || accountId,
-                      title: form.title.trim(),
-                      description: form.description.trim() || null,
-                      start_at: form.start_at,
-                      end_at: form.end_at,
-                      all_day: form.all_day,
-                      event_type: form.event_type,
-                      project_id: form.project_id,
-                      status: form.status,
-                      color: form.color,
-                      visibility: form.visibility,
+                    if (new Date(form.end_at).getTime() <= new Date(form.start_at).getTime()) {
+                      setEditorError('End time must be after start time');
+                      return;
+                    }
+                    setSaving(true);
+                    setEditorError(null);
+                    if (editorMode === 'create') {
+                      const payload: CreateCalendarEventInput = {
+                        account_id: accountId,
+                        created_by: currentUserId || accountId,
+                        title: form.title.trim(),
+                        description: form.description.trim() || null,
+                        start_at: form.start_at,
+                        end_at: form.end_at,
+                        all_day: form.all_day,
+                        event_type: form.event_type,
+                        project_id: form.project_id,
+                        status: form.status,
+                        color: form.color,
+                        visibility: form.visibility,
                       ...(form.visibility === 'custom' && sharedUserIds.length > 0 ? { shared_user_ids: sharedUserIds } : {}),
                     };
                     const { error } = await createCalendarEvent(payload);
@@ -2104,18 +2232,22 @@ const WeekView: React.FC<WeekViewProps> = ({
                   await fetchEvents();
                 }}
                 style={{
-                  borderRadius: 999,
-                  padding: '10px 16px',
+                  borderRadius: 12,
+                  padding: '12px 24px',
                   border: 'none',
-                  background: '#0c0c0c',
+                  background: '#0f172a',
                   color: '#fff',
+                  fontSize: 14,
                   fontWeight: 600,
                   cursor: 'pointer',
-                  minWidth: 100,
+                  transition: 'all 150ms ease',
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#1e293b'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#0f172a'}
               >
-                {saving ? 'Saving…' : 'Save'}
+                {saving ? 'Saving...' : 'Save Event'}
               </button>
+              </div>
             </div>
           </div>
         </div>

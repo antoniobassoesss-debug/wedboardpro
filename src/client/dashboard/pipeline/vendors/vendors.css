@@ -4,8 +4,8 @@
    ========================================================= */
 
 /* ========================================
-   Main Container
-   ======================================== */
+    Main Container
+    ======================================== */
 
 .vendors-tab {
   display: flex;
@@ -19,6 +19,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  padding: 0 4px;
 }
 
 .vendors-tab-header h2 {
@@ -27,6 +28,32 @@
   color: #0f172a;
   margin: 0;
   letter-spacing: -0.02em;
+}
+
+.vendors-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: #0f172a;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vendors-add-btn:hover {
+  background: #1e293b;
+  transform: translateY(-1px);
+}
+
+.vendors-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .loading-message,

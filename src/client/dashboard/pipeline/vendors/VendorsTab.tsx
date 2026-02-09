@@ -105,37 +105,52 @@ const VendorsTab: React.FC<VendorsTabProps> = ({ eventId }) => {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      {allCategories.map((category) => (
-        <CategoryAccordion
-          key={category.id}
-          categoryId={category.id}
-          categoryLabel={category.label}
-          vendors={getVendorsByCategory(category.id)}
-          onAddVendor={handleAddVendor}
-          onSelectVendor={setSelectedVendor}
-        />
-      ))}
+    <div className="vendors-tab">
+      <div className="vendors-tab-header">
+        <h2>Suppliers</h2>
+        <button
+          className="vendors-add-btn"
+          onClick={() => handleAddVendor('venue')}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          Add Supplier
+        </button>
+      </div>
 
-      {showAddModal && (
-        <AddVendorModal
-          eventId={eventId}
-          preSelectedCategory={selectedCategory}
-          onClose={() => {
-            setShowAddModal(false);
-            setSelectedCategory(null);
-          }}
-          onAdded={handleVendorAdded}
-        />
-      )}
+      <div className="vendors-tab-content">
+        {allCategories.map((category) => (
+          <CategoryAccordion
+            key={category.id}
+            categoryId={category.id}
+            categoryLabel={category.label}
+            vendors={getVendorsByCategory(category.id)}
+            onAddVendor={handleAddVendor}
+            onSelectVendor={setSelectedVendor}
+          />
+        ))}
 
-      {selectedVendor && (
-        <VendorDetailsDrawer
-          vendor={selectedVendor}
-          onClose={() => setSelectedVendor(null)}
-          onUpdate={handleVendorUpdated}
-        />
-      )}
+        {showAddModal && (
+          <AddVendorModal
+            eventId={eventId}
+            preSelectedCategory={selectedCategory}
+            onClose={() => {
+              setShowAddModal(false);
+              setSelectedCategory(null);
+            }}
+            onAdded={handleVendorAdded}
+          />
+        )}
+
+        {selectedVendor && (
+          <VendorDetailsDrawer
+            vendor={selectedVendor}
+            onClose={() => setSelectedVendor(null)}
+            onUpdate={handleVendorUpdated}
+          />
+        )}
+      </div>
     </div>
   );
 };
