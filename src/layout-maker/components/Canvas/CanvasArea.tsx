@@ -5,8 +5,9 @@
  * Handles viewport rendering, mouse events, and layer organization.
  */
 
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import { useViewportStore, useUIStore, useLayoutStore, useSelectionStore } from '../../stores';
+import { useWallScale } from '../../store/selectors';
 import { useViewport } from '../../hooks/useViewport';
 import { useAddElement } from '../../hooks/useAddElement';
 import { useGuestAssignment } from '../../hooks/useGuestAssignment';
@@ -55,7 +56,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
 
   const {
     viewport,
-    pixelsPerMeter,
+    pixelsPerMeter: defaultPixelsPerMeter,
     handleWheelZoom,
     handlePanStart,
     handlePanMove,
@@ -66,6 +67,12 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
     zoomIn,
     zoomOut,
   } = useViewport();
+
+  // Use wall scale pxPerMeter if available, otherwise fall back to default
+  const wallScale = useWallScale();
+  const pixelsPerMeter = useMemo(() => {
+    return wallScale?.pxPerMeter || defaultPixelsPerMeter;
+  }, [wallScale, defaultPixelsPerMeter]);
 
   const [isPanning, setIsPanning] = useState(false);
   const [isDragging, setIsDragging] = useState(false);

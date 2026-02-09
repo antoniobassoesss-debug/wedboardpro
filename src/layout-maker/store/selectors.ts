@@ -35,6 +35,9 @@ export const useSyncError = () =>
 export const useLastSyncedAt = () =>
   useCanvasStore((s) => s.lastSyncedAt);
 
+export const useWallScale = () =>
+  useCanvasStore((s) => s.wallScale);
+
 // ========== Element Selectors ==========
 
 export const useElementIds = () =>
