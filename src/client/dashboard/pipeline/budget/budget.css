@@ -1955,7 +1955,7 @@
   margin-top: 2px;
 }
 
-.fcc-expand-icon {
+.fcc-edit-icon {
   width: 24px;
   height: 24px;
   display: flex;
@@ -1963,13 +1963,17 @@
   justify-content: center;
   background: #f3f4f6;
   border-radius: 6px;
-  font-size: 14px;
-  font-weight: 600;
   color: #6b7280;
   margin-left: auto;
+  opacity: 0;
+  transition: all 0.15s;
 }
 
-.fcc-expanded .fcc-expand-icon {
+.fcc-table-row:hover .fcc-edit-icon {
+  opacity: 1;
+}
+
+.fcc-edit-icon:hover {
   background: #0f172a;
   color: white;
 }

@@ -73,7 +73,6 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
 
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [clientMode, setClientMode] = useState(false);
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [editingCell, setEditingCell] = useState<{ id: string; field: string; value: string } | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [showAddModal, setShowAddModal] = useState(false);
@@ -508,7 +507,6 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                   const variance = category.budgeted_amount - contracted;
                   const isOverCategoryBudget = contracted > category.budgeted_amount;
                   const balance = contracted - category.paid_amount;
-                  const expanded = expandedCategories.has(category.id);
                   const selected = selectedCategories.has(category.id);
 
                   return (
@@ -523,14 +521,10 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                             onChange={() => toggleCategorySelection(category.id)}
                           />
                         </div>
-                        <div 
+                        <div
                           className="fcc-col-category"
-                          onClick={() => {
-                            const next = new Set(expandedCategories);
-                            if (next.has(category.id)) next.delete(category.id);
-                            else next.add(category.id);
-                            setExpandedCategories(next);
-                          }}
+                          onClick={() => setEditingCategory(category)}
+                          title="Click to edit"
                         >
                           <div className="fcc-category-icon" style={{ backgroundColor: color }}>
                             {getCategoryLabel(category.category_name)[0]}
@@ -541,8 +535,11 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                               <div className="fcc-category-note">{category.custom_name}</div>
                             )}
                           </div>
-                          <div className={`fcc-expand-icon ${expanded ? 'fcc-expanded' : ''}`}>
-                            {expanded ? '−' : '+'}
+                          <div className="fcc-edit-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
                           </div>
                         </div>
 
@@ -649,67 +646,6 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                           </button>
                         </div>
                       </div>
-
-                      {expanded && (
-                        <div className="fcc-expanded-row">
-                          <div className="fcc-expanded-content">
-                            <div className="fcc-expanded-section">
-                              <h4>Payment Schedule</h4>
-                              {category.payment_schedule?.length > 0 ? (
-                                <div className="fcc-payment-list">
-                                  {category.payment_schedule.map(payment => (
-                                    <div key={payment.id} className="fcc-payment-item">
-                                      <div 
-                                        className={`fcc-payment-check ${payment.paid ? 'fcc-paid' : ''}`}
-                                        onClick={() => handlePaymentToggle(category, payment)}
-                                      >
-                                        {payment.paid && '✓'}
-                                      </div>
-                                      <div className="fcc-payment-info">
-                                        <span className="fcc-payment-desc">{payment.description}</span>
-                                        <span className="fcc-payment-date">{payment.due_date}</span>
-                                      </div>
-                                      <div className="fcc-payment-amount">
-{formatCurrency(payment.amount / 100)}
-                                      </div>
-                                      <div className={`fcc-payment-status ${payment.paid ? 'fcc-paid' : ''}`}>
-                                        {payment.paid ? 'Paid' : 'Pending'}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="fcc-empty-payments">
-                                  No payments scheduled
-                                  <button 
-                                    className="fcc-add-payment-btn"
-                                    onClick={() => setEditingCategory(category)}
-                                  >
-                                    + Add Payment
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="fcc-expanded-section">
-                              <h4>Details</h4>
-                              {category.notes && (
-                                <div className="fcc-notes-section">
-                                  <strong>Notes:</strong> {category.notes}
-                                </div>
-                              )}
-                              {category.vendor_id && (
-                                <div className="fcc-notes-section">
-                                  <strong>Vendor:</strong> Linked
-                                </div>
-                              )}
-                              <div className="fcc-notes-section">
-                                <strong>Created:</strong> {new Date(category.created_at).toLocaleDateString()}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
                     </React.Fragment>
                   );
                 })}
