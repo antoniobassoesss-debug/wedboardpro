@@ -1321,7 +1321,7 @@
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
-  max-height: 240px;
+  max-height: 200px;
   overflow-y: auto;
 }
 
@@ -1363,91 +1363,162 @@
   font-size: 13px;
 }
 
+/* Pending Supplier Form */
+.budget-pending-supplier {
+  background: #f9fafb;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.budget-pending-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.budget-pending-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.budget-pending-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  flex: 1;
+}
+
+.budget-pending-cancel {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.budget-pending-cancel:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.budget-pending-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.budget-pending-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.budget-form-group-small {
+  margin-bottom: 0;
+}
+
+.budget-form-group-small label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.budget-btn-add-supplier {
+  width: 100%;
+  padding: 10px 16px;
+  background: #0f172a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.budget-btn-add-supplier:hover {
+  background: #1e293b;
+}
+
 /* Suppliers List */
 .budget-suppliers-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-height: 280px;
+  gap: 8px;
+  max-height: 200px;
   overflow-y: auto;
   margin-bottom: 12px;
 }
 
 .budget-supplier-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  padding: 12px;
+  padding: 10px 12px;
   background: #f9fafb;
-  border-radius: 10px;
-  position: relative;
+  border-radius: 8px;
 }
 
-.budget-supplier-info {
-  flex-shrink: 0;
-  width: 120px;
+.budget-supplier-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .budget-supplier-name {
   font-size: 13px;
   font-weight: 600;
   color: #0f172a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin-bottom: 4px;
 }
 
-.budget-supplier-company {
+.budget-supplier-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.budget-supplier-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  background: #f3f4f6;
+  border-radius: 999px;
+}
+
+.budget-supplier-quote {
   font-size: 11px;
+  font-weight: 500;
+  color: #3b82f6;
+}
+
+.budget-supplier-invoice {
+  font-size: 10px;
+  font-weight: 500;
   color: #6b7280;
   text-transform: capitalize;
-}
-
-.budget-supplier-fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  flex: 1;
-}
-
-.budget-supplier-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.budget-supplier-field label {
-  font-size: 9px;
-  font-weight: 600;
-  color: #9ca3af;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.budget-select-small {
-  padding: 6px 8px;
-  font-size: 11px;
-}
-
-.budget-currency-small {
-  padding: 6px 8px;
-}
-
-.budget-currency-small .budget-currency-symbol {
-  font-size: 11px;
-}
-
-.budget-input-small {
-  padding: 6px 8px;
-  font-size: 12px;
+  padding: 2px 6px;
+  background: #e5e7eb;
+  border-radius: 4px;
 }
 
 .budget-payment-remove {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1472,7 +1543,7 @@
   padding: 10px 12px;
   background: #f3f4f6;
   border-radius: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .budget-supplier-total {
@@ -1494,9 +1565,26 @@
   color: #0f172a;
 }
 
-/* ================================================
-   FINANCIAL COMMAND CENTER STYLES
-   ================================================ */
+/* Select Small */
+.budget-select-small {
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+/* Currency Small */
+.budget-currency-small {
+  padding: 6px 8px;
+}
+
+.budget-currency-small .budget-currency-symbol {
+  font-size: 11px;
+}
+
+/* Input Small */
+.budget-input-small {
+  padding: 6px 8px;
+  font-size: 12px;
+}
 
 /* Loading State */
 .fcc-loading {
