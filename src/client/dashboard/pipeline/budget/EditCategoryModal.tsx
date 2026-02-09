@@ -4,11 +4,9 @@ import {
   updateCategory,
   formatCurrency,
   parseCurrencyToCents,
-  generatePaymentId,
   CATEGORY_LABELS,
   CATEGORY_ICONS,
   type BudgetCategory,
-  type PaymentScheduleItem,
   type CategoryName,
   type Currency,
 } from '../../../api/weddingBudgetApi';
@@ -72,7 +70,6 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
   );
   const [isContracted, setIsContracted] = useState(category.is_contracted);
   const [notes, setNotes] = useState(category.notes || '');
-  const [payments, setPayments] = useState<PaymentScheduleItem[]>(category.payment_schedule || []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,12 +83,6 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
   const [supplierStatus, setSupplierStatus] = useState<EventSupplierStatus>('potential');
   const [supplierInvoiceStatus, setSupplierInvoiceStatus] = useState('no_invoice');
   const [supplierInvoiceAmount, setSupplierInvoiceAmount] = useState('');
-
-  const [newPayment, setNewPayment] = useState({
-    amount: '',
-    due_date: '',
-    description: '',
-  });
 
   useEffect(() => {
     const loadSuppliers = async () => {
@@ -153,41 +144,6 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
     setCategorySuppliers(categorySuppliers.filter((cs) => cs.supplier_id !== supplierId));
   };
 
-  const handleAddPayment = () => {
-    if (!newPayment.amount || !newPayment.due_date || !newPayment.description.trim()) {
-      return;
-    }
-
-    const amount = parseCurrencyToCents(newPayment.amount);
-    if (amount <= 0) return;
-
-    const payment: PaymentScheduleItem = {
-      id: generatePaymentId(),
-      amount,
-      due_date: newPayment.due_date,
-      description: newPayment.description.trim(),
-      paid: false,
-      paid_date: null,
-    };
-
-    setPayments([...payments, payment]);
-    setNewPayment({ amount: '', due_date: '', description: '' });
-  };
-
-  const handleRemovePayment = (paymentId: string) => {
-    setPayments(payments.filter((p) => p.id !== paymentId));
-  };
-
-  const handleTogglePaymentPaid = (paymentId: string) => {
-    setPayments(
-      payments.map((p) =>
-        p.id === paymentId
-          ? { ...p, paid: !p.paid, paid_date: !p.paid ? new Date().toISOString().split('T')[0] as string : null }
-          : p
-      )
-    );
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -199,7 +155,6 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
     }
 
     const contracted = contractedAmount ? parseCurrencyToCents(contractedAmount) : null;
-    const paidAmount = payments.filter((p) => p.paid).reduce((sum, p) => sum + p.amount, 0);
 
     setSaving(true);
 
@@ -209,8 +164,7 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
       budgeted_amount: budgeted,
       contracted_amount: contracted,
       is_contracted: isContracted,
-      paid_amount: paidAmount,
-      payment_schedule: payments,
+      paid_amount: category.paid_amount,
       notes: notes.trim() || null,
     });
 
@@ -225,8 +179,6 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
   };
 
   const currencySymbol = currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '$';
-  const totalScheduled = payments.reduce((sum, p) => sum + p.amount, 0);
-  const totalPaid = payments.filter((p) => p.paid).reduce((sum, p) => sum + p.amount, 0);
   const totalSupplierQuotes = categorySuppliers.reduce((sum, cs) => sum + (cs.quoted_price || 0), 0);
   const totalInvoices = categorySuppliers.reduce((sum, cs) => sum + (cs.invoice_amount || 0), 0);
 
@@ -482,91 +434,6 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
                     </div>
                   </div>
                 )}
-
-                <div className="budget-payments-header" style={{ marginTop: '20px' }}>
-                  <h4>Payment Schedule</h4>
-                  <div className="budget-payments-summary">
-                    {formatCurrency(totalPaid, currency)} paid of {formatCurrency(totalScheduled, currency)}
-                  </div>
-                </div>
-
-                <div className="budget-payments-list">
-                  {payments.length === 0 ? (
-                    <div className="budget-payments-empty">No payments scheduled</div>
-                  ) : (
-                    payments
-                      .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
-                      .map((payment) => (
-                        <div
-                          key={payment.id}
-                          className={`budget-payment-edit-item ${payment.paid ? 'paid' : ''}`}
-                        >
-                          <button
-                            type="button"
-                            className={`budget-payment-check ${payment.paid ? 'checked' : ''}`}
-                            onClick={() => handleTogglePaymentPaid(payment.id)}
-                          >
-                            {payment.paid ? '✓' : ''}
-                          </button>
-                          <div className="budget-payment-edit-info">
-                            <div className="budget-payment-edit-desc">{payment.description}</div>
-                            <div className="budget-payment-edit-date">
-                              Due: {new Date(payment.due_date).toLocaleDateString()}
-                            </div>
-                          </div>
-                          <div className="budget-payment-edit-amount">
-                            {formatCurrency(payment.amount, currency)}
-                          </div>
-                          <button
-                            type="button"
-                            className="budget-payment-remove"
-                            onClick={() => handleRemovePayment(payment.id)}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))
-                  )}
-                </div>
-
-                <div className="budget-add-payment">
-                  <div className="budget-add-payment-title">Add Payment</div>
-                  <div className="budget-add-payment-form">
-                    <input
-                      type="text"
-                      value={newPayment.description}
-                      onChange={(e) => setNewPayment({ ...newPayment, description: e.target.value })}
-                      placeholder="Description"
-                      className="budget-input"
-                    />
-                    <div className="budget-add-payment-row">
-                      <div className="budget-currency-input budget-input-small">
-                        <span className="budget-currency-symbol">{currencySymbol}</span>
-                        <input
-                          type="text"
-                          value={newPayment.amount}
-                          onChange={(e) => setNewPayment({ ...newPayment, amount: e.target.value })}
-                          placeholder="0"
-                          className="budget-input budget-input-currency"
-                        />
-                      </div>
-                      <input
-                        type="date"
-                        value={newPayment.due_date}
-                        onChange={(e) => setNewPayment({ ...newPayment, due_date: e.target.value })}
-                        className="budget-input budget-input-date"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddPayment}
-                        className="budget-btn-add"
-                        disabled={!newPayment.amount || !newPayment.due_date || !newPayment.description.trim()}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
