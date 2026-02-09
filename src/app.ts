@@ -6750,6 +6750,13 @@ app.patch('/api/events/:id/budget/categories/:categoryId', async (req, res) => {
       patch.payment_schedule = body.payment_schedule;
     }
     if (body.is_contracted !== undefined) patch.is_contracted = body.is_contracted;
+    if (body.category_status !== undefined) {
+      const validStatuses = ['planned', 'in_progress', 'awaiting_invoice', 'invoice_received', 'paid', 'completed'];
+      if (!validStatuses.includes(body.category_status)) {
+        return res.status(400).json({ error: 'Invalid category_status' });
+      }
+      patch.category_status = body.category_status;
+    }
     if (body.notes !== undefined) patch.notes = body.notes;
 
     if (Object.keys(patch).length === 0) {
