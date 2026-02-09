@@ -380,8 +380,31 @@ export function formatCurrency(cents: number, currency: Currency = 'EUR'): strin
  * Parse currency string to cents
  */
 export function parseCurrencyToCents(value: string): number {
-  const cleaned = value.replace(/[^0-9.,]/g, '').replace(',', '.');
-  const amount = parseFloat(cleaned) || 0;
+  const cleaned = value.replace(/[^0-9.,]/g, '');
+
+  // Handle European format: "3.000,00" or "3.000" (period = thousands, comma = decimal)
+  // Handle US format: "3,000.00" or "3,000" (comma = thousands, period = decimal)
+  let normalized = cleaned;
+
+  if (cleaned.includes(',') && cleaned.includes('.')) {
+    // Both present - figure out which is decimal separator
+    if (cleaned.indexOf(',') < cleaned.indexOf('.')) {
+      // European: period is thousands, comma is decimal
+      normalized = cleaned.replace(/\./g, '').replace(',', '.');
+    } else {
+      // US: comma is thousands, period is decimal
+      normalized = cleaned.replace(/,/g, '');
+    }
+  } else if (cleaned.includes(',')) {
+    // Only comma - could be decimal (European) or thousands (US with single comma)
+    // Assume it's decimal if only one comma and comes after some digits
+    normalized = cleaned.replace(',', '.');
+  } else {
+    // Only numbers and periods - remove any thousand separators
+    normalized = cleaned.replace(/\.(?=.*\.)/g, '');
+  }
+
+  const amount = parseFloat(normalized) || 0;
   return Math.round(amount * 100);
 }
 
