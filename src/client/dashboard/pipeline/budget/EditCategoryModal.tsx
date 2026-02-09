@@ -337,8 +337,13 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
                               className="budget-supplier-result"
                               onClick={() => handleSelectSupplier(supplier)}
                             >
-                              <div className="budget-supplier-result-name">{supplier.name}</div>
-                              <div className="budget-supplier-result-company">{supplier.company_name || supplier.category}</div>
+                              <div className="budget-supplier-result-info">
+                                <div className="budget-supplier-result-name">{supplier.name}</div>
+                                <div className="budget-supplier-result-company">{supplier.company_name || supplier.category}</div>
+                              </div>
+                              <svg className="budget-supplier-result-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                              </svg>
                             </button>
                           ))}
                         {filteredSuppliers.filter((s) => !categorySuppliers.find((cs) => cs.supplier_id === s.id)).length === 0 && (
@@ -348,71 +353,76 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
                     )}
                   </div>
                 ) : (
-                  <div className="budget-pending-supplier">
-                    <div className="budget-pending-header">
-                      <span className="budget-pending-label">Adding:</span>
-                      <span className="budget-pending-name">{pendingSupplier.name}</span>
-                      <button type="button" className="budget-pending-cancel" onClick={handleCancelPending}>×</button>
-                    </div>
-                    <div className="budget-pending-fields">
-                      <div className="budget-pending-row">
-                        <div className="budget-form-group budget-form-group-small">
-                          <label>Status</label>
-                          <select
-                            value={supplierStatus}
-                            onChange={(e) => setSupplierStatus(e.target.value as EventSupplierStatus)}
-                            className="budget-select budget-select-small"
-                          >
-                            {SUPPLIER_STATUS_OPTIONS.map((opt) => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="budget-form-group budget-form-group-small">
-                          <label>Quote</label>
-                          <div className="budget-currency-input budget-currency-small">
-                            <span className="budget-currency-symbol">{currencySymbol}</span>
-                            <input
-                              type="text"
-                              value={supplierQuote}
-                              onChange={(e) => setSupplierQuote(e.target.value)}
-                              placeholder="0"
-                              className="budget-input budget-input-small"
-                            />
-                          </div>
-                        </div>
+                  <div className="budget-pending-card">
+                    <div className="budget-pending-card-header">
+                      <div className="budget-pending-card-info">
+                        <div className="budget-pending-card-name">{pendingSupplier.name}</div>
+                        <div className="budget-pending-card-company">{pendingSupplier.company_name || pendingSupplier.category}</div>
                       </div>
-                      <div className="budget-pending-row">
-                        <div className="budget-form-group budget-form-group-small">
-                          <label>Invoice Status</label>
-                          <select
-                            value={supplierInvoiceStatus}
-                            onChange={(e) => setSupplierInvoiceStatus(e.target.value)}
-                            className="budget-select budget-select-small"
-                          >
-                            {INVOICE_STATUS_OPTIONS.map((opt) => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="budget-form-group budget-form-group-small">
-                          <label>Amount</label>
-                          <div className="budget-currency-input budget-currency-small">
-                            <span className="budget-currency-symbol">{currencySymbol}</span>
-                            <input
-                              type="text"
-                              value={supplierInvoiceAmount}
-                              onChange={(e) => setSupplierInvoiceAmount(e.target.value)}
-                              placeholder="0"
-                              className="budget-input budget-input-small"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      <button type="button" className="budget-btn-add-supplier" onClick={handleAddSupplier}>
-                        Add Supplier
+                      <button type="button" className="budget-pending-card-cancel" onClick={handleCancelPending}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                       </button>
                     </div>
+                    <div className="budget-pending-card-body">
+                      <div className="budget-pending-card-field">
+                        <label>Status</label>
+                        <select
+                          value={supplierStatus}
+                          onChange={(e) => setSupplierStatus(e.target.value as EventSupplierStatus)}
+                          className="budget-select"
+                        >
+                          {SUPPLIER_STATUS_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="budget-pending-card-field">
+                        <label>Quote</label>
+                        <div className="budget-currency-input">
+                          <span className="budget-currency-symbol">{currencySymbol}</span>
+                          <input
+                            type="text"
+                            value={supplierQuote}
+                            onChange={(e) => setSupplierQuote(e.target.value)}
+                            placeholder="0"
+                            className="budget-input"
+                          />
+                        </div>
+                      </div>
+                      <div className="budget-pending-card-field">
+                        <label>Invoice</label>
+                        <select
+                          value={supplierInvoiceStatus}
+                          onChange={(e) => setSupplierInvoiceStatus(e.target.value)}
+                          className="budget-select"
+                        >
+                          {INVOICE_STATUS_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="budget-pending-card-field">
+                        <label>Amount</label>
+                        <div className="budget-currency-input">
+                          <span className="budget-currency-symbol">{currencySymbol}</span>
+                          <input
+                            type="text"
+                            value={supplierInvoiceAmount}
+                            onChange={(e) => setSupplierInvoiceAmount(e.target.value)}
+                            placeholder="0"
+                            className="budget-input"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <button type="button" className="budget-btn-add-supplier" onClick={handleAddSupplier}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add to Category
+                    </button>
                   </div>
                 )}
 
