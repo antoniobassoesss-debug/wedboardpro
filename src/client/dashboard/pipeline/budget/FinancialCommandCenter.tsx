@@ -84,6 +84,7 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
   const [newScenarioName, setNewScenarioName] = useState('');
   const [editingScenario, setEditingScenario] = useState<Scenario | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showUpcomingPayments, setShowUpcomingPayments] = useState(false);
 
   const currency: Currency = state.budget?.currency || 'EUR';
 
@@ -378,6 +379,34 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
             </div>
           </div>
           <button className="fcc-risk-action">Review</button>
+        </div>
+      )}
+
+      {/* Budget Health Compact Bar */}
+      {!clientMode && (
+        <div className="fcc-health-bar">
+          <div className="fcc-health-item">
+            <span className="fcc-health-label">Status</span>
+            <span className={`fcc-health-badge ${aiRiskLevel}`}>
+              {aiRiskLevel === 'healthy' ? 'On Track' : aiRiskLevel === 'warning' ? 'At Risk' : 'Critical'}
+            </span>
+          </div>
+          <div className="fcc-health-item">
+            <span className="fcc-health-label">Over Budget</span>
+            <span className="fcc-health-value">{state.alerts.over_budget_categories.length} categories</span>
+          </div>
+          <div className="fcc-health-item">
+            <span className="fcc-health-label">Payment Risk</span>
+            <span className={`fcc-health-badge ${overdueCount > 0 ? 'critical' : upcomingCount > 3 ? 'warning' : 'healthy'}`}>
+              {overdueCount > 0 ? 'High' : upcomingCount > 3 ? 'Medium' : 'Low'}
+            </span>
+          </div>
+          <div className="fcc-health-item">
+            <span className="fcc-health-label">Next Payment</span>
+            <span className="fcc-health-value">
+              {upcomingCount > 0 ? `${state.alerts.upcoming_payments[0]?.days_until === 0 ? 'Today' : `In ${state.alerts.upcoming_payments[0]?.days_until}d`}` : 'None'}
+            </span>
+          </div>
         </div>
       )}
 
@@ -688,76 +717,49 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
             </div>
           </div>
 
-          {/* Side Panel */}
-          {!clientMode && (
-            <div className="fcc-side-panel">
-              <div className="fcc-side-section">
-                <h3>Upcoming Payments</h3>
-                {state.alerts.upcoming_payments.length > 0 ? (
-                  <div className="fcc-upcoming-list">
-                    {state.alerts.upcoming_payments.slice(0, 5).map(({ category_name, payment, days_until }) => (
-                      <div key={`${category_name}-${payment.id}`} className="fcc-upcoming-item">
+          {/* Upcoming Payments Accordion */}
+          {!clientMode && state.alerts.upcoming_payments.length > 0 && (
+            <div className="fcc-payments-accordion">
+              <button
+                className="fcc-accordion-header"
+                onClick={() => setShowUpcomingPayments(!showUpcomingPayments)}
+              >
+                <div className="fcc-accordion-title">
+                  <span>Upcoming Payments</span>
+                  <span className="fcc-accordion-count">{state.alerts.upcoming_payments.length} pending</span>
+                </div>
+                <svg
+                  className={`fcc-accordion-icon ${showUpcomingPayments ? 'fcc-open' : ''}`}
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {showUpcomingPayments && (
+                <div className="fcc-accordion-content">
+                  <div className="fcc-upcoming-grid">
+                    {state.alerts.upcoming_payments.slice(0, 8).map(({ category_name, payment, days_until }) => (
+                      <div key={`${category_name}-${payment.id}`} className="fcc-upcoming-card">
                         <div className="fcc-upcoming-info">
                           <div className="fcc-upcoming-category">{getCategoryLabel(category_name)}</div>
                           <div className="fcc-upcoming-desc">{payment.description}</div>
                         </div>
-                        <div className="fcc-upcoming-amount">
-                          {formatCurrency(payment.amount / 100)}
-                          <span className="fcc-upcoming-due">
+                        <div className="fcc-upcoming-meta">
+                          <div className="fcc-upcoming-amount">{formatCurrency(payment.amount / 100)}</div>
+                          <div className={`fcc-upcoming-due ${days_until <= 3 ? 'fcc-urgent' : ''}`}>
                             {days_until === 0 ? 'Today' : `In ${days_until}d`}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="fcc-empty-state">No upcoming payments</div>
-                )}
-              </div>
-
-              {state.alerts.overdue_payments.length > 0 && (
-                <div className="fcc-side-section fcc-section-alert">
-                  <h3>Overdue Payments</h3>
-                  <div className="fcc-overdue-list">
-                    {state.alerts.overdue_payments.map(({ category_name, payment }) => (
-                      <div key={`${category_name}-${payment.id}`} className="fcc-overdue-item">
-                        <div className="fcc-overdue-warning">!</div>
-                        <div className="fcc-overdue-info">
-                          <div className="fcc-overdue-category">{getCategoryLabel(category_name)}</div>
-                          <div className="fcc-overdue-desc">{payment.description}</div>
-                        </div>
-<div className="fcc-overdue-amount">
-                            {formatCurrency(payment.amount / 100)}
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-
-              <div className="fcc-side-section">
-                <h3>Budget Health</h3>
-                <div className="fcc-health-metrics">
-                  <div className="fcc-health-item">
-                    <div className="fcc-health-label">Overall Status</div>
-                    <div className={`fcc-health-value ${aiRiskLevel}`}>
-                      {aiRiskLevel === 'healthy' ? 'On Track' : aiRiskLevel === 'warning' ? 'At Risk' : 'Critical'}
-                    </div>
-                  </div>
-                  <div className="fcc-health-item">
-                    <div className="fcc-health-label">Categories Over Budget</div>
-                    <div className="fcc-health-value warning">
-                      {state.alerts.over_budget_categories.length}
-                    </div>
-                  </div>
-                  <div className="fcc-health-item">
-                    <div className="fcc-health-label">Payment Risk</div>
-                    <div className="fcc-health-value">
-                      {overdueCount > 0 ? 'High' : upcomingCount > 3 ? 'Medium' : 'Low'}
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
         </div>
