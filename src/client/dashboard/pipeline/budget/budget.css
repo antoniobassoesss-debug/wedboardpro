@@ -1304,3 +1304,1720 @@
 .budget-btn-add:hover:not(:disabled) {
   background: #1e293b;
 }
+
+/* ================================================
+   FINANCIAL COMMAND CENTER STYLES
+   ================================================ */
+
+/* Loading State */
+.fcc-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.fcc-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #0f172a;
+  border-radius: 50%;
+  animation: fcc-spin 0.6s linear infinite;
+}
+
+@keyframes fcc-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error State */
+.fcc-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 20px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 16px;
+}
+
+.fcc-error-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ef4444;
+  color: white;
+  font-weight: 700;
+  border-radius: 50%;
+}
+
+.fcc-error-message {
+  text-align: center;
+}
+
+.fcc-error-message strong {
+  display: block;
+  color: #991b1b;
+  margin-bottom: 4px;
+}
+
+.fcc-error-message p {
+  color: #dc2626;
+  font-size: 13px;
+  margin: 0;
+}
+
+.fcc-retry-btn {
+  padding: 8px 16px;
+  background: #0f172a;
+  color: white;
+  border: none;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Container */
+.fcc-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+/* Command Bar */
+.fcc-command-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: white;
+  border: 1px solid #e5e5e5;
+  border-radius: 16px;
+}
+
+.fcc-title-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fcc-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.fcc-subtitle {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.fcc-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fcc-mode-btn {
+  padding: 8px 16px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.fcc-mode-btn:hover {
+  background: #e5e7eb;
+}
+
+.fcc-mode-active {
+  background: #ecfdf5 !important;
+  border-color: #10b981 !important;
+  color: #059669 !important;
+}
+
+.fcc-view-toggle {
+  display: flex;
+  background: #f3f4f6;
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.fcc-view-btn {
+  padding: 6px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.fcc-view-btn:hover {
+  color: #374151;
+}
+
+.fcc-view-active {
+  background: white;
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.fcc-export-btn {
+  padding: 8px 16px;
+  background: #0f172a;
+  color: white;
+  border: none;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* AI Risk Banner */
+.fcc-risk-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+}
+
+.fcc-risk-critical {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.fcc-risk-warning {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.fcc-risk-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.fcc-risk-critical .fcc-risk-icon {
+  background: #ef4444;
+  color: white;
+}
+
+.fcc-risk-warning .fcc-risk-icon {
+  background: #f59e0b;
+  color: white;
+}
+
+.fcc-risk-content {
+  flex: 1;
+}
+
+.fcc-risk-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.fcc-risk-message {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.fcc-risk-action {
+  padding: 6px 12px;
+  background: #0f172a;
+  color: white;
+  border: none;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Summary Bar */
+.fcc-summary-bar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 1200px) {
+  .fcc-summary-bar {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .fcc-summary-bar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.fcc-metric-card {
+  background: white;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.fcc-metric-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.fcc-metric-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.fcc-metric-value.fcc-positive {
+  color: #16a34a;
+}
+
+.fcc-metric-value.fcc-negative {
+  color: #dc2626;
+}
+
+.fcc-metric-change {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+.fcc-metric-change.positive {
+  color: #16a34a;
+}
+
+.fcc-metric-change.negative {
+  color: #dc2626;
+}
+
+.fcc-metric-bar {
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.fcc-metric-bar-fill {
+  height: 100%;
+  background: #0f172a;
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.fcc-metric-sublabel {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+.fcc-metric-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.fcc-metric-badge.warning {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+/* Main Content */
+.fcc-main-content {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+}
+
+@media (max-width: 1100px) {
+  .fcc-main-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Table Panel */
+.fcc-table-panel {
+  background: white;
+  border: 1px solid #e5e5e5;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.fcc-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.fcc-table-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.fcc-add-btn {
+  padding: 8px 16px;
+  background: #0f172a;
+  color: white;
+  border: none;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Tree Table */
+.fcc-tree-table {
+  overflow-x: auto;
+}
+
+.fcc-table-head {
+  display: grid;
+  grid-template-columns: 32px 1.5fr 100px 100px 100px 100px 100px 100px 60px;
+  gap: 0;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.fcc-table-head > div {
+  padding: 12px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.fcc-col-checkbox {
+  width: 32px;
+  padding: 12px 8px !important;
+}
+
+.fcc-col-category {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fcc-col-budget,
+.fcc-col-contracted,
+.fcc-col-variance,
+.fcc-col-paid,
+.fcc-col-balance {
+  text-align: right;
+  font-family: ui-monospace, monospace;
+}
+
+.fcc-table-row {
+  display: grid;
+  grid-template-columns: 32px 1.5fr 100px 100px 100px 100px 100px 100px 60px;
+  gap: 0;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.fcc-table-row:hover {
+  background: #f9fafb;
+}
+
+.fcc-row-over {
+  background: #fef2f2;
+}
+
+.fcc-row-over:hover {
+  background: #fee2e2;
+}
+
+.fcc-table-row > div {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+}
+
+.fcc-category-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  flex-shrink: 0;
+}
+
+.fcc-category-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.fcc-category-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.fcc-category-note {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+.fcc-expand-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-left: auto;
+}
+
+.fcc-expanded .fcc-expand-icon {
+  background: #0f172a;
+  color: white;
+}
+
+.fcc-over-badge {
+  display: block;
+  font-size: 10px;
+  color: #dc2626;
+  margin-top: 2px;
+}
+
+.fcc-col-variance {
+  font-weight: 600;
+}
+
+.fcc-col-variance.positive {
+  color: #16a34a;
+}
+
+.fcc-col-variance.negative {
+  color: #dc2626;
+}
+
+.fcc-variance-percent {
+  font-size: 10px;
+  color: #9ca3af;
+  margin-left: 4px;
+}
+
+.fcc-col-balance {
+  font-weight: 600;
+}
+
+.fcc-col-balance.fcc-pending {
+  color: #f59e0b;
+}
+
+.fcc-status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.fcc-action-btn {
+  padding: 4px 10px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+}
+
+.fcc-action-btn:hover {
+  background: #e5e7eb;
+}
+
+/* Expanded Row */
+.fcc-expanded-row {
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.fcc-expanded-content {
+  padding: 16px 20px 16px 60px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 900px) {
+  .fcc-expanded-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fcc-expanded-section h4 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.fcc-expanded-section p {
+  margin: 0;
+  font-size: 13px;
+  color: #374151;
+}
+
+.fcc-payment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fcc-payment-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.fcc-payment-info {
+  flex: 1;
+}
+
+.fcc-payment-desc {
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+  display: block;
+}
+
+.fcc-payment-date {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.fcc-payment-amount {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.fcc-payment-status {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.fcc-payment-status.fcc-paid {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.fcc-empty-payments,
+.fcc-empty-state {
+  padding: 16px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+/* Side Panel */
+.fcc-side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fcc-side-section {
+  background: white;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.fcc-side-section h3 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.fcc-section-alert {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.fcc-upcoming-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fcc-upcoming-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 10px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.fcc-upcoming-info {
+  flex: 1;
+}
+
+.fcc-upcoming-category {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.fcc-upcoming-desc {
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+  margin-top: 2px;
+}
+
+.fcc-upcoming-amount {
+  text-align: right;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.fcc-upcoming-due {
+  display: block;
+  font-size: 10px;
+  color: #f59e0b;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.fcc-overdue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fcc-overdue-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: white;
+  border-radius: 8px;
+}
+
+.fcc-overdue-warning {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ef4444;
+  color: white;
+  font-weight: 700;
+  font-size: 12px;
+  border-radius: 50%;
+}
+
+.fcc-overdue-info {
+  flex: 1;
+}
+
+.fcc-overdue-category {
+  font-size: 11px;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.fcc-overdue-desc {
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.fcc-overdue-amount {
+  font-weight: 600;
+  color: #dc2626;
+}
+
+/* Health Metrics */
+.fcc-health-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fcc-health-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fcc-health-label {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.fcc-health-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.fcc-health-value.healthy {
+  color: #16a34a;
+}
+
+.fcc-health-value.warning,
+.fcc-health-value.high {
+  color: #f59e0b;
+}
+
+.fcc-health-value.critical {
+  color: #dc2626;
+}
+
+/* ================================================
+   ADDITIONAL COMPONENT STYLES
+   ================================================ */
+
+/* Edit Input */
+.fcc-edit-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 2px solid #0f172a;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+.fcc-edit-input:focus {
+  border-color: #3b82f6;
+}
+
+/* Bulk Actions Bar */
+.fcc-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #1e40af;
+}
+
+.fcc-bulk-btn {
+  padding: 6px 12px;
+  background: white;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1e40af;
+  cursor: pointer;
+}
+
+.fcc-bulk-btn:hover {
+  background: #eff6ff;
+}
+
+/* Selected row */
+.fcc-row-selected {
+  background: #eff6ff !important;
+}
+
+/* Currency Input */
+.fcc-currency-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.fcc-currency-symbol {
+  position: absolute;
+  left: 12px;
+  font-size: 14px;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.fcc-input-currency {
+  padding-left: 28px !important;
+}
+
+/* Checkbox styles */
+.fcc-payment-check,
+.fcc-list-check {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #d1d5db;
+  border-radius: 4px;
+  background: white;
+  font-size: 12px;
+  cursor: pointer;
+  color: transparent;
+  flex-shrink: 0;
+}
+
+.fcc-payment-check:hover,
+.fcc-list-check:hover {
+  border-color: #9ca3af;
+}
+
+.fcc-payment-check.fcc-paid,
+.fcc-list-check.fcc-paid {
+  background: #10b981;
+  border-color: #10b981;
+  color: white;
+}
+
+/* Calendar View */
+.fcc-calendar-container {
+  background: white;
+  border: 1px solid #e5e5e5;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.fcc-calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.fcc-calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.fcc-calendar-nav h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.fcc-cal-nav-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.fcc-cal-nav-btn:hover {
+  background: #e5e7eb;
+}
+
+.fcc-calendar-view-toggle {
+  display: flex;
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.fcc-cal-view-btn {
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.fcc-cal-view-btn.fcc-active {
+  background: white;
+  color: #0f172a;
+}
+
+.fcc-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.fcc-weekday {
+  padding: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-align: center;
+}
+
+.fcc-calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.fcc-cal-day {
+  min-height: 80px;
+  padding: 8px;
+  background: #f9fafb;
+  border: 1px solid #f3f4f6;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.fcc-cal-day:hover {
+  background: #f3f4f6;
+}
+
+.fcc-cal-day.fcc-empty {
+  background: transparent;
+  border-color: transparent;
+  cursor: default;
+}
+
+.fcc-cal-day.fcc-today {
+  background: #eff6ff;
+  border-color: #3b82f6;
+}
+
+.fcc-cal-day.fcc-overdue-day {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.fcc-day-number {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.fcc-day-payments {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.fcc-day-payment {
+  padding: 2px 6px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fcc-day-payment.fcc-paid {
+  background: #ecfdf5;
+  color: #059669;
+  text-decoration: line-through;
+}
+
+.fcc-more-payments {
+  font-size: 10px;
+  color: #6b7280;
+}
+
+.fcc-calendar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fcc-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-radius: 10px;
+}
+
+.fcc-list-item.fcc-paid {
+  opacity: 0.6;
+}
+
+.fcc-list-date {
+  text-align: center;
+  min-width: 40px;
+}
+
+.fcc-list-day {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.fcc-list-month {
+  font-size: 10px;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.fcc-list-info {
+  flex: 1;
+}
+
+.fcc-list-desc {
+  font-size: 14px;
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.fcc-list-category {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.fcc-list-amount {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.fcc-list-status {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.fcc-list-status.fcc-paid {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.fcc-calendar-empty {
+  padding: 40px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+/* Scenarios View */
+.fcc-scenarios-container {
+  background: white;
+  border: 1px solid #e5e5e5;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.fcc-scenarios-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.fcc-scenarios-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.fcc-scenarios-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 900px) {
+  .fcc-scenarios-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fcc-scenarios-list h3,
+.fcc-scenario-comparison h3 {
+  margin: 0 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.fcc-scenario-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fcc-scenario-item {
+  padding: 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.fcc-scenario-item:hover {
+  border-color: #d1d5db;
+}
+
+.fcc-scenario-item.fcc-active {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.fcc-scenario-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.fcc-scenario-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.fcc-scenario-date {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.fcc-scenario-stats {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 12px;
+}
+
+.fcc-scenario-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fcc-stat-label {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.fcc-stat-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.fcc-scenario-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.fcc-scenario-btn {
+  padding: 4px 10px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+}
+
+.fcc-scenario-btn:hover {
+  background: #f3f4f6;
+}
+
+.fcc-scenario-btn.fcc-delete {
+  color: #dc2626;
+}
+
+.fcc-scenario-btn.fcc-delete:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.fcc-scenarios-empty {
+  padding: 30px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.fcc-scenarios-empty p {
+  margin: 4px 0;
+}
+
+.fcc-comparison-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: #f9fafb;
+  border-radius: 12px;
+}
+
+.fcc-comp-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fcc-comp-label {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.fcc-comp-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.fcc-comp-value.fcc-positive {
+  color: #16a34a;
+}
+
+.fcc-comp-value.fcc-negative {
+  color: #dc2626;
+}
+
+.fcc-comparison-note {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #eff6ff;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #1e40af;
+}
+
+.fcc-clear-scenario {
+  padding: 4px 10px;
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: #3b82f6;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* Modal Styles */
+.fcc-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.fcc-modal {
+  background: white;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.fcc-modal-large {
+  max-width: 800px;
+}
+
+.fcc-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.fcc-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.fcc-modal-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  color: #9ca3af;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.fcc-modal-close:hover {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.fcc-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.fcc-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.fcc-modal-error {
+  padding: 10px 14px;
+  background: #fef2f2;
+  color: #dc2626;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.fcc-form-group {
+  margin-bottom: 16px;
+}
+
+.fcc-form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.fcc-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.fcc-input,
+.fcc-select,
+.fcc-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  outline: none;
+  font-family: inherit;
+}
+
+.fcc-input:focus,
+.fcc-select:focus,
+.fcc-textarea:focus {
+  border-color: #0f172a;
+}
+
+.fcc-textarea {
+  resize: vertical;
+}
+
+.fcc-btn-primary {
+  padding: 10px 20px;
+  background: #0f172a;
+  color: white;
+  border: none;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fcc-btn-primary:hover:not(:disabled) {
+  background: #1e293b;
+}
+
+.fcc-btn-primary:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.fcc-btn-secondary {
+  padding: 10px 20px;
+  background: white;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fcc-btn-secondary:hover {
+  background: #f9fafb;
+}
+
+.fcc-checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500 !important;
+  cursor: pointer;
+}
+
+.fcc-checkbox-label input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Edit Payment Items */
+.fcc-payments-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.fcc-payments-header h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fcc-payments-summary {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.fcc-payments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+.fcc-payments-empty {
+  padding: 20px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 13px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.fcc-payment-edit-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.fcc-payment-edit-item.fcc-paid {
+  background: #ecfdf5;
+}
+
+.fcc-payment-edit-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fcc-payment-edit-input {
+  padding: 6px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+}
+
+.fcc-payment-edit-input:focus {
+  border-color: #0f172a;
+}
+
+.fcc-payment-edit-date {
+  padding: 4px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+}
+
+.fcc-payment-edit-amount {
+  width: 80px;
+  padding: 6px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: right;
+  outline: none;
+}
+
+.fcc-payment-remove {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  color: #9ca3af;
+  cursor: pointer;
+}
+
+.fcc-payment-remove:hover {
+  color: #dc2626;
+}
+
+.fcc-add-payment-btn {
+  width: 100%;
+  padding: 10px;
+  background: #f3f4f6;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.fcc-add-payment-btn:hover {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+/* Scenario Badge */
+.fcc-scenario-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #eff6ff;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #3b82f6;
+  margin-left: 12px;
+}
+
+/* Export Dropdown */
+.fcc-export-dropdown {
+  position: relative;
+}
+
+.fcc-export-dropdown:hover .fcc-export-menu {
+  display: block;
+}
+
+.fcc-export-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  min-width: 150px;
+  z-index: 100;
+}
+
+.fcc-export-menu button {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  color: #374151;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fcc-export-menu button:hover {
+  background: #f9fafb;
+}
+
+.fcc-export-menu button:first-child {
+  border-radius: 10px 10px 0 0;
+}
+
+.fcc-export-menu button:last-child {
+  border-radius: 0 0 10px 10px;
+}
+
+/* Notes Section */
+.fcc-notes-section {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.fcc-notes-section strong {
+  color: #374151;
+}

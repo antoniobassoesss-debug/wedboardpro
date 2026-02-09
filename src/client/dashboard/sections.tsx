@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import SectionCard from './SectionCard';
 import { useNavigate } from 'react-router-dom';
 import TodoPage from '../todo/TodoPage';
-import Calendar from '../components/Calendar';
+import Calendar from '../components/BeautifulCalendar';
 import EventProjectPage from './pipeline/EventProjectPage';
 import { listEvents, createEvent, deleteEvent, type Event, type LimitErrorResponse } from '../api/eventsPipelineApi';
 import SuppliersPage from '../suppliers/SuppliersPage';

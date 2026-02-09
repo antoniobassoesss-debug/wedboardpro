@@ -9,12 +9,13 @@ import {
   createClient,
   updateClient,
 } from '../../api/eventsPipelineApi';
+import './pipeline.css';
 import ProjectFilesSection from './files/ProjectFilesSection';
 import VendorsTab from './vendors/VendorsTab';
 import VisionStyleTab from './vision/VisionStyleTab';
 import VenueDateTab from './venue/VenueDateTab';
 import GuestListTab from './guests/GuestListTab';
-import BudgetTab from './budget/BudgetTab';
+import FinancialCommandCenter from './budget/FinancialCommandCenter';
 import DesignLayoutTab from './design/DesignLayoutTab';
 import { listContacts, createContact, updateContact, deleteContact, type TeamContact } from '../../api/contactsApi';
 
@@ -33,11 +34,9 @@ const formatDate = (iso: string | null | undefined) => {
 
 const PipelineIcon = ({ active }: { active: boolean }) => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#0f172a' : '#6b7280'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="6" height="6" rx="1" />
-    <rect x="15" y="3" width="6" height="6" rx="1" />
-    <path d="M9 9h6v6H9z" />
-    <path d="M6 15h4" />
-    <path d="M14 15h4" />
+    <path d="M4 8h16" />
+    <path d="M4 12h10" />
+    <path d="M4 16h6" />
   </svg>
 );
 
@@ -64,11 +63,7 @@ const BudgetIcon = ({ active }: { active: boolean }) => (
 
 const FilesIcon = ({ active }: { active: boolean }) => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#0f172a' : '#6b7280'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-    <polyline points="14 2 14 8 20 8" />
-    <line x1="16" y1="13" x2="8" y2="13" />
-    <line x1="16" y1="17" x2="8" y2="17" />
-    <polyline points="10 9 9 9 8 9" />
+    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
   </svg>
 );
 
@@ -76,9 +71,8 @@ const NotesIcon = ({ active }: { active: boolean }) => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#0f172a' : '#6b7280'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
     <path d="M14 2v6h6" />
-    <path d="M16 13H8" />
-    <path d="M16 17H8" />
-    <path d="M10 9H8" />
+    <path d="M12 18v-6" />
+    <path d="M9 15h6" />
   </svg>
 );
 
@@ -328,7 +322,7 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
                     ) : stage.key === 'guest_list' ? (
                       <GuestListTab eventId={eventId} />
                     ) : stage.key === 'budget' ? (
-                      <BudgetTab eventId={eventId} />
+                      <FinancialCommandCenter eventId={eventId} />
                     ) : stage.key === 'design_layout' ? (
                       <DesignLayoutTab eventId={eventId} />
                     ) : stageTasks.length === 0 ? (
@@ -1049,7 +1043,7 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
           {activeTab === 'pipeline' && renderPipelineTab()}
           {activeTab === 'tasks' && renderTasksTab()}
           {activeTab === 'vendors' && <VendorsTab eventId={eventId} />}
-          {activeTab === 'budget' && <BudgetTab eventId={eventId} />}
+          {activeTab === 'budget' && <FinancialCommandCenter eventId={eventId} />}
           {activeTab === 'files' && renderFilesTab()}
           {activeTab === 'notes' && renderNotesTab()}
           {activeTab === 'contacts' && renderContactsTab()}
