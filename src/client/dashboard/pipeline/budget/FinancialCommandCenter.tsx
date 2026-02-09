@@ -491,13 +491,8 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                   />
                 </div>
                 <div className="fcc-col-category">Category</div>
-                <div className="fcc-col-budget">Target</div>
+                <div className="fcc-col-budget">Budget</div>
                 <div className="fcc-col-contracted">Contracted</div>
-                <div className="fcc-col-variance">Variance</div>
-                <div className="fcc-col-paid">Paid</div>
-                <div className="fcc-col-balance">Balance</div>
-                {!clientMode && <div className="fcc-col-status">Status</div>}
-                <div className="fcc-col-actions"></div>
               </div>
 
               <div className="fcc-table-body">
@@ -506,26 +501,22 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                   const contracted = category.contracted_amount || 0;
                   const variance = category.budgeted_amount - contracted;
                   const isOverCategoryBudget = contracted > category.budgeted_amount;
-                  const balance = contracted - category.paid_amount;
                   const selected = selectedCategories.has(category.id);
 
                   return (
                     <React.Fragment key={category.id}>
-                      <div 
+                      <div
                         className={`fcc-table-row ${selected ? 'fcc-row-selected' : ''} ${isOverCategoryBudget ? 'fcc-row-over' : ''}`}
+                        onClick={() => setEditingCategory(category)}
                       >
                         <div className="fcc-col-checkbox" onClick={(e) => e.stopPropagation()}>
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             checked={selected}
                             onChange={() => toggleCategorySelection(category.id)}
                           />
                         </div>
-                        <div
-                          className="fcc-col-category"
-                          onClick={() => setEditingCategory(category)}
-                          title="Click to edit"
-                        >
+                        <div className="fcc-col-category">
                           <div className="fcc-category-icon" style={{ backgroundColor: color }}>
                             {getCategoryLabel(category.category_name)[0]}
                           </div>
@@ -535,18 +526,11 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                               <div className="fcc-category-note">{category.custom_name}</div>
                             )}
                           </div>
-                          <div className="fcc-edit-icon">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                            </svg>
-                          </div>
                         </div>
 
-                        {/* Inline Editable: Target */}
-                        <div 
+                        <div
                           className="fcc-col-budget"
-                          onDoubleClick={() => handleCellDoubleClick(category, 'budgeted_amount')}
+                          onDoubleClick={(e) => { e.stopPropagation(); handleCellDoubleClick(category, 'budgeted_amount'); }}
                         >
                           {editingCell?.id === category.id && editingCell?.field === 'budgeted_amount' ? (
                             <input
@@ -563,10 +547,9 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                           )}
                         </div>
 
-                        {/* Inline Editable: Contracted */}
-                        <div 
+                        <div
                           className="fcc-col-contracted"
-                          onDoubleClick={() => handleCellDoubleClick(category, 'contracted_amount')}
+                          onDoubleClick={(e) => { e.stopPropagation(); handleCellDoubleClick(category, 'contracted_amount'); }}
                         >
                           {editingCell?.id === category.id && editingCell?.field === 'contracted_amount' ? (
                             <input
@@ -579,71 +562,8 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                               autoFocus
                             />
                           ) : (
-                            <>
-                              {formatCurrency(contracted / 100)}
-                              {isOverCategoryBudget && (
-                                <span className="fcc-over-badge">
-                                  +{formatCurrency((contracted - category.budgeted_amount) / 100)}
-                                </span>
-                              )}
-                            </>
+                            <>{formatCurrency(contracted / 100)}</>
                           )}
-                        </div>
-
-                        {/* Variance (Read-only) */}
-                        <div className={`fcc-col-variance ${isOverCategoryBudget ? 'fcc-negative' : 'fcc-positive'}`}>
-                          {variance >= 0 ? '' : '+'}
-                          {formatCurrency(Math.abs(variance) / 100)}
-                          <span className="fcc-variance-percent">
-                            ({((variance / (category.budgeted_amount || 1)) * 100).toFixed(0)}%)
-                          </span>
-                        </div>
-
-                        {/* Inline Editable: Paid */}
-                        <div 
-                          className="fcc-col-paid"
-                          onDoubleClick={() => handleCellDoubleClick(category, 'paid_amount')}
-                        >
-                          {editingCell?.id === category.id && editingCell?.field === 'paid_amount' ? (
-                            <input
-                              type="text"
-                              className="fcc-edit-input"
-                              value={editingCell.value}
-                              onChange={(e) => handleCellChange(e.target.value)}
-                              onBlur={handleCellSave}
-                              onKeyDown={handleKeyDown}
-                              autoFocus
-                            />
-                          ) : (
-                            <>{formatCurrency(category.paid_amount / 100)}</>
-                          )}
-                        </div>
-
-                        <div className={`fcc-col-balance ${balance > 0 ? 'fcc-pending' : ''}`}>
-                          {formatCurrency(balance / 100)}
-                        </div>
-
-                        {!clientMode && (
-                          <div className="fcc-col-status">
-                            <StatusBadge category={category} />
-                          </div>
-                        )}
-
-                        <div className="fcc-col-actions" onClick={(e) => e.stopPropagation()}>
-                          <button 
-                            className="fcc-action-btn" 
-                            onClick={() => setEditingCategory(category)}
-                            title="Edit"
-                          >
-                            Edit
-                          </button>
-                          <button 
-                            className="fcc-action-btn fcc-action-delete" 
-                            onClick={() => handleDeleteCategory(category.id)}
-                            title="Delete"
-                          >
-                            Delete
-                          </button>
                         </div>
                       </div>
                     </React.Fragment>
@@ -778,27 +698,6 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
         </div>
       )}
     </div>
-  );
-};
-
-// Status Badge Component
-function StatusBadge({ category }: { category: BudgetCategory }) {
-  const getStatusConfig = () => {
-    const hasOverdue = category.payment_schedule?.some(p => !p.paid && new Date(p.due_date) < new Date());
-    if (hasOverdue) return { label: 'Overdue', color: '#dc2626', bg: '#fef2f2' };
-    if (category.contracted_amount && category.paid_amount >= category.contracted_amount) {
-      return { label: 'Paid', color: '#16a34a', bg: '#ecfdf5' };
-    }
-    if (category.paid_amount > 0) return { label: 'Partial', color: '#f97316', bg: '#fff7ed' };
-    if (category.is_contracted) return { label: 'Contracted', color: '#3b82f6', bg: '#eff6ff' };
-    return { label: 'Planned', color: '#6b7280', bg: '#f3f4f6' };
-  };
-
-  const config = getStatusConfig();
-  return (
-    <span className="fcc-status-badge" style={{ color: config.color, backgroundColor: config.bg }}>
-      {config.label}
-    </span>
   );
 }
 
