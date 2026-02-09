@@ -86,7 +86,6 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
   const [saving, setSaving] = useState(false);
 
   const currency: Currency = state.budget?.currency || 'EUR';
-  const symbol = CURRENCY_SYMBOLS[currency];
 
   const loadBudgetData = useCallback(async () => {
     setState(prev => ({ ...prev, loading: true, error: null }));
@@ -367,7 +366,7 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
             <div className="fcc-risk-message">
               {aiRiskLevel === 'critical' ? (
                 <>
-                  {overdueCount} overdue payments totaling {symbol}{formatCurrency(
+                  {overdueCount} overdue payments totaling {formatCurrency(
                     state.alerts.overdue_payments.reduce((sum, p) => sum + p.payment.amount, 0) / 100
                   )}. Immediate action required.
                 </>
@@ -386,15 +385,15 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
       <div className="fcc-summary-bar">
         <div className="fcc-metric-card">
           <div className="fcc-metric-label">Total Budget</div>
-          <div className="fcc-metric-value">{symbol}{formatCurrency(state.totals.total_budgeted / 100)}</div>
+          <div className="fcc-metric-value">{formatCurrency(state.totals.total_budgeted / 100)}</div>
           <div className="fcc-metric-change positive">
-            {symbol}{formatCurrency(state.totals.total_budgeted / 100)} allocated
+            {formatCurrency(state.totals.total_budgeted / 100)} allocated
           </div>
         </div>
 
         <div className="fcc-metric-card">
           <div className="fcc-metric-label">Committed</div>
-          <div className="fcc-metric-value">{symbol}{formatCurrency(state.totals.total_contracted / 100)}</div>
+          <div className="fcc-metric-value">{formatCurrency(state.totals.total_contracted / 100)}</div>
           <div className="fcc-metric-bar">
             <div className="fcc-metric-bar-fill" style={{ width: `${Math.min(utilizationPercent, 100)}%` }} />
           </div>
@@ -403,7 +402,7 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
 
         <div className="fcc-metric-card">
           <div className="fcc-metric-label">Paid to Date</div>
-          <div className="fcc-metric-value">{symbol}{formatCurrency(state.totals.total_paid / 100)}</div>
+          <div className="fcc-metric-value">{formatCurrency(state.totals.total_paid / 100)}</div>
           <div className="fcc-metric-change">
             {((state.totals.total_paid / (state.totals.total_contracted || 1)) * 100).toFixed(0)}% of committed
           </div>
@@ -412,17 +411,17 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
         <div className="fcc-metric-card">
           <div className="fcc-metric-label">Remaining</div>
           <div className={`fcc-metric-value ${isOverBudget ? 'fcc-negative' : 'fcc-positive'}`}>
-            {symbol}{formatCurrency(state.totals.total_remaining / 100)}
+            {formatCurrency(state.totals.total_remaining / 100)}
           </div>
           <div className={`fcc-metric-change ${isOverBudget ? 'fcc-negative' : 'fcc-positive'}`}>
             {isOverBudget ? 'Over budget by ' : 'Under budget by '}
-            {symbol}{formatCurrency(Math.abs(totalVariance) / 100)} ({variancePercent.toFixed(1)}%)
+            {formatCurrency(Math.abs(totalVariance) / 100)} ({variancePercent.toFixed(1)}%)
           </div>
         </div>
 
         <div className="fcc-metric-card">
           <div className="fcc-metric-label">Pending Payments</div>
-          <div className="fcc-metric-value">{symbol}{formatCurrency(
+          <div className="fcc-metric-value">{formatCurrency(
             state.categories.reduce((sum, c) => sum + ((c.contracted_amount || 0) - c.paid_amount), 0) / 100
           )}</div>
           <div className="fcc-metric-badge warning">
@@ -534,7 +533,7 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                               autoFocus
                             />
                           ) : (
-                            <>{symbol}{formatCurrency(category.budgeted_amount / 100)}</>
+                            <>{formatCurrency(category.budgeted_amount / 100)}</>
                           )}
                         </div>
 
@@ -555,10 +554,10 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                             />
                           ) : (
                             <>
-                              {symbol}{formatCurrency(contracted / 100)}
+                              {formatCurrency(contracted / 100)}
                               {isOverCategoryBudget && (
                                 <span className="fcc-over-badge">
-                                  +{symbol}{formatCurrency((contracted - category.budgeted_amount) / 100)}
+                                  +{formatCurrency((contracted - category.budgeted_amount) / 100)}
                                 </span>
                               )}
                             </>
@@ -568,7 +567,7 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                         {/* Variance (Read-only) */}
                         <div className={`fcc-col-variance ${isOverCategoryBudget ? 'fcc-negative' : 'fcc-positive'}`}>
                           {variance >= 0 ? '' : '+'}
-                          {symbol}{formatCurrency(Math.abs(variance) / 100)}
+                          {formatCurrency(Math.abs(variance) / 100)}
                           <span className="fcc-variance-percent">
                             ({((variance / (category.budgeted_amount || 1)) * 100).toFixed(0)}%)
                           </span>
@@ -590,12 +589,12 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                               autoFocus
                             />
                           ) : (
-                            <>{symbol}{formatCurrency(category.paid_amount / 100)}</>
+                            <>{formatCurrency(category.paid_amount / 100)}</>
                           )}
                         </div>
 
                         <div className={`fcc-col-balance ${balance > 0 ? 'fcc-pending' : ''}`}>
-                          {symbol}{formatCurrency(balance / 100)}
+                          {formatCurrency(balance / 100)}
                         </div>
 
                         {!clientMode && (
@@ -642,7 +641,7 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                                         <span className="fcc-payment-date">{payment.due_date}</span>
                                       </div>
                                       <div className="fcc-payment-amount">
-                                        {symbol}{formatCurrency(payment.amount / 100)}
+{formatCurrency(payment.amount / 100)}
                                       </div>
                                       <div className={`fcc-payment-status ${payment.paid ? 'fcc-paid' : ''}`}>
                                         {payment.paid ? 'Paid' : 'Pending'}
@@ -703,7 +702,7 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                           <div className="fcc-upcoming-desc">{payment.description}</div>
                         </div>
                         <div className="fcc-upcoming-amount">
-                          {symbol}{formatCurrency(payment.amount / 100)}
+                          {formatCurrency(payment.amount / 100)}
                           <span className="fcc-upcoming-due">
                             {days_until === 0 ? 'Today' : `In ${days_until}d`}
                           </span>
@@ -727,8 +726,8 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                           <div className="fcc-overdue-category">{getCategoryLabel(category_name)}</div>
                           <div className="fcc-overdue-desc">{payment.description}</div>
                         </div>
-                        <div className="fcc-overdue-amount">
-                          {symbol}{formatCurrency(payment.amount / 100)}
+<div className="fcc-overdue-amount">
+                            {formatCurrency(payment.amount / 100)}
                         </div>
                       </div>
                     ))}
@@ -766,10 +765,9 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
 
       {/* Calendar View */}
       {viewMode === 'calendar' && (
-        <CalendarView 
-          categories={state.categories} 
+        <CalendarView
+          categories={state.categories}
           currency={currency}
-          symbol={symbol}
           onPaymentToggle={handlePaymentToggle}
         />
       )}
@@ -780,7 +778,6 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
           scenarios={scenarios}
           activeScenario={activeScenario}
           state={state}
-          symbol={symbol}
           onSaveScenario={() => setShowScenarioSave(true)}
           onLoadScenario={loadScenario}
           onDeleteScenario={deleteScenario}
@@ -868,15 +865,13 @@ function StatusBadge({ category }: { category: BudgetCategory }) {
 }
 
 // Calendar View Component
-function CalendarView({ 
-  categories, 
-  currency, 
-  symbol,
-  onPaymentToggle 
-}: { 
+function CalendarView({
+  categories,
+  currency,
+  onPaymentToggle
+}: {
   categories: BudgetCategory[];
   currency: Currency;
-  symbol: string;
   onPaymentToggle: (cat: BudgetCategory, payment: PaymentScheduleItem) => void;
 }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -940,12 +935,12 @@ function CalendarView({
                   <span className="fcc-day-number">{day}</span>
                   <div className="fcc-day-payments">
                     {dayPayments.slice(0, 2).map(p => (
-                      <div 
-                        key={p.id} 
+                      <div
+                        key={p.id}
                         className={`fcc-day-payment ${p.paid ? 'fcc-paid' : ''}`}
-                        title={`${p.description}: ${symbol}${(p.amount / 100).toFixed(2)}`}
+                        title={`${p.description}: ${formatCurrency(p.amount / 100)}`}
                       >
-                        {symbol}{(p.amount / 100).toFixed(0)}
+                        {formatCurrency(p.amount / 100)}
                       </div>
                     ))}
                     {dayPayments.length > 2 && (
@@ -975,7 +970,7 @@ function CalendarView({
                 <div className="fcc-list-desc">{p.description}</div>
                 <div className="fcc-list-category">{getCategoryLabel(p.category.category_name)}</div>
               </div>
-              <div className="fcc-list-amount">{symbol}{formatCurrency(p.amount / 100)}</div>
+              <div className="fcc-list-amount">{formatCurrency(p.amount / 100)}</div>
               <div className={`fcc-list-status ${p.paid ? 'fcc-paid' : ''}`}>
                 {p.paid ? 'Paid' : 'Pending'}
               </div>
@@ -994,7 +989,6 @@ function ScenarioView({
   scenarios,
   activeScenario,
   state,
-  symbol,
   onSaveScenario,
   onLoadScenario,
   onDeleteScenario,
@@ -1003,7 +997,6 @@ function ScenarioView({
   scenarios: Scenario[];
   activeScenario: Scenario | null;
   state: BudgetState;
-  symbol: string;
   onSaveScenario: () => void;
   onLoadScenario: (s: Scenario) => void;
   onDeleteScenario: (id: string) => void;
@@ -1035,11 +1028,11 @@ function ScenarioView({
                   <div className="fcc-scenario-stats">
                     <div className="fcc-scenario-stat">
                       <span className="fcc-stat-label">Budget</span>
-                      <span className="fcc-stat-value">{symbol}{formatCurrency(scenario.totals.total_budgeted / 100)}</span>
+                      <span className="fcc-stat-value">{formatCurrency(scenario.totals.total_budgeted / 100)}</span>
                     </div>
                     <div className="fcc-scenario-stat">
                       <span className="fcc-stat-label">Committed</span>
-                      <span className="fcc-stat-value">{symbol}{formatCurrency(scenario.totals.total_contracted / 100)}</span>
+                      <span className="fcc-stat-value">{formatCurrency(scenario.totals.total_contracted / 100)}</span>
                     </div>
                   </div>
                   <div className="fcc-scenario-actions">
@@ -1064,13 +1057,13 @@ function ScenarioView({
             <div className="fcc-comp-stat">
               <span className="fcc-comp-label">Total Budget</span>
               <span className="fcc-comp-value">
-                {symbol}{formatCurrency((activeScenario?.totals.total_budgeted || state.totals.total_budgeted) / 100)}
+                {formatCurrency((activeScenario?.totals.total_budgeted || state.totals.total_budgeted) / 100)}
               </span>
             </div>
             <div className="fcc-comp-stat">
               <span className="fcc-comp-label">Committed</span>
               <span className="fcc-comp-value">
-                {symbol}{formatCurrency((activeScenario?.totals.total_contracted || state.totals.total_contracted) / 100)}
+                {formatCurrency((activeScenario?.totals.total_contracted || state.totals.total_contracted) / 100)}
               </span>
             </div>
             <div className="fcc-comp-stat">
@@ -1078,11 +1071,11 @@ function ScenarioView({
               <span className={`fcc-comp-value ${
                 ((activeScenario?.totals.total_budgeted || state.totals.total_budgeted) - 
                  (activeScenario?.totals.total_contracted || state.totals.total_contracted)) >= 0 
-                  ? 'fcc-positive' : 'fcc-negative'
-              }`}>
-                {symbol}{formatCurrency(
+? 'fcc-positive' : 'fcc-negative'
+                }`}>
+                {formatCurrency(
                   Math.abs(
-                    ((activeScenario?.totals.total_budgeted || state.totals.total_budgeted) - 
+                    ((activeScenario?.totals.total_budgeted || state.totals.total_budgeted) -
                      (activeScenario?.totals.total_contracted || state.totals.total_contracted))
                   ) / 100
                 )}
@@ -1379,7 +1372,7 @@ function EditCategoryModal({
                 <div className="fcc-payments-header">
                   <h4>Payment Schedule</h4>
                   <div className="fcc-payments-summary">
-                    Total: {CURRENCY_SYMBOLS[currency]}{formatCurrency(
+                    Total: {formatCurrency(
                       payments.reduce((sum, p) => sum + p.amount, 0) / 100
                     )}
                   </div>
