@@ -118,12 +118,13 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
             <>
               {console.log('[ElementsLayer] TABLE RotateButton for:', element.id)}
               <RotateButton
-              x={rotateButtonX}
-              y={rotateButtonY}
-              onRotate={() => handleRotate(element.id, ((element.rotation || 0) + 90) % 360)}
-              onClose={() => {}}
-              elementSize={{ width: element.width, height: element.height }}
-            />
+                x={rotateButtonX}
+                y={rotateButtonY}
+                onRotate={() => handleRotate(element.id, ((element.rotation || 0) + 90) % 360)}
+                onClose={() => {}}
+                elementSize={{ width: element.width, height: element.height }}
+              />
+            </>
           )}
         </React.Fragment>
       );
