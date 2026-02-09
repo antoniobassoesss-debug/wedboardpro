@@ -717,9 +717,12 @@ const CATEGORY_STATUS_CONFIG: Record<string, { label: string; color: string; bg:
   completed: { label: 'Completed', color: '#059669', bg: '#d1fae5' },
 };
 
+const DEFAULT_STATUS = CATEGORY_STATUS_CONFIG.planned;
+
 function CategoryStatus({ category }: { category: BudgetCategory }) {
   const status = category.category_status || 'planned';
-  const config = CATEGORY_STATUS_CONFIG[status] || CATEGORY_STATUS_CONFIG.planned;
+  const statusConfig = CATEGORY_STATUS_CONFIG[status];
+  const config = (statusConfig ?? DEFAULT_STATUS) as { label: string; color: string; bg: string };
 
   return (
     <span className="fcc-status-pill" style={{ color: config.color, backgroundColor: config.bg }}>
