@@ -95,10 +95,29 @@ export interface ApiResponse<T> {
  */
 const getAccountId = (): string | null => {
   try {
-    const sessionStr = localStorage.getItem('wedboarpro_session');
-    if (!sessionStr) return null;
-    const session = JSON.parse(sessionStr);
-    return session?.user?.id || null;
+    // Try both possible session keys (for backward compatibility)
+    const sessionKeys = ['wedboardpro_session', 'wedboarpro_session', 'supabase.auth.token'];
+    for (const key of sessionKeys) {
+      const sessionStr = localStorage.getItem(key);
+      if (sessionStr) {
+        try {
+          const session = JSON.parse(sessionStr);
+          // Handle different session formats
+          if (session?.user?.id) return session.user.id;
+          if (session?.access_token) {
+            // Parse JWT to get user id (basic decoding)
+            const parts = session.access_token.split('.');
+            if (parts.length === 3) {
+              const payload = JSON.parse(atob(parts[1]));
+              if (payload.sub) return payload.sub;
+            }
+          }
+        } catch {
+          // Try next key
+        }
+      }
+    }
+    return null;
   } catch {
     return null;
   }
@@ -548,7 +567,7 @@ export async function listLayoutsWithEvents(): Promise<ApiResponse<Array<LayoutR
       .from('layouts')
       .select(`
         *,
-        event:events!event_id (
+        event:events (
           id,
           title,
           wedding_date
@@ -563,6 +582,7 @@ export async function listLayoutsWithEvents(): Promise<ApiResponse<Array<LayoutR
       return { data: null, error: error.message };
     }
 
+    console.log('[layoutsApi] listLayoutsWithEvents fetched:', data?.length, 'layouts');
     return { data: data as any, error: null };
   } catch (err: any) {
     console.error('[layoutsApi] listLayoutsWithEvents exception:', err);

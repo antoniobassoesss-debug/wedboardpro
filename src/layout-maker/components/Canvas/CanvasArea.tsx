@@ -571,6 +571,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
           {layoutStore.layout && (
             <ElementsLayer
               layout={layoutStore.layout}
+              pixelsPerMeter={pixelsPerMeter}
               onElementClick={handleElementClick}
               onElementHover={handleElementHover}
               onElementMouseDown={handleElementMouseDown}

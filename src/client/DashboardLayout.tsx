@@ -1,6 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './dashboard-layout.css';
+import {
+  listLayoutsWithEvents,
+  getOrCreateLayoutForEvent,
+  isLayoutFileData,
+  type LayoutRecord,
+  type LayoutFileData,
+} from './api/layoutsApi';
+import { listEvents, type Event } from './api/eventsPipelineApi';
 
 type MenuItem = {
   id: string;
@@ -221,46 +229,362 @@ const HomeSection: React.FC<{ onNavigate: (id: string) => void }> = ({ onNavigat
   </div>
 );
 
+interface LayoutWithEvent extends LayoutRecord {
+  event?: {
+    id: string;
+    title: string;
+    wedding_date: string;
+  };
+}
+
+const formatDate = (dateStr: string | undefined): string => {
+  if (!dateStr) return 'Unknown';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return 'Unknown';
+  return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const formatWeddingDate = (dateStr: string | undefined): string => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const getTabCount = (layout: LayoutRecord): number => {
+  if (isLayoutFileData(layout.canvas_data)) {
+    return (layout.canvas_data as LayoutFileData).tabs.length;
+  }
+  return 1;
+};
+
+const getLayoutPreviewInfo = (layout: LayoutRecord): { tables: number; elements: number } => {
+  if (isLayoutFileData(layout.canvas_data)) {
+    const fileData = layout.canvas_data as LayoutFileData;
+    let tables = 0;
+    let elements = 0;
+    fileData.tabs.forEach(tab => {
+      const shapes = tab.canvas.shapes || [];
+      tables += shapes.filter((s: any) => s.tableData).length;
+      elements += shapes.length + (tab.canvas.walls?.length || 0);
+    });
+    return { tables, elements };
+  }
+  const shapes = layout.canvas_data.shapes || [];
+  return {
+    tables: shapes.filter((s: any) => s.tableData).length,
+    elements: shapes.length + (layout.canvas_data.walls?.length || 0),
+  };
+};
+
 const LayoutsSection: React.FC = () => {
   const navigate = useNavigate();
-  const recent = useMemo(() => ['Garden Gala', 'Corporate Launch', 'Winter Ball'], []);
-  const saved = useMemo(() => ['Conference template', 'Banquet seating', 'Outdoor ceremony', 'Black tie ballroom'], []);
+  const [layouts, setLayouts] = useState<LayoutWithEvent[]>([]);
+  const [eventsWithoutLayout, setEventsWithoutLayout] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      console.log('[LayoutsSection] Loading layouts...');
+      const layoutsResult = await listLayoutsWithEvents();
+      console.log('[LayoutsSection] Layouts result:', layoutsResult);
+
+      if (layoutsResult.data) {
+        setLayouts(layoutsResult.data);
+        console.log('[LayoutsSection] Loaded', layoutsResult.data.length, 'layouts');
+        layoutsResult.data.forEach((l: any) => {
+          console.log(`  - ${l.name}: event_id=${l.event_id}, event=${JSON.stringify(l.event)}`);
+        });
+      }
+
+      const eventsResult = await listEvents();
+      console.log('[LayoutsSection] Events result:', eventsResult);
+
+      if (eventsResult.data && layoutsResult.data) {
+        const eventIdsWithLayouts = new Set(
+          layoutsResult.data.filter(l => l.event_id).map(l => l.event_id)
+        );
+        console.log('[LayoutsSection] Event IDs with layouts:', Array.from(eventIdsWithLayouts));
+
+        const withoutLayout = eventsResult.data.filter(
+          e => e.status !== 'completed' && !eventIdsWithLayouts.has(e.id)
+        );
+        setEventsWithoutLayout(withoutLayout);
+        console.log('[LayoutsSection] Events without layouts:', withoutLayout.length);
+      }
+    } catch (err) {
+      console.error('[LayoutsSection] Error loading data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredLayouts = useMemo(() => {
+    if (!searchQuery.trim()) return layouts;
+    const q = searchQuery.toLowerCase();
+    return layouts.filter(
+      (l) =>
+        l.name.toLowerCase().includes(q) ||
+        l.event?.title.toLowerCase().includes(q)
+    );
+  }, [layouts, searchQuery]);
+
+  const handleOpenLayout = (layout: LayoutWithEvent) => {
+    if (layout.event_id) {
+      navigate(`/layout-maker?eventId=${layout.event_id}`);
+    } else {
+      navigate(`/layout-maker?layoutId=${layout.id}`);
+    }
+  };
+
+  const handleSelectEvent = async (eventId: string, eventTitle: string) => {
+    const result = await getOrCreateLayoutForEvent(eventId, eventTitle);
+    if (result.data || !result.error) {
+      navigate(`/layout-maker?eventId=${eventId}`);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="layouts-section">
+        <div className="layouts-header">
+          <div>
+            <p className="eyebrow">Layouts</p>
+            <h2>Your layouts</h2>
+          </div>
+        </div>
+        <div style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>
+          Loading layouts...
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="layouts-section">
+    <div className="layouts-section" style={{ paddingBottom: '80px' }}>
       <div className="layouts-header">
         <div>
           <p className="eyebrow">Layouts</p>
-          <h2>Your layout library</h2>
+          <h2>Your layouts</h2>
         </div>
-        <button type="button" onClick={() => navigate('/layout-maker')} className="primary ghost">
-          Layout Maker
+        <button
+          type="button"
+          onClick={() => navigate('/layout-maker')}
+          className="primary ghost"
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M12 8v8M8 12h8" strokeLinecap="round" />
+          </svg>
+          Open Layout Maker
         </button>
       </div>
-      <div className="layout-panels">
-        <div className="layout-panel">
-          <h3>Create New Layout</h3>
-          <p>Start from a blank canvas or apply your templates.</p>
-          <button type="button" onClick={() => navigate('/layout-maker')} className="primary">
-            + New Layout
+
+      {eventsWithoutLayout.length > 0 && (
+        <div style={{ marginTop: '32px' }}>
+          <h3 style={{ fontSize: '13px', fontWeight: 600, color: '#64748b', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Events without layouts ({eventsWithoutLayout.length})
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+            {eventsWithoutLayout.map((event) => (
+              <div
+                key={event.id}
+                onClick={() => handleSelectEvent(event.id, event.title)}
+                style={{
+                  background: '#fff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#3b82f6';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '10px',
+                  background: '#f1f5f9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#64748b',
+                }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M12 8v8M8 12h8" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {event.title}
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#64748b' }}>
+                    {formatWeddingDate(event.wedding_date)}
+                  </div>
+                </div>
+                <span style={{
+                  padding: '6px 12px',
+                  background: '#f0f9ff',
+                  color: '#0284c7',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                }}>
+                  Create
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {filteredLayouts.length > 0 && (
+        <div style={{ marginTop: '40px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+            <h3 style={{ fontSize: '13px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Layout Files ({filteredLayouts.length})
+            </h3>
+            <input
+              type="text"
+              placeholder="Search layouts..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                fontSize: '13px',
+                width: '200px',
+                outline: 'none',
+              }}
+            />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+            {filteredLayouts.map((layout) => {
+              const tabCount = getTabCount(layout);
+              const { tables, elements } = getLayoutPreviewInfo(layout);
+
+              return (
+                <div
+                  key={layout.id}
+                  onClick={() => handleOpenLayout(layout)}
+                  style={{
+                    background: '#fff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#3b82f6';
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(59, 130, 246, 0.12)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  <div style={{
+                    height: '160px',
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative',
+                  }}>
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.2">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <line x1="3" y1="9" x2="21" y2="9" />
+                      <line x1="9" y1="21" x2="9" y2="9" />
+                    </svg>
+                    <span style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      padding: '4px 10px',
+                      background: 'rgba(255,255,255,0.9)',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      color: '#64748b',
+                    }}>
+                      {tabCount} tab{tabCount !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div style={{ padding: '20px' }}>
+                    <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: '4px' }}>
+                      {layout.event?.title || layout.name}
+                    </div>
+                    {layout.event?.wedding_date && (
+                      <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '12px' }}>
+                        {formatWeddingDate(layout.event.wedding_date)}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: '#64748b' }}>
+                      <span>{tables} table{tables !== 1 ? 's' : ''}</span>
+                      <span style={{ color: '#cbd5e1' }}>·</span>
+                      <span>{elements} element{elements !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f1f5f9', fontSize: '12px', color: '#94a3b8' }}>
+                      Updated {formatDate(layout.updated_at)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {layouts.length === 0 && eventsWithoutLayout.length === 0 && (
+        <div style={{ marginTop: '64px', textAlign: 'center', padding: '48px', background: '#f8fafc', borderRadius: '16px' }}>
+          <div style={{ width: '64px', height: '64px', margin: '0 auto 20px', background: '#e2e8f0', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M12 8v8M8 12h8" strokeLinecap="round" />
+            </svg>
+          </div>
+          <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#1e293b', marginBottom: '8px' }}>
+            No layouts yet
+          </h3>
+          <p style={{ color: '#64748b', marginBottom: '24px' }}>
+            Create your first layout to start designing floor plans and seating arrangements.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/layout-maker')}
+            className="primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M12 8v8M8 12h8" strokeLinecap="round" />
+            </svg>
+            Open Layout Maker
           </button>
         </div>
-        <div className="layout-panel list">
-          <h3>Recent</h3>
-          <ul>
-            {recent.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </div>
-        <div className="layout-panel list">
-          <h3>Saved Layouts</h3>
-          <ul>
-            {saved.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

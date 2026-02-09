@@ -18,6 +18,7 @@ import { useSelectionStore } from '../../stores';
 
 interface ElementsLayerProps {
   layout: Layout;
+  pixelsPerMeter?: number;
   onElementClick?: (elementId: string, event: React.MouseEvent) => void;
   onElementDoubleClick?: (elementId: string, event: React.MouseEvent) => void;
   onElementHover?: (elementId: string | null) => void;
@@ -27,6 +28,7 @@ interface ElementsLayerProps {
 
 export const ElementsLayer: React.FC<ElementsLayerProps> = ({
   layout,
+  pixelsPerMeter = 100,
   onElementClick,
   onElementDoubleClick,
   onElementHover,
@@ -35,7 +37,7 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
 }) => {
   const selectionStore = useSelectionStore();
   const selectedIds = selectionStore.selectedIds;
-  console.log('[ElementsLayer] Selected IDs:', selectedIds);
+  console.log('[ElementsLayer] Selected IDs:', selectedIds, 'pixelsPerMeter:', pixelsPerMeter);
 
   const handleRotate = useCallback((elementId: string, newRotation: number) => {
     console.log('[ElementsLayer] Rotating element:', elementId, 'to:', newRotation);
@@ -70,7 +72,6 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
 
     const centerX = (element.x + element.width / 2);
     const centerY = (element.y + element.height / 2);
-    const pixelsPerMeter = 100;
     const rotateButtonX = centerX * pixelsPerMeter;
     const rotateButtonY = (element.y * pixelsPerMeter) - 30;
 

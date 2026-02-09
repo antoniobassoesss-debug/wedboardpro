@@ -1,12 +1,25 @@
-import React, { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import MarketingHome from './MarketingHome';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
 import ForgotPasswordPage from './ForgotPasswordPage';
 import ResetPasswordPage from './ResetPasswordPage';
 import EmailConfirmationWaiting from './EmailConfirmationWaiting';
+import PrivacyPolicy from './PrivacyPolicy';
+import TermsOfService from './TermsOfService';
+import Contact from './Contact';
+import Demo from './Demo';
+import AboutUs from './AboutUs';
 import { AuthCallbackPage, AuthUrlHandler } from './auth/index.ts';
+
+function ScrollToTop() {
+  const location = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location]);
+  return null;
+}
 import { WeddingDashboard } from './dashboard/index';
 import SuppliersPage from './suppliers/SuppliersPage';
 import PricingPage from './PricingPage';
@@ -68,6 +81,7 @@ const App: React.FC = () => {
   }, []);
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <AuthUrlHandler />
       <Routes>
         <Route path="/" element={<MarketingHome />} />
@@ -133,12 +147,13 @@ const App: React.FC = () => {
           } 
         />
         <Route path="/suppliers" element={<SuppliersPage />} />
-        <Route path="/demo" element={<PlaceholderPage title="Book a Demo" />} />
+        <Route path="/demo" element={<Demo />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/invite/:token" element={<InviteAcceptPage />} />
-        <Route path="/privacy" element={<PlaceholderPage title="Privacy Policy" />} />
-        <Route path="/terms" element={<PlaceholderPage title="Terms of Service" />} />
-        <Route path="/contact" element={<PlaceholderPage title="Contact Us" />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/about" element={<AboutUs />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

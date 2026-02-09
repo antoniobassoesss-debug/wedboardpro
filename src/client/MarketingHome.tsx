@@ -105,104 +105,209 @@ const MarketingHome: React.FC = () => {
 
       <main>
         {/* Hero */}
-        <section style={{ paddingTop: isMobile ? '100px' : '180px', paddingBottom: isMobile ? '60px' : '120px' }}>
-          <div style={{ maxWidth: '1000px', margin: '0 auto', padding: isMobile ? '0 20px' : '0 32px', textAlign: 'center' }}>
-            <div style={{
-              display: 'inline-block',
-              padding: isMobile ? '5px 12px' : '6px 14px',
-              backgroundColor: '#f3f4f6',
-              borderRadius: '100px',
-              fontSize: isMobile ? '11px' : '13px',
-              fontWeight: 500,
-              color: '#4b5563',
-              marginBottom: isMobile ? '16px' : '24px'
-            }}>
-              Trusted by 500+ wedding professionals
-            </div>
-            <h1 style={{
-              fontSize: isMobile ? '32px' : 'clamp(44px, 6vw, 64px)',
-              fontWeight: 600,
-              letterSpacing: '-0.035em',
-              color: '#111827',
-              lineHeight: 1.15,
-              margin: 0
-            }}>
-              {isMobile ? (
-                <>The operating system for wedding planners</>
-              ) : (
-                <>The operating system for<br />modern wedding planners</>
-              )}
-            </h1>
-            <p style={{
-              marginTop: isMobile ? '16px' : '28px',
-              fontSize: isMobile ? '16px' : '19px',
-              color: '#6b7280',
-              maxWidth: '580px',
-              marginLeft: 'auto',
-              marginRight: 'auto',
-              lineHeight: 1.6,
-              fontWeight: 400
-            }}>
-              {isMobile
-                ? 'Centralize your workflows and manage multiple weddings from one platform.'
-                : 'Centralize your workflows, manage multiple weddings, and deliver exceptional experiences — all from one platform.'
-              }
-            </p>
-            <div style={{
-              marginTop: isMobile ? '28px' : '48px',
-              display: 'flex',
-              flexDirection: isMobile ? 'column' : 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: isMobile ? '12px' : '16px'
-            }}>
-              <Link
-                to="/signup"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  width: isMobile ? '100%' : 'auto',
-                  padding: isMobile ? '14px 24px' : '16px 28px',
-                  fontSize: '15px',
+        <section style={{ paddingTop: isMobile ? '100px' : '120px', paddingBottom: isMobile ? '60px' : '80px' }}>
+          <div style={{ maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '0 20px' : '0 48px' }}>
+            {isMobile ? (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{
+                  display: 'inline-block',
+                  padding: '5px 12px',
+                  backgroundColor: '#f3f4f6',
+                  borderRadius: '100px',
+                  fontSize: '11px',
                   fontWeight: 500,
-                  color: '#ffffff',
-                  textDecoration: 'none',
-                  borderRadius: '10px',
-                  backgroundColor: '#111827',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-                }}
-              >
-                Start free trial
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ marginLeft: '4px' }}>
-                  <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </Link>
-              <Link
-                to="/demo"
-                style={{
-                  display: 'inline-flex',
+                  color: '#4b5563',
+                  marginBottom: '16px'
+                }}>
+                  Trusted by 500+ wedding professionals
+                </div>
+                <h1 style={{
+                  fontSize: '32px',
+                  fontWeight: 600,
+                  letterSpacing: '-0.035em',
+                  color: '#111827',
+                  lineHeight: 1.15,
+                  margin: 0
+                }}>
+                  The operating system for wedding planners
+                </h1>
+                <p style={{
+                  marginTop: '16px',
+                  fontSize: '16px',
+                  color: '#6b7280',
+                  lineHeight: 1.6,
+                  fontWeight: 400
+                }}>
+                  Centralize your workflows and manage multiple weddings from one platform.
+                </p>
+                <div style={{
+                  marginTop: '28px',
+                  display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  width: isMobile ? '100%' : 'auto',
-                  padding: isMobile ? '14px 24px' : '16px 28px',
-                  fontSize: '15px',
-                  fontWeight: 500,
-                  color: '#374151',
-                  textDecoration: 'none',
-                  borderRadius: '10px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e5e7eb'
-                }}
-              >
-                Book a demo
-              </Link>
-            </div>
-            <p style={{ marginTop: isMobile ? '16px' : '20px', fontSize: isMobile ? '12px' : '13px', color: '#9ca3af' }}>
-              14-day free trial · No credit card required
-            </p>
+                  gap: '12px'
+                }}>
+                  <Link
+                    to="/signup"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      padding: '14px 24px',
+                      fontSize: '15px',
+                      fontWeight: 500,
+                      color: '#ffffff',
+                      textDecoration: 'none',
+                      borderRadius: '10px',
+                      backgroundColor: '#111827',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+                    }}
+                  >
+                    Start free trial
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ marginLeft: '4px' }}>
+                      <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </Link>
+                  <Link
+                    to="/demo"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      padding: '14px 24px',
+                      fontSize: '15px',
+                      fontWeight: 500,
+                      color: '#374151',
+                      textDecoration: 'none',
+                      borderRadius: '10px',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e5e7eb'
+                    }}
+                  >
+                    Book a demo
+                  </Link>
+                </div>
+                <p style={{ marginTop: '16px', fontSize: '12px', color: '#9ca3af' }}>
+                  14-day free trial · No credit card required
+                </p>
+                <div style={{
+                  marginTop: '32px',
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)'
+                }}>
+                  <img
+                    src="/landing_page.png"
+                    alt="WedBoardPro Platform Overview"
+                    style={{ width: '100%', height: 'auto', display: 'block' }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '64px', alignItems: 'center' }}>
+                <div>
+                  <div style={{
+                    display: 'inline-block',
+                    padding: '6px 14px',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '100px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: '#4b5563',
+                    marginBottom: '24px'
+                  }}>
+                    Trusted by 500+ wedding professionals
+                  </div>
+                  <h1 style={{
+                    fontSize: '48px',
+                    fontWeight: 600,
+                    letterSpacing: '-0.035em',
+                    color: '#111827',
+                    lineHeight: 1.1,
+                    margin: 0
+                  }}>
+                    The operating system for<br />modern wedding planners
+                  </h1>
+                  <p style={{
+                    marginTop: '28px',
+                    fontSize: '19px',
+                    color: '#6b7280',
+                    lineHeight: 1.6,
+                    fontWeight: 400,
+                    maxWidth: '480px'
+                  }}>
+                    Centralize your workflows, manage multiple weddings, and deliver exceptional experiences — all from one platform.
+                  </p>
+                  <div style={{
+                    marginTop: '48px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px'
+                  }}>
+                    <Link
+                      to="/signup"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        padding: '16px 28px',
+                        fontSize: '15px',
+                        fontWeight: 500,
+                        color: '#ffffff',
+                        textDecoration: 'none',
+                        borderRadius: '10px',
+                        backgroundColor: '#111827',
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+                      }}
+                    >
+                      Start free trial
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ marginLeft: '4px' }}>
+                        <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </Link>
+                    <Link
+                      to="/demo"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        padding: '16px 28px',
+                        fontSize: '15px',
+                        fontWeight: 500,
+                        color: '#374151',
+                        textDecoration: 'none',
+                        borderRadius: '10px',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e5e7eb'
+                      }}
+                    >
+                      Book a demo
+                    </Link>
+                  </div>
+                  <p style={{ marginTop: '20px', fontSize: '13px', color: '#9ca3af' }}>
+                    14-day free trial · No credit card required
+                  </p>
+                </div>
+                <div style={{
+                  borderRadius: '16px',
+                  overflow: 'hidden',
+                  boxShadow: '0 20px 60px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08)',
+                  border: '1px solid rgba(0, 0, 0, 0.06)'
+                }}>
+                  <img
+                    src="/landing_page.png"
+                    alt="WedBoardPro Platform Overview"
+                    style={{ width: '100%', height: 'auto', display: 'block' }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
@@ -387,7 +492,8 @@ const MarketingHome: React.FC = () => {
             <img src="/logo/iconlogo.png" alt="WedBoardPro" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
             <span style={{ fontSize: '15px', fontWeight: 600, color: '#111827' }}>WedBoardPro</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '20px' : '32px', fontSize: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '16px' : '32px', fontSize: '14px' }}>
+            <Link to="/about" style={{ color: '#111827', textDecoration: 'none', fontWeight: 500 }}>About</Link>
             <Link to="/privacy" style={{ color: '#6b7280', textDecoration: 'none' }}>Privacy</Link>
             <Link to="/terms" style={{ color: '#6b7280', textDecoration: 'none' }}>Terms</Link>
             <Link to="/contact" style={{ color: '#6b7280', textDecoration: 'none' }}>Contact</Link>

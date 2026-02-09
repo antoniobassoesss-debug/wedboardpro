@@ -12,6 +12,12 @@ export interface Project {
     powerPoints?: any[];
     viewBox: { x: number; y: number; width: number; height: number };
   };
+  a4Dimensions?: {
+    a4X: number;
+    a4Y: number;
+    a4WidthPx: number;
+    a4HeightPx: number;
+  };
 }
 
 interface WorkflowPosition {
@@ -29,207 +35,114 @@ interface WorkflowCanvasProps {
   onPositionsChange: (positions: Record<string, WorkflowPosition>) => void;
 }
 
-interface DragState {
-  isDragging: boolean;
-  dragId: string | null;
-  startX: number;
-  startY: number;
-  initialX: number;
-  initialY: number;
-  offsetX: number;
-  offsetY: number;
-  hasMoved: boolean;
-}
-
 const MiniPreview: React.FC<{ project: Project }> = ({ project }) => {
-  const { canvasData } = project;
-  const svgRef = useRef<SVGSVGElement>(null);
+  const { canvasData, a4Dimensions } = project;
 
-  const CANVAS_WIDTH = 1132;
-  const CANVAS_HEIGHT = 800;
-  const PADDING = 40;
+  const a4 = a4Dimensions;
+  const hasA4 = a4?.a4WidthPx && a4?.a4HeightPx && a4?.a4WidthPx > 0;
 
-  const wallsPath = useMemo(() => {
-    const walls = canvasData.walls || [];
-    return walls.map((wall: any) => {
-      const thickness = wall.thickness || 4;
-      const angle = Math.atan2(wall.endY - wall.startY, wall.endX - wall.startX);
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-
-      const dx = (thickness / 2) * sin;
-      const dy = (thickness / 2) * cos;
-
-      return `M ${wall.startX - dx} ${wall.startY + dy} L ${wall.endX - dx} ${wall.endY + dy} L ${wall.endX + dx} ${wall.endY - dy} L ${wall.startX + dx} ${wall.startY - dy} Z`;
-    }).join(' ');
-  }, [canvasData.walls]);
-
-  const contentBounds = useMemo(() => {
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-
-    const shapes = canvasData.shapes || [];
-    const walls = canvasData.walls || [];
-
-    shapes.forEach((shape: any) => {
-      if (shape.x !== undefined && shape.y !== undefined) {
-        minX = Math.min(minX, shape.x);
-        minY = Math.min(minY, shape.y);
-        maxX = Math.max(maxX, shape.x + (shape.width || 0));
-        maxY = Math.max(maxY, shape.y + (shape.height || 0));
-      }
-    });
-
-    walls.forEach((wall: any) => {
-      minX = Math.min(minX, wall.startX, wall.endX);
-      minY = Math.min(minY, wall.startY, wall.endY);
-      maxX = Math.max(maxX, wall.startX, wall.endX);
-      maxY = Math.max(maxY, wall.startY, wall.endY);
-    });
-
-    if (!isFinite(minX) || minX === Infinity) {
-      minX = 0;
-      minY = 0;
-      maxX = CANVAS_WIDTH;
-      maxY = CANVAS_HEIGHT;
-    }
-
-    return { minX, minY, maxX, maxY };
-  }, [canvasData]);
-
-  const viewBox = useMemo(() => {
-    const { minX, minY, maxX, maxY } = contentBounds;
-    const contentMinX = Math.min(0, minX);
-    const contentMinY = Math.min(0, minY);
-    const contentMaxX = Math.max(CANVAS_WIDTH, maxX);
-    const contentMaxY = Math.max(CANVAS_HEIGHT, maxY);
-
-    const viewX = contentMinX - PADDING;
-    const viewY = contentMinY - PADDING;
-    const viewW = (contentMaxX - contentMinX) + PADDING * 2;
-    const viewH = (contentMaxY - contentMinY) + PADDING * 2;
-
-    return `${viewX} ${viewY} ${viewW} ${viewH}`;
-  }, [contentBounds]);
-
+  if (hasA4) {
   return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      background: '#ffffff',
-      borderRadius: '8px',
-      overflow: 'hidden',
-      border: '1px solid #e5e5e5',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}>
-      <svg
-        ref={svgRef}
-        viewBox={viewBox}
-        style={{
-          width: '100%',
-          height: '100%',
-        }}
-        preserveAspectRatio="xMidYMid meet"
-      >
-        {/* Canvas background */}
-        <rect x={0} y={0} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} fill="#ffffff" stroke="#e0e0e0" strokeWidth={1} />
-
-        {/* Grid pattern */}
+    <div style={{ width: '100%', height: '100%', background: '#ffffff', borderRadius: '4px', overflow: 'hidden' }}>
+      <svg viewBox={`${a4!.a4X} ${a4!.a4Y} ${a4!.a4WidthPx} ${a4!.a4HeightPx}`} style={{ width: '100%', height: '100%' }}>
         <defs>
-          <pattern id={`grid-${project.id}`} width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#f1f5f9" strokeWidth="0.5" />
+          <pattern id="previewGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#f1f5f9" strokeWidth="0.5" />
           </pattern>
         </defs>
-        <rect x={0} y={0} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} fill={`url(#grid-${project.id})`} />
+        <rect x={a4!.a4X} y={a4!.a4Y} width={a4!.a4WidthPx} height={a4!.a4HeightPx} fill="white" />
+        <rect x={a4!.a4X} y={a4!.a4Y} width={a4!.a4WidthPx} height={a4!.a4HeightPx} fill="url(#previewGrid)" />
 
-        {/* Drawings (brush strokes) */}
-        {canvasData.drawings?.map((drawing: any) => (
-          <path
-            key={drawing.id}
-            d={drawing.d}
-            stroke={drawing.stroke || '#94a3b8'}
-            strokeWidth={drawing.strokeWidth || 2}
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity="0.6"
-          />
-        ))}
+          {(canvasData.walls || []).map((w: any) => (
+            <line key={w.id || Math.random()} x1={w.startX || 0} y1={w.startY || 0} x2={w.endX || 0} y2={w.endY || 0} stroke="#475569" strokeWidth={w.thickness || 6} />
+          ))}
 
-        {/* Shapes */}
-        {canvasData.shapes?.map((shape: any) => {
-          if (shape.type === 'rectangle') {
-            if (shape.tableData?.type === 'table-oval') {
-              return (
-                <ellipse
-                  key={shape.id}
-                  cx={shape.x + shape.width / 2}
-                  cy={shape.y + shape.height / 2}
-                  rx={shape.width / 2}
-                  ry={shape.height / 2}
-                  fill={shape.fill || '#f8fafc'}
-                  stroke={shape.stroke || '#cbd5e1'}
-                  strokeWidth={shape.strokeWidth || 1}
+          {(canvasData.doors || []).map((d: any) => {
+            const doorWidth = d.width || 30;
+            const doorHeight = d.height || 6;
+            return (
+              <g key={d.id || Math.random()}>
+                <path
+                  d={`M ${(d.x || 0) - doorWidth/2} ${(d.y || 0) - doorHeight} Q ${(d.x || 0) - doorWidth/2} ${(d.y || 0)} ${(d.x || 0) + doorWidth/2} ${(d.y || 0) - doorHeight} Z`}
+                  fill="#a8a29e"
+                  stroke="#78716c"
+                  strokeWidth="1"
                 />
-              );
+                <circle cx={d.x || 0} cy={(d.y || 0) - doorHeight} r="3" fill="#1c1917" />
+              </g>
+            );
+          })}
+
+          {(canvasData.shapes || []).map((s: any) => {
+            const x = s.x ?? 0;
+            const y = s.y ?? 0;
+            const w = s.width ?? 50;
+            const h = s.height ?? 50;
+
+            if (s.tableData?.type === 'table-round' || s.type === 'circle') {
+              return <circle key={s.id} cx={x + w/2} cy={y + h/2} r={w/2} fill={s.fill || '#fef3c7'} stroke={s.stroke || '#f59e0b'} strokeWidth="2" />;
             }
+
+            if (s.tableData?.type === 'table-oval' || s.type === 'ellipse') {
+              return <ellipse key={s.id} cx={x + w/2} cy={y + h/2} rx={w/2} ry={h/2} fill={s.fill || '#fef3c7'} stroke={s.stroke || '#f59e0b'} strokeWidth="2" />;
+            }
+
+            if (s.type === 'image' && s.imageUrl) {
+              return <image key={s.id} href={s.imageUrl} x={x} y={y} width={w} height={h} />;
+            }
+
+            const radius = s.tableData?.type === 'table-rectangle' ? Math.min(w, h) * 0.15 : 4;
             return (
               <rect
-                key={shape.id}
-                x={shape.x}
-                y={shape.y}
-                width={shape.width}
-                height={shape.height}
-                fill={shape.spaceMetersWidth ? 'rgba(248, 250, 252, 0.95)' : (shape.fill || '#f8fafc')}
-                stroke={shape.spaceMetersWidth ? '#334155' : (shape.stroke || '#cbd5e1')}
-                strokeWidth={shape.strokeWidth || (shape.spaceMetersWidth ? 3 : 1)}
-                rx={shape.type === 'rectangle' ? 2 : 0}
+                key={s.id}
+                x={x}
+                y={y}
+                width={w}
+                height={h}
+                fill={s.spaceMetersWidth ? 'rgba(248, 250, 252, 0.95)' : (s.fill || '#f8fafc')}
+                stroke={s.spaceMetersWidth ? '#334155' : (s.stroke || '#e2e8f0')}
+                strokeWidth={s.spaceMetersWidth ? 3 : 1.5}
+                rx={radius}
               />
             );
-          }
-          if (shape.type === 'circle') {
-            const radius = shape.width / 2;
-            return (
-              <circle
-                key={shape.id}
-                cx={shape.x + radius}
-                cy={shape.y + radius}
-                r={radius}
-                fill={shape.fill || '#f8fafc'}
-                stroke={shape.stroke || '#cbd5e1'}
-                strokeWidth={shape.strokeWidth || 1}
-              />
-            );
-          }
-          if (shape.type === 'image' && shape.imageUrl) {
-            return (
-              <image
-                key={shape.id}
-                href={shape.imageUrl}
-                x={shape.x}
-                y={shape.y}
-                width={shape.width}
-                height={shape.height}
-                preserveAspectRatio="xMidYMid meet"
-              />
-            );
-          }
-          return null;
-        })}
+          })}
 
-        {/* Walls */}
-        {wallsPath && (
-          <path
-            d={wallsPath}
-            fill="#334155"
-            stroke="#1e293b"
-            strokeWidth={0.5}
-          />
-        )}
+          {(canvasData.textElements || []).map((t: any) => (
+            <text key={t.id} x={t.x || 0} y={t.y || 0} fill={t.fill || '#374151'} fontSize={t.fontSize || 12} fontFamily="sans-serif">
+              {t.text}
+            </text>
+          ))}
+        </svg>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ width: '100%', height: '100%', background: '#ffffff', borderRadius: '4px', overflow: 'hidden' }}>
+      <svg viewBox="-200 -150 400 300" style={{ width: '100%', height: '100%' }}>
+        <rect x="-200" y="-150" width="400" height="300" fill="white" />
+        <rect x="-200" y="-150" width="400" height="300" fill="url(#previewGrid)" />
+
+        {(canvasData.walls || []).map((w: any) => (
+          <line key={w.id || Math.random()} x1={w.startX || 0} y1={w.startY || 0} x2={w.endX || 0} y2={w.endY || 0} stroke="#475569" strokeWidth={w.thickness || 6} />
+        ))}
+
+        {(canvasData.shapes || []).map((s: any) => {
+          const x = s.x ?? 0;
+          const y = s.y ?? 0;
+          const w = s.width ?? 50;
+          const h = s.height ?? 50;
+
+          if (s.tableData?.type === 'table-round') {
+            return <circle key={s.id} cx={x + w/2} cy={y + h/2} r={w/2} fill="#fef3c7" stroke="#f59e0b" strokeWidth="2" />;
+          }
+
+          if (s.tableData?.type === 'table-oval') {
+            return <ellipse key={s.id} cx={x + w/2} cy={y + h/2} rx={w/2} ry={h/2} fill="#fef3c7" stroke="#f59e0b" strokeWidth="2" />;
+          }
+
+          return <rect key={s.id} x={x} y={y} width={w} height={h} fill={s.fill || '#f8fafc'} stroke={s.stroke || '#e2e8f0'} strokeWidth="2" rx="4" />;
+        })}
       </svg>
     </div>
   );
@@ -240,146 +153,114 @@ const DraggableCard: React.FC<{
   index: number;
   isActive: boolean;
   position: WorkflowPosition;
-  containerRef: React.RefObject<HTMLDivElement | null>;
-  dragState: DragState;
-  onDragChange: (changes: Partial<DragState>) => void;
-  onSelect: () => void;
-  onHighlight: () => void;
   onPositionChange: (id: string, x: number, y: number) => void;
-}> = ({
-  project,
-  index,
-  isActive,
-  position,
-  containerRef,
-  dragState,
-  onDragChange,
-  onSelect,
-  onHighlight,
-  onPositionChange,
-}) => {
+  onSelect: () => void;
+}> = ({ project, index, isActive, position, onPositionChange, onSelect }) => {
   const cardRef = useRef<HTMLDivElement>(null);
-  const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const dragStartPos = useRef({ x: 0, y: 0 });
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
 
-    const cardRect = cardRef.current?.getBoundingClientRect();
-    if (!cardRect) return;
+    const rect = cardRef.current?.getBoundingClientRect();
+    if (!rect) return;
 
-    const clickOffsetX = e.clientX - cardRect.left;
-    const clickOffsetY = e.clientY - cardRect.top;
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
 
-    // Track where mouse went down for movement detection
-    mouseDownPosRef.current = { x: e.clientX, y: e.clientY };
+    setDragOffset({ x: clickX, y: clickY });
+    dragStartPos.current = { x: position.x, y: position.y };
+    setIsDragging(true);
+  };
 
-    onDragChange({
-      isDragging: true,
-      dragId: project.id,
-      startX: e.clientX,
-      startY: e.clientY,
-      initialX: position.x,
-      initialY: position.y,
-      offsetX: clickOffsetX,
-      offsetY: clickOffsetY,
-      hasMoved: false,
-    });
-  }, [project.id, position.x, position.y, onDragChange]);
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDragging) return;
 
-  const isBeingDragged = dragState.isDragging && dragState.dragId === project.id;
-  const translateX = isBeingDragged ? dragState.startX - dragState.offsetX : position.x;
-  const translateY = isBeingDragged ? dragState.startY - dragState.offsetY : position.y;
+    const newX = e.clientX - dragOffset.x;
+    const newY = e.clientY - dragOffset.y;
+
+    onPositionChange(project.id, newX, newY);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging]);
 
   return (
     <div
       ref={cardRef}
       onMouseDown={handleMouseDown}
-      onClick={(e) => {
-        // Don't open if we just finished dragging (card was moved more than 5px)
-        if (mouseDownPosRef.current) {
-          const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
-          const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
-          mouseDownPosRef.current = null;
-
-          if (dx > 5 || dy > 5) {
-            e.preventDefault();
-            e.stopPropagation();
-            return;
-          }
-        }
-
-        // Single click opens the project
-        onSelect();
-      }}
+      onClick={onSelect}
       style={{
         position: 'absolute',
-        left: 0,
-        top: 0,
-        width: '280px',
-        minHeight: '220px',
+        left: position.x,
+        top: position.y,
+        width: '320px',
+        height: '280px',
         background: '#ffffff',
-        borderRadius: '12px',
-        border: isActive ? '2px solid #000000' : '1px solid #e5e5e5',
-        boxShadow: isBeingDragged
-          ? '0 12px 40px rgba(0, 0, 0, 0.25)'
-          : '0 2px 8px rgba(0, 0, 0, 0.06)',
-        cursor: isBeingDragged ? 'grabbing' : 'grab',
-        transition: isBeingDragged ? 'none' : 'box-shadow 0.2s ease',
-        opacity: isBeingDragged ? 0.95 : 1,
+        borderRadius: '16px',
+        border: isActive ? '2.5px solid #000000' : '1px solid #e5e5e5',
+        boxShadow: isDragging
+          ? '0 20px 50px rgba(0, 0, 0, 0.3)'
+          : '0 4px 20px rgba(0, 0, 0, 0.08)',
+        cursor: isDragging ? 'grabbing' : 'grab',
+        opacity: isDragging ? 0.95 : 1,
         overflow: 'hidden',
         userSelect: 'none',
         display: 'flex',
         flexDirection: 'column',
-        zIndex: isBeingDragged ? 9999 : (isActive ? 100 : 1),
-        pointerEvents: isBeingDragged ? 'none' : 'auto',
-        transform: `translate(${translateX}px, ${translateY}px)`,
-        willChange: 'transform',
-      }}
-      onMouseEnter={(e) => {
-        if (!isBeingDragged) {
-          e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.1)';
-          e.currentTarget.style.borderColor = '#d0d0d0';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isBeingDragged) {
-          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.06)';
-          e.currentTarget.style.borderColor = '#e5e5e5';
-        }
+        zIndex: isDragging ? 9999 : (isActive ? 100 : 1),
+        pointerEvents: isDragging ? 'none' : 'auto',
+        transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
       }}
     >
       <div style={{
-        padding: '16px',
-        borderBottom: '1px solid #f0f0f0',
+        padding: '14px 16px',
+        borderBottom: '1px solid #f5f5f5',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            background: isActive ? '#000000' : '#f5f5f5',
+            width: '28px',
+            height: '28px',
+            borderRadius: '7px',
+            background: isActive ? '#000000' : '#f8fafc',
+            border: '1px solid #e2e8f0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '14px',
+            fontSize: '13px',
             fontWeight: 600,
-            color: isActive ? '#ffffff' : '#333333',
+            color: isActive ? '#ffffff' : '#475569',
           }}>
             {index + 1}
           </div>
           <span style={{
-            fontSize: '14px',
+            fontSize: '13px',
             fontWeight: 600,
-            color: '#333333',
+            color: '#1e293b',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            maxWidth: '180px',
+            maxWidth: '200px',
           }}>
             {project.name}
           </span>
@@ -388,16 +269,23 @@ const DraggableCard: React.FC<{
           width: '8px',
           height: '8px',
           borderRadius: '50%',
-          background: isActive ? '#22c55e' : '#e5e5e5',
+          background: isActive ? '#22c55e' : '#e2e8f0',
+          boxShadow: isActive ? '0 0 8px rgba(34, 197, 94, 0.4)' : 'none',
         }} />
       </div>
       <div style={{
-        padding: '12px',
+        flex: 1,
+        padding: '10px',
         display: 'flex',
-        justifyContent: 'center',
         alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        background: '#fafafa',
+        borderTop: '1px solid #f0f0f0',
       }}>
-        <MiniPreview project={project} />
+        <div style={{ width: '100%', height: '100%' }}>
+          <MiniPreview project={project} />
+        </div>
       </div>
     </div>
   );
@@ -412,41 +300,20 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   onPositionsChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dragState, setDragState] = useState<DragState>({
-    isDragging: false,
-    dragId: null,
-    startX: 0,
-    startY: 0,
-    initialX: 0,
-    initialY: 0,
-    offsetX: 0,
-    offsetY: 0,
-    hasMoved: false,
-  });
-
-  const positionsRef = useRef(positions);
-  positionsRef.current = positions;
-
-  const onPositionsChangeRef = useRef(onPositionsChange);
-  onPositionsChangeRef.current = onPositionsChange;
+  const [pan, setPan] = useState({ x: -200, y: -200 });
+  const [zoom, setZoom] = useState(1);
+  const [isPanning, setIsPanning] = useState(false);
+  const panStart = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     const newPositions: Record<string, WorkflowPosition> = { ...positions };
     let hasChanges = false;
 
-    projects.forEach((project) => {
+    projects.forEach((project, index) => {
       if (!newPositions[project.id]) {
-        const cols = 4;
-        const spacingX = 320;
-        const spacingY = 320;
-        const offsetX = 60;
-        const offsetY = 120;
-        const index = projects.indexOf(project);
-        const col = index % cols;
-        const row = Math.floor(index / cols);
         newPositions[project.id] = {
-          x: offsetX + col * spacingX,
-          y: offsetY + row * spacingY,
+          x: 40 + (index % 3) * 340,
+          y: 40 + Math.floor(index / 3) * 300,
         };
         hasChanges = true;
       }
@@ -457,87 +324,42 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     }
   }, [projects, onPositionsChange]);
 
-  useEffect(() => {
-    if (!dragState.isDragging) return;
+  const handlePanStart = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    setIsPanning(true);
+    panStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+  };
 
-    let lastUpdateTime = 0;
-    const updateThrottleMs = 16;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const now = Date.now();
-      const newX = e.clientX - dragState.offsetX;
-      const newY = e.clientY - dragState.offsetY;
-
-      setDragState(prev => ({
-        ...prev,
-        startX: e.clientX,
-        startY: e.clientY,
-        hasMoved: prev.hasMoved || Math.abs(newX - dragState.initialX) > 3 || Math.abs(newY - dragState.initialY) > 3,
-      }));
-
-      if (dragState.dragId && now - lastUpdateTime >= updateThrottleMs) {
-        lastUpdateTime = now;
-        onPositionsChangeRef.current({
-          ...positionsRef.current,
-          [dragState.dragId]: { x: newX, y: newY },
-        });
-      }
-    };
-
-    const handleMouseUp = () => {
-      setDragState({
-        isDragging: false,
-        dragId: null,
-        startX: 0,
-        startY: 0,
-        initialX: 0,
-        initialY: 0,
-        offsetX: 0,
-        offsetY: 0,
-        hasMoved: false,
-      });
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [dragState.isDragging, dragState.dragId, dragState.offsetX, dragState.offsetY, dragState.initialX, dragState.initialY]);
-
-  useEffect(() => {
-    return () => {
-      setDragState({
-        isDragging: false,
-        dragId: null,
-        startX: 0,
-        startY: 0,
-        initialX: 0,
-        initialY: 0,
-        offsetX: 0,
-        offsetY: 0,
-        hasMoved: false,
-      });
-    };
-  }, []);
-
-  const handleDragChange = useCallback((changes: Partial<DragState>) => {
-    setDragState(prev => ({ ...prev, ...changes }));
-  }, []);
-
-  const handlePositionChange = useCallback((id: string, x: number, y: number) => {
-    onPositionsChange({
-      ...positions,
-      [id]: { x, y },
+  const handlePanMove = (e: MouseEvent) => {
+    if (!isPanning) return;
+    setPan({
+      x: e.clientX - panStart.current.x,
+      y: e.clientY - panStart.current.y,
     });
-  }, [positions, onPositionsChange]);
+  };
+
+  const handlePanEnd = () => {
+    setIsPanning(false);
+  };
+
+  useEffect(() => {
+    if (isPanning) {
+      window.addEventListener('mousemove', handlePanMove);
+      window.addEventListener('mouseup', handlePanEnd);
+      return () => {
+        window.removeEventListener('mousemove', handlePanMove);
+        window.removeEventListener('mouseup', handlePanEnd);
+      };
+    }
+  }, [isPanning]);
+
+  const handleZoomIn = () => setZoom(Math.min(zoom + 0.1, 2));
+  const handleZoomOut = () => setZoom(Math.max(zoom - 0.1, 0.3));
+  const handleReset = () => { setPan({ x: 0, y: 0 }); setZoom(1); };
 
   const handleHighlight = useCallback((projectId: string) => {
-    // Just highlight the project without opening it
-    // This is handled by the parent component
-  }, []);
+    onHighlight(projectId);
+  }, [onHighlight]);
 
   const [notesExpanded, setNotesExpanded] = useState(true);
   const [notes, setNotes] = useState<string>(() => {
@@ -561,20 +383,33 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         left: 0,
         width: '100vw',
         height: '100vh',
-        background: '#e5e5e5',
+        background: '#1a1a1a',
         overflow: 'hidden',
         zIndex: 1000,
-        pointerEvents: 'auto',
+        cursor: isPanning ? 'grabbing' : 'grab',
       }}
+      onMouseDown={handlePanStart}
     >
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        background: '#e5e5e5',
-      }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+          transformOrigin: '0 0',
+          transition: isPanning ? 'none' : 'transform 0.1s ease-out',
+        }}
+      >
+      <div
+        style={{
+          position: 'absolute',
+          top: -1000,
+          left: -1000,
+          width: '5000px',
+          height: '5000px',
+          background: '#e5e5e5',
+        }}
+      >
         <svg width="100%" height="100%" style={{ position: 'absolute', top: 0, left: 0 }}>
           <defs>
             <pattern id="workflow-grid" width="20" height="20" patternUnits="userSpaceOnUse">
@@ -585,32 +420,29 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
               <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#b0b0b0" strokeWidth={1} />
             </pattern>
           </defs>
-          <rect x="-10000" y="-10000" width="20000" height="20000" fill="url(#workflow-grid-major)" />
+          <rect width="100%" height="100%" fill="url(#workflow-grid-major)" />
         </svg>
       </div>
-      {projects.map((project, index) => (
-        <div
-          key={project.id}
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-          }}
-        >
+
+        {projects.map((project, index) => {
+        return (
           <DraggableCard
+            key={project.id}
             project={project}
             index={index}
             isActive={activeProjectId === project.id}
-            position={positions[project.id] || { x: 0, y: 0 }}
-            containerRef={containerRef}
-            dragState={dragState}
-            onDragChange={handleDragChange}
+            position={positions[project.id] || { x: 60 + (index % 4) * 340, y: 120 + Math.floor(index / 4) * 300 }}
+            onPositionChange={(id, x, y) => {
+              onPositionsChange({
+                ...positions,
+                [id]: { x, y },
+              });
+            }}
             onSelect={() => onProjectSelect(project.id)}
-            onHighlight={() => onHighlight(project.id)}
-            onPositionChange={handlePositionChange}
           />
-        </div>
-      ))}
+        );
+      })}
+
       {projects.length === 0 && (
         <div style={{
           position: 'absolute',
@@ -633,6 +465,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
           <p style={{ fontSize: '13px', color: '#999999' }}>Create a new project to get started</p>
         </div>
       )}
+
       <div style={{
         position: 'fixed',
         top: '88px',
@@ -733,6 +566,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
           )}
         </div>
       </div>
+
       {!notesExpanded && (
         <button
           onClick={() => setNotesExpanded(true)}
@@ -762,8 +596,46 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
           Notes
         </button>
       )}
+
+      <div style={{
+        position: 'fixed',
+        bottom: '24px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        gap: '8px',
+        background: '#ffffff',
+        padding: '8px 12px',
+        borderRadius: '12px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+        zIndex: 1002,
+      }}>
+        <button onClick={handleZoomOut} style={zoomBtnStyle}>−</button>
+        <span style={{ display: 'flex', alignItems: 'center', fontSize: '13px', fontWeight: 500, minWidth: '50px', justifyContent: 'center' }}>
+          {Math.round(zoom * 100)}%
+        </span>
+        <button onClick={handleZoomIn} style={zoomBtnStyle}>+</button>
+        <div style={{ width: '1px', background: '#e2e8f0', margin: '0 4px' }} />
+        <button onClick={handleReset} style={{ ...zoomBtnStyle, padding: '0 12px' }}>Reset</button>
+      </div>
+      </div>
     </div>
   );
+};
+
+const zoomBtnStyle: React.CSSProperties = {
+  width: '32px',
+  height: '32px',
+  borderRadius: '8px',
+  border: '1px solid #e2e8f0',
+  background: '#ffffff',
+  fontSize: '18px',
+  fontWeight: 500,
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: '#475569',
 };
 
 export default WorkflowCanvas;
