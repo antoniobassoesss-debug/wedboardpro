@@ -708,19 +708,19 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
 }
 
 // Category Status Badge Component
-function CategoryStatus({ category }: { category: BudgetCategory }) {
-  const getStatusConfig = () => {
-    const hasOverdue = category.payment_schedule?.some(p => !p.paid && new Date(p.due_date) < new Date());
-    if (hasOverdue) return { label: 'Overdue', color: '#dc2626', bg: '#fef2f2' };
-    if (category.contracted_amount && category.paid_amount >= category.contracted_amount) {
-      return { label: 'Paid', color: '#16a34a', bg: '#ecfdf5' };
-    }
-    if (category.paid_amount > 0) return { label: 'Partial', color: '#f97316', bg: '#fff7ed' };
-    if (category.contracted_amount && category.contracted_amount > 0) return { label: 'Contracted', color: '#3b82f6', bg: '#eff6ff' };
-    return { label: 'Planned', color: '#6b7280', bg: '#f3f4f6' };
-  };
+const CATEGORY_STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  planned: { label: 'Planned', color: '#6b7280', bg: '#f3f4f6' },
+  in_progress: { label: 'In Progress', color: '#3b82f6', bg: '#eff6ff' },
+  awaiting_invoice: { label: 'Awaiting Invoice', color: '#f59e0b', bg: '#fef3c7' },
+  invoice_received: { label: 'Invoice Received', color: '#8b5cf6', bg: '#f5f3ff' },
+  paid: { label: 'Paid', color: '#16a34a', bg: '#ecfdf5' },
+  completed: { label: 'Completed', color: '#059669', bg: '#d1fae5' },
+};
 
-  const config = getStatusConfig();
+function CategoryStatus({ category }: { category: BudgetCategory }) {
+  const status = category.category_status || 'planned';
+  const config = CATEGORY_STATUS_CONFIG[status] || CATEGORY_STATUS_CONFIG.planned;
+
   return (
     <span className="fcc-status-pill" style={{ color: config.color, backgroundColor: config.bg }}>
       {config.label}

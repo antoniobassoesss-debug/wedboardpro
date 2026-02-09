@@ -45,6 +45,15 @@ const INVOICE_STATUS_OPTIONS = [
   { value: 'invoice_paid', label: 'Paid' },
 ];
 
+const CATEGORY_STATUS_OPTIONS = [
+  { value: 'planned', label: 'Planned', color: '#6b7280', bg: '#f3f4f6' },
+  { value: 'in_progress', label: 'In Progress', color: '#3b82f6', bg: '#eff6ff' },
+  { value: 'awaiting_invoice', label: 'Awaiting Invoice', color: '#f59e0b', bg: '#fef3c7' },
+  { value: 'invoice_received', label: 'Invoice Received', color: '#8b5cf6', bg: '#f5f3ff' },
+  { value: 'paid', label: 'Paid', color: '#16a34a', bg: '#ecfdf5' },
+  { value: 'completed', label: 'Completed', color: '#059669', bg: '#d1fae5' },
+];
+
 interface CategorySupplier {
   supplier_id: string;
   supplier_name: string;
@@ -69,6 +78,7 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
     category.contracted_amount ? String(category.contracted_amount / 100) : ''
   );
   const [isContracted, setIsContracted] = useState(category.is_contracted);
+  const [categoryStatus, setCategoryStatus] = useState('planned');
   const [notes, setNotes] = useState(category.notes || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -164,6 +174,7 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
       budgeted_amount: budgeted,
       contracted_amount: contracted,
       is_contracted: isContracted,
+      category_status: categoryStatus,
       paid_amount: category.paid_amount,
       notes: notes.trim() || null,
     });
@@ -243,17 +254,30 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
                   </div>
 
                   <div className="budget-form-group">
-                    <label>Contracted</label>
-                    <div className="budget-currency-input">
-                      <span className="budget-currency-symbol">{currencySymbol}</span>
-                      <input
-                        type="text"
-                        value={contractedAmount}
-                        onChange={(e) => setContractedAmount(e.target.value)}
-                        placeholder="0"
-                        className="budget-input budget-input-currency"
-                      />
-                    </div>
+                    <label>Status</label>
+                    <select
+                      value={categoryStatus}
+                      onChange={(e) => setCategoryStatus(e.target.value)}
+                      className="budget-select"
+                    >
+                      {CATEGORY_STATUS_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="budget-form-group">
+                  <label>Contracted</label>
+                  <div className="budget-currency-input">
+                    <span className="budget-currency-symbol">{currencySymbol}</span>
+                    <input
+                      type="text"
+                      value={contractedAmount}
+                      onChange={(e) => setContractedAmount(e.target.value)}
+                      placeholder="0"
+                      className="budget-input budget-input-currency"
+                    />
                   </div>
                 </div>
 

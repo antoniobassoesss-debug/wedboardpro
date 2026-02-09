@@ -57,6 +57,7 @@ export interface BudgetCategory {
   payment_schedule: PaymentScheduleItem[];
   vendor_id: string | null;
   is_contracted: boolean;
+  category_status: string;
   notes: string | null;
   deleted_at: string | null;
   created_at: string;
@@ -103,6 +104,7 @@ export interface CategoryUpdate {
   paid_amount?: number;
   payment_schedule?: PaymentScheduleItem[];
   is_contracted?: boolean;
+  category_status?: string;
   notes?: string | null;
 }
 
