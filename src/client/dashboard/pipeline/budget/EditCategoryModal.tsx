@@ -230,8 +230,6 @@ const [supplierInvoiceAmount, setSupplierInvoiceAmount] = useState('');
   };
 
   const currencySymbol = currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '$';
-  const totalSupplierQuotes = categorySuppliers.reduce((sum, cs) => sum + (cs.quoted_price || 0), 0);
-  const totalInvoices = categorySuppliers.reduce((sum, cs) => sum + (cs.invoice_amount || 0), 0);
 
   const content = (
     <div className="budget-modal-backdrop" onClick={onClose}>
@@ -577,19 +575,6 @@ const [supplierInvoiceAmount, setSupplierInvoiceAmount] = useState('');
                     ))
                   )}
                 </div>
-
-                {categorySuppliers.length > 0 && (
-                  <div className="budget-supplier-totals">
-                    <div className="budget-supplier-total">
-                      <span>Quotes:</span>
-                      <span>{formatCurrency(totalSupplierQuotes, currency)}</span>
-                    </div>
-                    <div className="budget-supplier-total">
-                      <span>Invoices:</span>
-                      <span>{formatCurrency(totalInvoices, currency)}</span>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </div>

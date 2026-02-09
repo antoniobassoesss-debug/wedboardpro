@@ -1569,36 +1569,6 @@
   font-family: ui-monospace, monospace;
 }
 
-/* Supplier Totals */
-.budget-supplier-totals {
-  display: flex;
-  justify-content: space-between;
-  padding: 14px 16px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-}
-
-.budget-supplier-total {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.budget-supplier-total span:first-child {
-  font-size: 11px;
-  font-weight: 600;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.budget-supplier-total span:last-child {
-  font-size: 15px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
 /* Select Small */
 .budget-select-small {
   padding: 6px 8px;
