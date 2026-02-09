@@ -493,6 +493,7 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                 <div className="fcc-col-category">Category</div>
                 <div className="fcc-col-budget">Budget</div>
                 <div className="fcc-col-contracted">Contracted</div>
+                <div className="fcc-col-status">Status</div>
               </div>
 
               <div className="fcc-table-body">
@@ -564,6 +565,10 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
                           ) : (
                             <>{formatCurrency(contracted / 100)}</>
                           )}
+                        </div>
+
+                        <div className="fcc-col-status">
+                          <CategoryStatus category={category} />
                         </div>
                       </div>
                     </React.Fragment>
@@ -698,6 +703,27 @@ const FinancialCommandCenter: React.FC<FinancialCommandCenterProps> = ({ eventId
         </div>
       )}
     </div>
+  );
+}
+
+// Category Status Badge Component
+function CategoryStatus({ category }: { category: BudgetCategory }) {
+  const getStatusConfig = () => {
+    const hasOverdue = category.payment_schedule?.some(p => !p.paid && new Date(p.due_date) < new Date());
+    if (hasOverdue) return { label: 'Overdue', color: '#dc2626', bg: '#fef2f2' };
+    if (category.contracted_amount && category.paid_amount >= category.contracted_amount) {
+      return { label: 'Paid', color: '#16a34a', bg: '#ecfdf5' };
+    }
+    if (category.paid_amount > 0) return { label: 'Partial', color: '#f97316', bg: '#fff7ed' };
+    if (category.contracted_amount && category.contracted_amount > 0) return { label: 'Contracted', color: '#3b82f6', bg: '#eff6ff' };
+    return { label: 'Planned', color: '#6b7280', bg: '#f3f4f6' };
+  };
+
+  const config = getStatusConfig();
+  return (
+    <span className="fcc-status-pill" style={{ color: config.color, backgroundColor: config.bg }}>
+      {config.label}
+    </span>
   );
 }
 
