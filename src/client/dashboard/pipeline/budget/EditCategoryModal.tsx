@@ -26,15 +26,15 @@ const CATEGORY_OPTIONS = Object.entries(CATEGORY_LABELS).map(([value, label]) =>
   icon: CATEGORY_ICONS[value as CategoryName],
 }));
 
-const SUPPLIER_STATUS_OPTIONS: { value: EventSupplierStatus; label: string; color: string }[] = [
-  { value: 'potential', label: 'Potential', color: '#6b7280' },
-  { value: 'contacted', label: 'Contacted', color: '#8b5cf6' },
-  { value: 'quote_requested', label: 'Quote Requested', color: '#f59e0b' },
-  { value: 'quote_received', label: 'Quote Received', color: '#3b82f6' },
-  { value: 'negotiating', label: 'Negotiating', color: '#ec4899' },
-  { value: 'confirmed', label: 'Confirmed', color: '#16a34a' },
-  { value: 'paid_completed', label: 'Paid', color: '#059669' },
-  { value: 'declined_lost', label: 'Declined', color: '#dc2626' },
+const SUPPLIER_STATUS_OPTIONS: { value: EventSupplierStatus; label: string; color: string; bg: string }[] = [
+  { value: 'potential', label: 'Potential', color: '#6b7280', bg: '#f3f4f6' },
+  { value: 'contacted', label: 'Contacted', color: '#8b5cf6', bg: '#f5f3ff' },
+  { value: 'quote_requested', label: 'Quote Requested', color: '#f59e0b', bg: '#fef3c7' },
+  { value: 'quote_received', label: 'Quote Received', color: '#3b82f6', bg: '#eff6ff' },
+  { value: 'negotiating', label: 'Negotiating', color: '#ec4899', bg: '#fdf2f8' },
+  { value: 'confirmed', label: 'Confirmed', color: '#16a34a', bg: '#ecfdf5' },
+  { value: 'paid_completed', label: 'Paid', color: '#059669', bg: '#d1fae5' },
+  { value: 'declined_lost', label: 'Declined', color: '#dc2626', bg: '#fef2f2' },
 ];
 
 const INVOICE_STATUS_OPTIONS = [
@@ -58,6 +58,7 @@ interface CategorySupplier {
   supplier_id: string;
   supplier_name: string;
   supplier_company: string | null;
+  supplier_category: string;
   status: EventSupplierStatus;
   quoted_price: number | null;
   invoice_status: string;
@@ -92,7 +93,12 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
   const [supplierQuote, setSupplierQuote] = useState('');
   const [supplierStatus, setSupplierStatus] = useState<EventSupplierStatus>('potential');
   const [supplierInvoiceStatus, setSupplierInvoiceStatus] = useState('no_invoice');
-  const [supplierInvoiceAmount, setSupplierInvoiceAmount] = useState('');
+const [supplierInvoiceAmount, setSupplierInvoiceAmount] = useState('');
+  const [editingSupplier, setEditingSupplier] = useState<CategorySupplier | null>(null);
+  const [editStatus, setEditStatus] = useState<EventSupplierStatus>('potential');
+  const [editQuote, setEditQuote] = useState('');
+  const [editInvoiceStatus, setEditInvoiceStatus] = useState('no_invoice');
+  const [editInvoiceAmount, setEditInvoiceAmount] = useState('');
 
   useEffect(() => {
     const loadSuppliers = async () => {
@@ -140,6 +146,7 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
       supplier_id: pendingSupplier.id,
       supplier_name: pendingSupplier.name,
       supplier_company: pendingSupplier.company_name,
+      supplier_category: pendingSupplier.category,
       status: supplierStatus,
       quoted_price: supplierQuote ? parseCurrencyToCents(supplierQuote) : null,
       invoice_status: supplierInvoiceStatus,
@@ -152,6 +159,39 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
 
   const handleRemoveSupplier = (supplierId: string) => {
     setCategorySuppliers(categorySuppliers.filter((cs) => cs.supplier_id !== supplierId));
+    if (editingSupplier?.supplier_id === supplierId) {
+      setEditingSupplier(null);
+    }
+  };
+
+  const handleOpenEditSupplier = (cs: CategorySupplier) => {
+    setEditingSupplier(cs);
+    setEditStatus(cs.status);
+    setEditQuote(cs.quoted_price ? String(cs.quoted_price / 100) : '');
+    setEditInvoiceStatus(cs.invoice_status);
+    setEditInvoiceAmount(cs.invoice_amount ? String(cs.invoice_amount / 100) : '');
+  };
+
+  const handleSaveEditSupplier = () => {
+    if (!editingSupplier) return;
+    setCategorySuppliers(
+      categorySuppliers.map((cs) =>
+        cs.supplier_id === editingSupplier.supplier_id
+          ? {
+              ...cs,
+              status: editStatus,
+              quoted_price: editQuote ? parseCurrencyToCents(editQuote) : null,
+              invoice_status: editInvoiceStatus,
+              invoice_amount: editInvoiceAmount ? parseCurrencyToCents(editInvoiceAmount) : null,
+            }
+          : cs
+      )
+    );
+    setEditingSupplier(null);
+  };
+
+  const handleCancelEditSupplier = () => {
+    setEditingSupplier(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -431,37 +471,108 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
                     <div className="budget-payments-empty">No suppliers added yet</div>
                   ) : (
                     categorySuppliers.map((cs) => (
-                      <div key={cs.supplier_id} className="budget-supplier-card">
-                        <div className="budget-supplier-card-left">
-                          <div className="budget-supplier-avatar">
-                            {cs.supplier_name.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="budget-supplier-card-info">
-                            <div className="budget-supplier-card-name">{cs.supplier_name}</div>
-                            <div className="budget-supplier-card-badges">
-                              <span className="budget-supplier-card-badge" style={{ color: SUPPLIER_STATUS_OPTIONS.find(o => o.value === cs.status)?.color, backgroundColor: SUPPLIER_STATUS_OPTIONS.find(o => o.value === cs.status)?.bg }}>
-                                {SUPPLIER_STATUS_OPTIONS.find(o => o.value === cs.status)?.label}
-                              </span>
-                              <span className="budget-supplier-card-invoice" style={{ color: cs.invoice_status === 'invoice_paid' ? '#16a34a' : cs.invoice_status === 'no_invoice' ? '#9ca3af' : '#f59e0b' }}>
-                                {cs.invoice_status === 'no_invoice' ? 'No Invoice' : cs.invoice_status.replace('invoice_', '').replace('_', ' ')}
-                              </span>
+                      <div key={cs.supplier_id}>
+                        {editingSupplier?.supplier_id === cs.supplier_id ? (
+                          <div className="budget-pending-card">
+                            <div className="budget-pending-card-header">
+                              <div className="budget-pending-card-info">
+                                <div className="budget-pending-card-name">{cs.supplier_name}</div>
+                                <div className="budget-pending-card-company">{cs.supplier_company || cs.supplier_category}</div>
+                              </div>
+                              <button type="button" className="budget-pending-card-cancel" onClick={handleCancelEditSupplier}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
                             </div>
+                            <div className="budget-pending-card-body">
+                              <div className="budget-pending-card-field">
+                                <label>Status</label>
+                                <select
+                                  value={editStatus}
+                                  onChange={(e) => setEditStatus(e.target.value as EventSupplierStatus)}
+                                  className="budget-select"
+                                >
+                                  {SUPPLIER_STATUS_OPTIONS.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="budget-pending-card-field">
+                                <label>Quote</label>
+                                <div className="budget-currency-input">
+                                  <span className="budget-currency-symbol">{currencySymbol}</span>
+                                  <input
+                                    type="text"
+                                    value={editQuote}
+                                    onChange={(e) => setEditQuote(e.target.value)}
+                                    placeholder="0"
+                                    className="budget-input"
+                                  />
+                                </div>
+                              </div>
+                              <div className="budget-pending-card-field">
+                                <label>Invoice</label>
+                                <select
+                                  value={editInvoiceStatus}
+                                  onChange={(e) => setEditInvoiceStatus(e.target.value)}
+                                  className="budget-select"
+                                >
+                                  {INVOICE_STATUS_OPTIONS.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="budget-pending-card-field">
+                                <label>Amount</label>
+                                <div className="budget-currency-input">
+                                  <span className="budget-currency-symbol">{currencySymbol}</span>
+                                  <input
+                                    type="text"
+                                    value={editInvoiceAmount}
+                                    onChange={(e) => setEditInvoiceAmount(e.target.value)}
+                                    placeholder="0"
+                                    className="budget-input"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                            <button type="button" className="budget-btn-add-supplier" onClick={handleSaveEditSupplier}>
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                              Save Changes
+                            </button>
                           </div>
-                        </div>
-                        <div className="budget-supplier-card-right">
-                          <div className="budget-supplier-card-amount">
-                            {cs.quoted_price ? formatCurrency(cs.quoted_price, currency) : '-'}
-                          </div>
+                        ) : (
                           <button
                             type="button"
-                            className="budget-supplier-card-remove"
-                            onClick={() => handleRemoveSupplier(cs.supplier_id)}
+                            className="budget-supplier-card"
+                            onClick={() => handleOpenEditSupplier(cs)}
                           >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
+                            <div className="budget-supplier-card-left">
+                              <div className="budget-supplier-avatar">
+                                {cs.supplier_name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="budget-supplier-card-info">
+                                <div className="budget-supplier-card-name">{cs.supplier_name}</div>
+                                <div className="budget-supplier-card-badges">
+                                  <span className="budget-supplier-card-badge" style={{ color: SUPPLIER_STATUS_OPTIONS.find(o => o.value === cs.status)?.color, backgroundColor: SUPPLIER_STATUS_OPTIONS.find(o => o.value === cs.status)?.bg }}>
+                                    {SUPPLIER_STATUS_OPTIONS.find(o => o.value === cs.status)?.label}
+                                  </span>
+                                  <span className="budget-supplier-card-invoice" style={{ color: cs.invoice_status === 'invoice_paid' ? '#16a34a' : cs.invoice_status === 'no_invoice' ? '#9ca3af' : '#f59e0b' }}>
+                                    {cs.invoice_status === 'no_invoice' ? 'No Invoice' : cs.invoice_status.replace('invoice_', '').replace('_', ' ')}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="budget-supplier-card-right">
+                              <div className="budget-supplier-card-amount">
+                                {cs.quoted_price ? formatCurrency(cs.quoted_price, currency) : '-'}
+                              </div>
+                            </div>
                           </button>
-                        </div>
+                        )}
                       </div>
                     ))
                   )}
