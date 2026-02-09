@@ -1305,6 +1305,195 @@
   background: #1e293b;
 }
 
+/* Supplier Dropdown */
+.budget-supplier-dropdown {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.budget-supplier-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.budget-supplier-result {
+  width: 100%;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.15s;
+}
+
+.budget-supplier-result:last-child {
+  border-bottom: none;
+}
+
+.budget-supplier-result:hover {
+  background: #f9fafb;
+}
+
+.budget-supplier-result-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.budget-supplier-result-company {
+  font-size: 11px;
+  color: #6b7280;
+  text-transform: capitalize;
+}
+
+.budget-supplier-empty {
+  padding: 16px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+/* Suppliers List */
+.budget-suppliers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+.budget-supplier-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 10px;
+  position: relative;
+}
+
+.budget-supplier-info {
+  flex-shrink: 0;
+  width: 120px;
+}
+
+.budget-supplier-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.budget-supplier-company {
+  font-size: 11px;
+  color: #6b7280;
+  text-transform: capitalize;
+}
+
+.budget-supplier-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  flex: 1;
+}
+
+.budget-supplier-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.budget-supplier-field label {
+  font-size: 9px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.budget-select-small {
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+.budget-currency-small {
+  padding: 6px 8px;
+}
+
+.budget-currency-small .budget-currency-symbol {
+  font-size: 11px;
+}
+
+.budget-input-small {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.budget-payment-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.budget-payment-remove:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* Supplier Totals */
+.budget-supplier-totals {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.budget-supplier-total {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.budget-supplier-total span:first-child {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.budget-supplier-total span:last-child {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
 /* ================================================
    FINANCIAL COMMAND CENTER STYLES
    ================================================ */
