@@ -31,6 +31,76 @@ const formatDate = (iso: string | null | undefined) => {
   return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
+const PipelineIcon = ({ active }: { active: boolean }) => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#0f172a' : '#6b7280'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="6" height="6" rx="1" />
+    <rect x="15" y="3" width="6" height="6" rx="1" />
+    <path d="M9 9h6v6H9z" />
+    <path d="M6 15h4" />
+    <path d="M14 15h4" />
+  </svg>
+);
+
+const TasksIcon = ({ active }: { active: boolean }) => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#0f172a' : '#6b7280'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 11l3 3L22 4" />
+    <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+  </svg>
+);
+
+const VendorsIcon = ({ active }: { active: boolean }) => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#0f172a' : '#6b7280'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+    <polyline points="9 22 9 12 15 12 15 22" />
+  </svg>
+);
+
+const BudgetIcon = ({ active }: { active: boolean }) => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#0f172a' : '#6b7280'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="1" x2="12" y2="23" />
+    <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+  </svg>
+);
+
+const FilesIcon = ({ active }: { active: boolean }) => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#0f172a' : '#6b7280'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
+    <polyline points="10 9 9 9 8 9" />
+  </svg>
+);
+
+const NotesIcon = ({ active }: { active: boolean }) => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#0f172a' : '#6b7280'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+    <path d="M14 2v6h6" />
+    <path d="M16 13H8" />
+    <path d="M16 17H8" />
+    <path d="M10 9H8" />
+  </svg>
+);
+
+const ContactsIcon = ({ active }: { active: boolean }) => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#0f172a' : '#6b7280'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 00-3-3.87" />
+    <path d="M16 3.13a4 4 0 010 7.75" />
+  </svg>
+);
+
+const tabConfig = [
+  { id: 'pipeline', label: 'Pipeline', Icon: PipelineIcon },
+  { id: 'tasks', label: 'Tasks', Icon: TasksIcon },
+  { id: 'vendors', label: 'Vendors', Icon: VendorsIcon },
+  { id: 'budget', label: 'Budget', Icon: BudgetIcon },
+  { id: 'files', label: 'Files', Icon: FilesIcon },
+  { id: 'notes', label: 'Notes', Icon: NotesIcon },
+  { id: 'contacts', label: 'Contacts', Icon: ContactsIcon },
+];
+
 const countDoneTasksForStage = (stage: PipelineStage, tasks: StageTask[]) => {
   const stageTasks = tasks.filter((t) => t.stage_id === stage.id);
   if (stageTasks.length === 0) return { done: 0, total: 0 };
@@ -951,39 +1021,27 @@ const EventProjectPage: React.FC<EventProjectPageProps> = ({ eventId }) => {
 
         {/* Tabs */}
         <div
+          className="project-tabs"
           style={{
             display: 'flex',
             gap: 8,
             borderBottom: '1px solid #e5e5e5',
           }}
         >
-          {[
-            { id: 'pipeline', label: 'Pipeline' },
-            { id: 'tasks', label: 'Tasks' },
-            { id: 'vendors', label: 'Vendors' },
-            { id: 'budget', label: 'Budget' },
-            { id: 'files', label: 'Files' },
-            { id: 'notes', label: 'Notes' },
-            { id: 'contacts', label: 'Contacts' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id as ActiveTab)}
-              style={{
-                border: 'none',
-                background: 'transparent',
-                padding: '8px 10px',
-                borderBottom: activeTab === tab.id ? '2px solid #0f172a' : '2px solid transparent',
-                fontSize: 13,
-                fontWeight: activeTab === tab.id ? 600 : 400,
-                color: activeTab === tab.id ? '#0f172a' : '#6b7280',
-                cursor: 'pointer',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {tabConfig.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id as ActiveTab)}
+                className={`project-tab-btn ${isActive ? 'active' : ''}`}
+              >
+                <tab.Icon active={isActive} />
+                <span className="project-tab-label">{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Tab content */}

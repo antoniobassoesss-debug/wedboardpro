@@ -1190,4 +1190,60 @@
   }
 }
 
+.project-tabs {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.project-tab-btn {
+  border: none;
+  background: transparent;
+  padding: 10px 12px;
+  border-bottom: 2px solid transparent;
+  font-size: 13px;
+  font-weight: 400;
+  color: #6b7280;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.project-tab-btn.active {
+  border-bottom-color: #0f172a;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.project-tab-btn svg {
+  display: none;
+}
+
+.project-tab-label {
+  display: inline;
+}
+
+@media (max-width: 767px) {
+  .project-tab-btn {
+    padding: 10px 14px;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11px;
+  }
+
+  .project-tab-btn svg {
+    display: block;
+  }
+
+  .project-tab-label {
+    display: none;
+  }
+
+  .project-tab-btn.active {
+    border-bottom-width: 3px;
+  }
+}
+
 

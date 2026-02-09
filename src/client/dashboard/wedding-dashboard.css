@@ -1194,6 +1194,64 @@ body {
   .stat-card {
     padding: 16px;
     border-radius: 14px;
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    flex: none !important;
+    flex-basis: auto !important;
+    overflow: hidden !important;
+    display: block !important;
+  }
+
+  .stat-card * {
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+  }
+
+  .stat-value {
+    font-size: 24px !important;
+    display: block !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .stat-label {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .stats-grid {
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .wp-card {
+    overflow: hidden !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
+
+  .stats-grid {
+    flex-direction: column;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden;
+    flex-wrap: nowrap !important;
+  }
+
+  .wp-card {
+    overflow: hidden;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
   }
 
   .stat-value {
