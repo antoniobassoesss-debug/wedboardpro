@@ -10,7 +10,7 @@ declare global {
 
 // GA4 Property IDs
 const MAIN_SITE_GA_ID = 'G-X7PSZXCEK0';  // Main site property
-const BLOG_GA_ID = 'G-BLOG_ID';           // Blog property (REPLACE THIS)
+const BLOG_GA_ID = 'G-RMFYLJS16S';       // Blog property
 
 // Detect which property to use
 const getGAProperty = (): string => {
