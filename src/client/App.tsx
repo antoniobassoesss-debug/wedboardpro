@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import MarketingHome from './MarketingHome';
+import BlogPage from './BlogPage';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
 import ForgotPasswordPage from './ForgotPasswordPage';
@@ -12,6 +13,8 @@ import Contact from './Contact';
 import Demo from './Demo';
 import AboutUs from './AboutUs';
 import { AuthCallbackPage, AuthUrlHandler } from './auth/index.ts';
+import TeamLoginPage from './TeamLoginPage';
+import TeamDashboard from './TeamDashboard';
 
 function ScrollToTop() {
   const location = useLocation();
@@ -85,6 +88,7 @@ const App: React.FC = () => {
       <AuthUrlHandler />
       <Routes>
         <Route path="/" element={<MarketingHome />} />
+        <Route path="/blog" element={<BlogPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -154,6 +158,8 @@ const App: React.FC = () => {
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/about" element={<AboutUs />} />
+        <Route path="/team-login" element={<TeamLoginPage />} />
+        <Route path="/team" element={<TeamDashboard />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
