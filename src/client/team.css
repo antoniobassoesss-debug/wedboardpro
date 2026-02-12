@@ -1,0 +1,671 @@
+.team-login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  padding: 20px;
+}
+
+.team-login-container {
+  width: 100%;
+  max-width: 400px;
+}
+
+.team-login-card {
+  background: white;
+  border-radius: 16px;
+  padding: 40px 32px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+}
+
+.team-login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.team-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  margin-bottom: 24px;
+}
+
+.team-logo img {
+  width: 36px;
+  height: 36px;
+}
+
+.team-logo span {
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.team-login-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 8px 0;
+}
+
+.team-login-header p {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.team-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.team-error-message {
+  padding: 12px 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 14px;
+}
+
+.team-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.team-form-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.team-form-group input {
+  padding: 12px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.team-form-group input:focus {
+  border-color: #111827;
+}
+
+.team-login-button {
+  padding: 14px 24px;
+  background: #111827;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 8px;
+}
+
+.team-login-button:hover {
+  background: #1f2937;
+}
+
+.team-login-button:disabled {
+  background: #6b7280;
+  cursor: not-allowed;
+}
+
+.team-login-footer {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.team-back-link {
+  font-size: 14px;
+  color: #6b7280;
+  text-decoration: none;
+}
+
+.team-back-link:hover {
+  color: #111827;
+}
+
+/* Team Dashboard Styles */
+.team-dashboard-page {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.team-header {
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.team-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.team-header-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.team-header-logo img {
+  width: 32px;
+  height: 32px;
+}
+
+.team-header-logo span {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.team-header-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.team-nav-btn {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.team-nav-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.team-nav-btn.active {
+  background: #111827;
+  color: white;
+}
+
+.team-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.team-user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: #f3f4f6;
+  border-radius: 8px;
+}
+
+.team-user-avatar {
+  width: 28px;
+  height: 28px;
+  background: #111827;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.team-user-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #111827;
+}
+
+.team-logout-btn {
+  padding: 8px 14px;
+  border: 1px solid #d1d5db;
+  background: white;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.team-logout-btn:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.team-content {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.team-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.team-stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.team-stat-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.team-stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.team-stat-change {
+  font-size: 12px;
+  color: #059669;
+  margin-top: 4px;
+}
+
+.team-stat-change.negative {
+  color: #dc2626;
+}
+
+.team-section {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.team-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.team-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Calendar Styles */
+.team-calendar {
+  width: 100%;
+}
+
+.team-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.team-calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.team-calendar-nav-btn {
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.team-calendar-nav-btn:hover {
+  background: #f3f4f6;
+}
+
+.team-calendar-month {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.team-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.team-calendar-day-header {
+  padding: 8px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.team-calendar-day {
+  aspect-ratio: 1;
+  padding: 8px;
+  border-radius: 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.team-calendar-day:hover {
+  background: #f3f4f6;
+}
+
+.team-calendar-day.today {
+  background: #eff6ff;
+}
+
+.team-calendar-day.selected {
+  background: #111827;
+  color: white;
+}
+
+.team-calendar-day-number {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.team-calendar-day.has-bookings::after {
+  content: '';
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  background: #2563eb;
+  border-radius: 50%;
+}
+
+.team-calendar-day.today.has-bookings::after {
+  background: #2563eb;
+}
+
+.team-calendar-day.selected.has-bookings::after {
+  background: white;
+}
+
+/* Time Slots */
+.team-time-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.team-time-slot {
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.team-time-slot:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.team-time-slot.booked {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+  cursor: not-allowed;
+}
+
+.team-time-slot.available {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #16a34a;
+}
+
+.team-time-slot.selected {
+  background: #111827;
+  color: white;
+  border-color: #111827;
+}
+
+/* Availability Settings */
+.team-availability-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+
+.team-availability-day {
+  padding: 16px 12px;
+  background: #f9fafb;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.team-availability-day-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 10px;
+}
+
+.team-availability-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.team-toggle-switch {
+  width: 40px;
+  height: 22px;
+  background: #d1d5db;
+  border-radius: 11px;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+}
+
+.team-toggle-switch.active {
+  background: #16a34a;
+}
+
+.team-toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.team-toggle-switch.active::after {
+  transform: translateX(18px);
+}
+
+.team-availability-times {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.team-time-input {
+  padding: 6px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 12px;
+  text-align: center;
+  width: 100%;
+}
+
+/* Bookings List */
+.team-bookings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.team-booking-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+
+.team-booking-item:hover {
+  background: #f3f4f6;
+}
+
+.team-booking-avatar {
+  width: 40px;
+  height: 40px;
+  background: #111827;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.team-booking-info {
+  flex: 1;
+}
+
+.team-booking-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 2px;
+}
+
+.team-booking-details {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.team-booking-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.team-booking-time {
+  padding: 6px 12px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+}
+
+.team-booking-status {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+}
+
+.team-booking-status.confirmed {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.team-booking-status.pending {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.team-booking-status.cancelled {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.team-booking-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.team-action-btn {
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.team-action-btn:hover {
+  background: #f9fafb;
+}
+
+.team-action-btn.danger:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .team-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .team-header-nav {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .team-availability-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .team-calendar-grid {
+    font-size: 12px;
+  }
+}
