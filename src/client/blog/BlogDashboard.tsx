@@ -57,10 +57,30 @@ interface Settings {
   gaMeasurementId: string;
   gaPropertyId: string;
   gaServiceAccountKey: string;
-  geminiApiKey: string;
   slackWebhook: string;
   blogTitle: string;
   blogDescription: string;
+}
+
+interface AIAnalysis {
+  score: number;
+  overallAssessment: string;
+  strengths: string[];
+  weaknesses: string[];
+  recommendations: string[];
+  contentQuality: {
+    clarity: number;
+    depth: number;
+    engagement: number;
+    tone: string;
+  };
+  keywordAnalysis: {
+    relevance: number;
+    placement: string;
+    suggestions: string[];
+  };
+  competitorInsights?: string;
+  viralPotential: number;
 }
 
 const CATEGORIES = [
@@ -100,7 +120,6 @@ const BlogDashboard: React.FC = () => {
     gaMeasurementId: '',
     gaPropertyId: '',
     gaServiceAccountKey: '',
-    geminiApiKey: '',
     slackWebhook: '',
     blogTitle: 'WedBoardPro Blog',
     blogDescription: 'Expert insights for wedding planners'
@@ -136,7 +155,6 @@ const BlogDashboard: React.FC = () => {
         gaMeasurementId: parsed.gaMeasurementId || '',
         gaPropertyId: parsed.gaPropertyId || '',
         gaServiceAccountKey: parsed.gaServiceAccountKey || '',
-        geminiApiKey: parsed.geminiApiKey || '',
         slackWebhook: parsed.slackWebhook || '',
         blogTitle: parsed.blogTitle || 'WedBoardPro Blog',
         blogDescription: parsed.blogDescription || 'Expert insights for wedding planners'
@@ -527,10 +545,10 @@ const BlogDashboard: React.FC = () => {
                   <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Get notified when posts are published</p>
                 </div>
 
-                <div style={{ marginBottom: 20, padding: 16, background: '#f0f9ff', borderRadius: 8, border: '1px solid #bae6fd' }}>
-                  <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 8, color: '#0369a1' }}>🔮 AI SEO Analysis (Optional)</label>
-                  <input type="password" placeholder="Enter Gemini API Key" value={settings.geminiApiKey} onChange={(e) => setSettings(prev => ({ ...prev, geminiApiKey: e.target.value }))} style={{ width: '100%', padding: '10px 12px', fontSize: 14, border: '1px solid #bae6fd', borderRadius: 8, outline: 'none' }} />
-                  <p style={{ fontSize: 11, color: '#0369a1', marginTop: 4 }}>Add Gemini API Key for AI-powered SEO analysis. Get key from Google AI Studio.</p>
+                <div style={{ marginBottom: 20, padding: 16, background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0' }}>
+                  <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 8, color: '#166534' }}>🤖 AI SEO Analysis</label>
+                  <p style={{ fontSize: 12, color: '#15803d', marginBottom: 8 }}>AI-powered SEO analysis is enabled using OpenAI API (already configured on server)</p>
+                  <p style={{ fontSize: 11, color: '#166534' }}>Click "Analyze with AI" in the Editor to get AI-powered recommendations.</p>
                 </div>
 
                 <button className="team-action-btn" style={{ background: '#111827', color: '#fff' }} onClick={saveSettings}>Save Settings</button>

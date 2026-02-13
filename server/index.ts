@@ -728,6 +728,92 @@ app.post('/api/v1/demo/book', async (req: Request, res: Response) => {
   try { res.json({ success: true }); } catch (err) { errorHandler(res, err, '/v1/demo/book'); }
 });
 
+// AI SEO Analysis using OpenAI
+app.post('/api/v1/blog/ai-seo-analyze', async (req: Request, res: Response) => {
+  try {
+    const { title, content, metaDescription, keyword, targetAudience } = req.body;
+
+    if (!title || !content) {
+      res.status(400).json({ error: 'Title and content are required' });
+      return;
+    }
+
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) {
+      res.status(500).json({ error: 'OpenAI API key not configured' });
+      return;
+    }
+
+    const cleanContent = content.replace(/<[^>]*>/g, '');
+    const wordCount = cleanContent.split(/\s+/).filter((w: string) => w.length > 0).length;
+
+    const prompt = `You are an expert SEO consultant for wedding planning blogs. Analyze this blog post and provide detailed SEO feedback.
+
+POST DETAILS:
+- Title: ${title}
+- Primary Keyword: ${keyword || 'Not specified'}
+- Target Audience: ${targetAudience || 'wedding planners'}
+- Word Count: ${wordCount}
+- Meta Description: ${metaDescription || 'Not provided'}
+
+CONTENT (first 3000 chars):
+${cleanContent.substring(0, 3000)}
+
+Please analyze and respond with ONLY valid JSON:
+
+{
+  "score": (overall SEO score 0-100),
+  "overallAssessment": (2-3 sentence summary),
+  "strengths": [3-4 things the post does well],
+  "weaknesses": [3-4 things that need improvement],
+  "recommendations": [4-5 specific actionable suggestions],
+  "contentQuality": {
+    "clarity": (1-10),
+    "depth": (1-10),
+    "engagement": (1-10),
+    "tone": "professional/casual/authoritative/friendly"
+  },
+  "keywordAnalysis": {
+    "relevance": (1-10),
+    "placement": "brief assessment",
+    "suggestions": [2-3 suggestions]
+  },
+  "competitorInsights": "brief insight",
+  "viralPotential": (1-10)
+}`;
+
+    const OpenAI = await import('openai');
+    const openai = new OpenAI.default({ apiKey: openaiApiKey });
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      max_tokens: 1500,
+    });
+
+    const responseText = completion.choices[0]?.message?.content;
+
+    if (!responseText) {
+      res.status(500).json({ error: 'No response from AI' });
+      return;
+    }
+
+    const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    try {
+      const analysis = JSON.parse(cleanJson);
+      res.json(analysis);
+    } catch {
+      console.error('Failed to parse AI response:', cleanJson);
+      res.status(500).json({ error: 'Failed to parse AI response' });
+    }
+  } catch (err) {
+    console.error('AI SEO analysis error:', err);
+    res.status(500).json({ error: 'Failed to analyze SEO' });
+  }
+});
+
 app.post('/api/assistant', async (req: Request, res: Response) => {
   try { res.json({ response: 'I can help you with that.' }); } catch (err) { errorHandler(res, err, '/assistant'); }
 });
