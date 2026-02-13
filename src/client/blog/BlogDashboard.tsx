@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns';
+import { analyzeSEO, getSeoScoreColor, getSeoScoreLabel } from '../../lib/seo-analyzer';
 
 interface BlogPost {
   id: string;
