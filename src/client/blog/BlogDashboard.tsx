@@ -57,6 +57,7 @@ interface Settings {
   gaMeasurementId: string;
   gaPropertyId: string;
   gaServiceAccountKey: string;
+  geminiApiKey: string;
   slackWebhook: string;
   blogTitle: string;
   blogDescription: string;
@@ -99,6 +100,7 @@ const BlogDashboard: React.FC = () => {
     gaMeasurementId: '',
     gaPropertyId: '',
     gaServiceAccountKey: '',
+    geminiApiKey: '',
     slackWebhook: '',
     blogTitle: 'WedBoardPro Blog',
     blogDescription: 'Expert insights for wedding planners'
@@ -126,7 +128,19 @@ const BlogDashboard: React.FC = () => {
   const loadSettings = () => {
     const savedSettings = localStorage.getItem('blogSettings');
     if (savedSettings) {
-      setSettings(JSON.parse(savedSettings));
+      const parsed = JSON.parse(savedSettings);
+      setSettings(prev => ({
+        ...prev,
+        ...parsed,
+        // Ensure all fields exist
+        gaMeasurementId: parsed.gaMeasurementId || '',
+        gaPropertyId: parsed.gaPropertyId || '',
+        gaServiceAccountKey: parsed.gaServiceAccountKey || '',
+        geminiApiKey: parsed.geminiApiKey || '',
+        slackWebhook: parsed.slackWebhook || '',
+        blogTitle: parsed.blogTitle || 'WedBoardPro Blog',
+        blogDescription: parsed.blogDescription || 'Expert insights for wedding planners'
+      }));
     }
   };
 
@@ -511,6 +525,12 @@ const BlogDashboard: React.FC = () => {
                   <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 8 }}>Slack Webhook (optional)</label>
                   <input type="text" placeholder="https://hooks.slack.com/..." value={settings.slackWebhook} onChange={(e) => setSettings(prev => ({ ...prev, slackWebhook: e.target.value }))} style={{ width: '100%', padding: '10px 12px', fontSize: 14, border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none' }} />
                   <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Get notified when posts are published</p>
+                </div>
+
+                <div style={{ marginBottom: 20, padding: 16, background: '#f0f9ff', borderRadius: 8, border: '1px solid #bae6fd' }}>
+                  <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 8, color: '#0369a1' }}>🔮 AI SEO Analysis (Optional)</label>
+                  <input type="password" placeholder="Enter Gemini API Key" value={settings.geminiApiKey} onChange={(e) => setSettings(prev => ({ ...prev, geminiApiKey: e.target.value }))} style={{ width: '100%', padding: '10px 12px', fontSize: 14, border: '1px solid #bae6fd', borderRadius: 8, outline: 'none' }} />
+                  <p style={{ fontSize: 11, color: '#0369a1', marginTop: 4 }}>Add Gemini API Key for AI-powered SEO analysis. Get key from Google AI Studio.</p>
                 </div>
 
                 <button className="team-action-btn" style={{ background: '#111827', color: '#fff' }} onClick={saveSettings}>Save Settings</button>
