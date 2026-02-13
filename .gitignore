@@ -60,3 +60,4 @@ nodemon
 *.bak
 *.tmp
 
+.env.production
