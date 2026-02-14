@@ -362,7 +362,7 @@ export const WorkSection: React.FC = () => {
 export const CalendarSection: React.FC = () => {
   const [accountId, setAccountId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [showAddEventModal, setShowAddEventModal] = useState(false);
+  const [editorTrigger, setEditorTrigger] = useState(0);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -388,10 +388,14 @@ export const CalendarSection: React.FC = () => {
     window.dispatchEvent(new CustomEvent('wbp:toggle-mobile-menu'));
   };
 
+  const openAddEvent = () => {
+    setEditorTrigger(prev => prev + 1);
+  };
+
   return (
     <SectionCard title="Calendar">
       {accountId ? (
-        <Calendar accountId={accountId} />
+        <Calendar accountId={accountId} openEditorTrigger={editorTrigger} />
       ) : (
         <p style={{ marginTop: 0, marginBottom: 0, color: '#7b7b7b' }}>
           Log in to load your calendar events.
@@ -408,161 +412,13 @@ export const CalendarSection: React.FC = () => {
           </button>
           <button
             className="calendar-fab-plus"
-            onClick={() => setShowAddEventModal(true)}
+            onClick={openAddEvent}
           >
             +
           </button>
         </div>
       )}
-
-      {showAddEventModal && (
-        <AddEventModal
-          onClose={() => setShowAddEventModal(false)}
-          onSuccess={() => {
-            setShowAddEventModal(false);
-            window.location.reload();
-          }}
-        />
-      )}
     </SectionCard>
-  );
-};
-
-interface AddEventModalProps {
-  onClose: () => void;
-  onSuccess: () => void;
-}
-
-const AddEventModal: React.FC<AddEventModalProps> = ({ onClose, onSuccess }) => {
-  const [formData, setFormData] = useState({
-    title: '',
-    eventDate: format(new Date(), 'yyyy-MM-dd'),
-    description: ''
-  });
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      const { createEvent } = await import('../api/eventsPipelineApi');
-      const { data, error } = await createEvent({
-        title: formData.title,
-        wedding_date: formData.eventDate,
-        visibility: 'team'
-      });
-
-      if (error) {
-        alert(error);
-      } else if (data?.event) {
-        onSuccess();
-      }
-    } catch (err) {
-      console.error('Failed to create event:', err);
-      alert('Failed to create event');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      padding: 20
-    }}>
-      <div style={{
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 24,
-        maxWidth: 400,
-        width: '100%'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 600, color: '#111827', margin: 0 }}>Add Event</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#6b7280' }}>✕</button>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>Title *</label>
-            <input
-              type="text"
-              required
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="e.g. Wedding - Smith"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 14 }}
-            />
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>Date</label>
-            <input
-              type="date"
-              value={formData.eventDate}
-              onChange={(e) => setFormData({ ...formData, eventDate: e.target.value })}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 14 }}
-            />
-          </div>
-
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>Description</label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Add notes..."
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 14, minHeight: 80, resize: 'vertical' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                flex: 1,
-                padding: '12px 20px',
-                borderRadius: 8,
-                border: '1px solid #e5e7eb',
-                background: '#fff',
-                color: '#374151',
-                fontSize: 14,
-                cursor: 'pointer'
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              style={{
-                flex: 1,
-                padding: '12px 20px',
-                borderRadius: 8,
-                border: 'none',
-                background: '#111827',
-                color: '#fff',
-                fontSize: 14,
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                opacity: isLoading ? 0.7 : 1
-              }}
-            >
-              {isLoading ? 'Creating...' : 'Create Event'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
   );
 };
 

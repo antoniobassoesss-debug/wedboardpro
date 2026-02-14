@@ -9,67 +9,10 @@ type CalendarProps = {
   accountId: string;
   currentUserId?: string;
   weekStartsOn?: 'monday' | 'sunday';
+  openEditorTrigger?: number;
 };
 
-const EVENT_COLORS: Record<string, string> = {
-  red: '#ef4444',
-  orange: '#f97316',
-  yellow: '#eab308',
-  green: '#22c55e',
-  blue: '#2563eb',
-  purple: '#8b5cf6',
-  event: '#0f172a',
-  meeting: '#3b82f6',
-  task: '#22c55e',
-  other: '#6b7280',
-  default: '#6b7280',
-};
-
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  event: 'Event',
-  meeting: 'Meeting',
-  task: 'Task',
-  other: 'Other',
-};
-
-const EVENT_TYPE_ICONS: Record<string, string> = {
-  event: '📅',
-  meeting: '👥',
-  task: '✓',
-  other: '📌',
-};
-
-function addDays(d: Date, n: number): Date {
-  const date = new Date(d);
-  date.setDate(date.getDate() + n);
-  return date;
-}
-
-function addMonths(d: Date, n: number): Date {
-  const date = new Date(d);
-  date.setMonth(date.getMonth() + n);
-  return date;
-}
-
-function formatDateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-function groupEventsByDay(events: CalendarEvent[]): Map<string, CalendarEvent[]> {
-  const map = new Map<string, CalendarEvent[]>();
-  events.forEach((evt) => {
-    const day = evt.start_at.slice(0, 10);
-    if (!map.has(day)) map.set(day, []);
-    map.get(day)!.push(evt);
-  });
-  return map;
-}
-
-function formatMonthLabel(d: Date): string {
-  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-}
-
-export function BeautifulCalendar({ accountId, currentUserId, weekStartsOn = 'monday' }: CalendarProps) {
+export function BeautifulCalendar({ accountId, currentUserId, weekStartsOn = 'monday', openEditorTrigger }: CalendarProps) {
   const [view, setView] = useState<CalendarViewMode>('month');
   const [currentDate, setCurrentDate] = useState(() => {
     const d = new Date();
@@ -170,6 +113,12 @@ export function BeautifulCalendar({ accountId, currentUserId, weekStartsOn = 'mo
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
+
+  useEffect(() => {
+    if (openEditorTrigger) {
+      handleOpenCreate();
+    }
+  }, [openEditorTrigger]);
 
   const resolveColor = (evt: CalendarEvent): string => {
     if (evt.color && evt.color in EVENT_COLORS) {
