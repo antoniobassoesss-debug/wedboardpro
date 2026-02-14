@@ -16,16 +16,35 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-function getUserId(req: Request): string | null {
+async function getUserId(req: Request): Promise<string | null> {
   const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) return null;
+  if (!authHeader?.startsWith('Bearer ')) {
+    console.warn('[getUserId] No Bearer token found');
+    return null;
+  }
   const token = authHeader.substring(7);
-  return token;
+
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error) {
+      console.warn('[getUserId] Token validation failed:', error.message);
+      return null;
+    }
+    if (!user) {
+      console.warn('[getUserId] No user found for token');
+      return null;
+    }
+    return user.id;
+  } catch (err: any) {
+    console.error('[getUserId] Exception:', err.message);
+    return null;
+  }
 }
 
 function errorHandler(res: Response, err: any, endpoint: string) {
-  console.error(`Error in ${endpoint}:`, err);
-  res.status(500).json({ error: err.message || 'Internal server error' });
+  console.error(`[${endpoint}] Error:`, err.message || err);
+  console.error(`[${endpoint}] Stack:`, err.stack || 'no stack');
+  res.status(500).json({ error: err.message || 'Internal server error', details: err.code || 'unknown' });
 }
 
 app.get('/api/auth/check-verification', async (req: Request, res: Response) => {
@@ -66,7 +85,7 @@ app.get('/api/auth/verification-status', async (req: Request, res: Response) => 
 
 app.get('/api/teams/my-team', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     const { data: membership, error } = await supabase
@@ -82,7 +101,7 @@ app.get('/api/teams/my-team', async (req: Request, res: Response) => {
 
 app.get('/api/teams/members', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     const { data: memberships, error } = await supabase
@@ -105,7 +124,7 @@ app.get('/api/teams/members', async (req: Request, res: Response) => {
 
 app.get('/api/teams', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     // Get teams user owns OR is member of
@@ -144,7 +163,7 @@ app.get('/api/teams', async (req: Request, res: Response) => {
 
 app.post('/api/teams/invite', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     const { email, role } = req.body;
@@ -187,7 +206,7 @@ app.post('/api/teams/invitations/accept', async (req: Request, res: Response) =>
       return res.status(400).json({ error: 'Invalid invitation' });
     }
 
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     const { error } = await supabase
@@ -211,7 +230,7 @@ app.post('/api/teams/invitations/accept', async (req: Request, res: Response) =>
 
 app.get('/api/teams/invitations/pending', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     const { data, error } = await supabase
@@ -227,7 +246,7 @@ app.get('/api/teams/invitations/pending', async (req: Request, res: Response) =>
 
 app.get('/api/team', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     const { data: memberships, error: memError } = await supabase
@@ -268,7 +287,7 @@ app.get('/api/team', async (req: Request, res: Response) => {
 
 app.get('/api/team/:memberId', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     const { data: member, error } = await supabase
@@ -317,7 +336,7 @@ app.get('/api/team/calendar', async (req: Request, res: Response) => {
 
 app.get('/api/teams/invitations/sent', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     const { data: invitations, error } = await supabase
@@ -333,7 +352,7 @@ app.get('/api/teams/invitations/sent', async (req: Request, res: Response) => {
 
 app.delete('/api/teams/invitations/:invitationId', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     const { error } = await supabase
@@ -348,7 +367,7 @@ app.delete('/api/teams/invitations/:invitationId', async (req: Request, res: Res
 
 app.post('/api/teams/invitations/:invitationId/resend', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     await supabase
@@ -368,7 +387,7 @@ app.post('/api/teams/invitations/:invitationId/resend', async (req: Request, res
 
 app.post('/api/teams/invite-with-permissions', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     const { email, permissions } = req.body;
@@ -405,7 +424,7 @@ app.patch('/api/team/members/:memberId/permissions', async (req: Request, res: R
 
 app.delete('/api/team/members/:memberId', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     const { error } = await supabase.from('team_members').delete().eq('id', req.params.memberId);
@@ -416,7 +435,7 @@ app.delete('/api/team/members/:memberId', async (req: Request, res: Response) =>
 
 app.post('/api/team/leave', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     const { data: membership } = await supabase.from('team_members').select('id').eq('user_id', userId).single();
@@ -427,7 +446,7 @@ app.post('/api/team/leave', async (req: Request, res: Response) => {
 
 app.get('/api/events', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     const { data: events, error } = await supabase
@@ -442,7 +461,7 @@ app.get('/api/events', async (req: Request, res: Response) => {
 
 app.get('/api/tasks', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     const { data: tasks, error } = await supabase
@@ -556,7 +575,53 @@ app.get('/api/v1/team/leads', async (req: Request, res: Response) => {
 });
 
 app.get('/api/v1/team/bookings', async (req: Request, res: Response) => {
-  try { res.json({ bookings: [] }); } catch (err) { errorHandler(res, err, '/v1/team/bookings'); }
+  try {
+    const { data: bookings, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .order('booking_date', { ascending: true })
+      .order('booking_time', { ascending: true });
+
+    if (error) {
+      console.error('[bookings] Error fetching:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json({ bookings: bookings || [] });
+  } catch (err) { errorHandler(res, err, '/v1/team/bookings'); }
+});
+
+app.post('/api/v1/team/bookings', async (req: Request, res: Response) => {
+  try {
+    const { name, email, company, phone, booking_date, booking_time, goal, team_size } = req.body;
+    
+    if (!name || !email || !booking_date || !booking_time) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const { data: booking, error } = await supabase
+      .from('bookings')
+      .insert({
+        name,
+        email,
+        company: company || null,
+        phone: phone || null,
+        booking_date,
+        booking_time,
+        goal: goal || null,
+        team_size: team_size || null,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[bookings] Error creating:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.status(201).json({ booking });
+  } catch (err) { errorHandler(res, err, '/v1/team/bookings'); }
 });
 
 app.get('/api/v1/team/availability', async (req: Request, res: Response) => {
@@ -611,6 +676,45 @@ app.get('/api/v1/blog/posts', async (req: Request, res: Response) => {
       }
     });
   } catch (err) { errorHandler(res, err, '/v1/blog/posts'); }
+});
+
+app.get('/api/v1/blog/featured', async (req: Request, res: Response) => {
+  try {
+    res.json({
+      posts: [
+        {
+          id: '1',
+          title: 'How to Raise Your Wedding Planning Prices by 30%',
+          slug: 'raise-wedding-planning-prices',
+          excerpt: 'A step-by-step framework for positioning your services as premium and attracting high-end clients.',
+          category: 'Business Growth',
+          readingTime: 8,
+          publishedAt: '2026-02-08T10:00:00Z',
+          featuredImage: null
+        },
+        {
+          id: '2',
+          title: 'The Tech Stack Every Wedding Planner Needs in 2026',
+          slug: 'tech-stack-wedding-planners-2026',
+          excerpt: 'From CRM to floor plan design, discover the tools top planners use to scale their businesses.',
+          category: 'Operations',
+          readingTime: 12,
+          publishedAt: '2026-01-28T14:00:00Z',
+          featuredImage: null
+        },
+        {
+          id: '3',
+          title: 'Create Wedding Wow Moments That Generate Referrals',
+          slug: 'wow-moments-wedding-referrals',
+          excerpt: 'Turn every wedding into a referral machine with these proven client experience strategies.',
+          category: 'Client Experience',
+          readingTime: 6,
+          publishedAt: '2026-01-15T09:00:00Z',
+          featuredImage: null
+        }
+      ]
+    });
+  } catch (err) { errorHandler(res, err, '/v1/blog/featured'); }
 });
 
 app.post('/api/v1/blog/posts', async (req: Request, res: Response) => {
@@ -728,10 +832,10 @@ app.post('/api/v1/demo/book', async (req: Request, res: Response) => {
   try { res.json({ success: true }); } catch (err) { errorHandler(res, err, '/v1/demo/book'); }
 });
 
-// AI SEO Analysis using OpenAI
+// AI SEO Analysis using OpenAI - 5-Pillar Framework
 app.post('/api/v1/blog/ai-seo-analyze', async (req: Request, res: Response) => {
   try {
-    const { title, content, metaDescription, keyword, targetAudience } = req.body;
+    const { title, content, metaDescription, keyword, slug, url } = req.body;
 
     if (!title || !content) {
       res.status(400).json({ error: 'Title and content are required' });
@@ -745,41 +849,109 @@ app.post('/api/v1/blog/ai-seo-analyze', async (req: Request, res: Response) => {
     }
 
     const cleanContent = content.replace(/<[^>]*>/g, '');
-    const wordCount = cleanContent.split(/\s+/).filter((w: string) => w.length > 0).length;
+    const firstSentence = cleanContent.split(/[.!?]/)[0] || '';
+    const paragraphs = cleanContent.split(/\n\n+/);
+    const hasLongParagraphs = paragraphs.some((p: string) => p.split('\n').length > 3);
+    const bulletPoints = (cleanContent.match(/[•\-\*]/g) || []).length;
+    const boldText = (cleanContent.match(/\*\*[^*]+\*\*/g) || []).length;
 
-    const prompt = `You are an expert SEO consultant for wedding planning blogs. Analyze this blog post and provide detailed SEO feedback.
+    const prompt = `You are the Chief SEO Strategist & Conversion Auditor for a high-end B2B Wedding SaaS in the US Market. Evaluate this blog content rigorously to ensure it ranks #1 on Google and converts Wedding Planners into software users.
 
-POST DETAILS:
+## BLOG POST TO ANALYZE
 - Title: ${title}
 - Primary Keyword: ${keyword || 'Not specified'}
-- Target Audience: ${targetAudience || 'wedding planners'}
-- Word Count: ${wordCount}
+- URL Slug: ${slug || url || 'Not provided'}
 - Meta Description: ${metaDescription || 'Not provided'}
 
-CONTENT (first 3000 chars):
-${cleanContent.substring(0, 3000)}
+## CONTENT (full text):
+${cleanContent}
 
-Please analyze and respond with ONLY valid JSON:
+## YOUR TASK
+Evaluate the content using this strict 100-point scoring algorithm:
+
+### 1. KEYWORD STRATEGY & INTENT (25 points)
+- PRIMARY KEYWORD MUST appear in: H1 (title), first sentence (approx), and URL slug
+- Search Intent: Does content directly solve the specific "Job-to-be-Done" for the keyword?
+- US Localization: STRICT CHECK for US English spelling (Color not Colour, Inquire not Enquire, Bachelorette not Hen Party, etc.) and US Wedding terminology
+
+### 2. THE HOOK & READABILITY (20 points)
+- FIRST 2 PARAGRAPHS must hook reader emotionally with pain point agitation
+- NO paragraph longer than 3 lines
+- Extensive bullets and bolding for scannability
+- Professional yet empathetic tone for stressed planners
+
+### 3. PRODUCT-LED CONVERSION (25 points)
+- SaaS presented as the ONLY logical solution to the problem
+- Required: at least one "Soft CTA" (contextual link like "See how our timeline feature helps...") and one "Hard CTA" (Start Free Trial, Book Demo, Download Template)
+- Specific CTAs allowed: "Start Free Trial", "See the Feature", "Download Template"
+
+### 4. AUTHORITY - E-E-A-T (15 points)
+- Must cite reputable US industry sources: The Knot Real Weddings Study, WeddingWire, or Vogue Weddings
+- Must sound like an industry veteran, not generic copywriter
+
+### 5. TECHNICAL HYGIENE (15 points)
+- Internal links to SPECIFIC feature pages (/features/timeline, /pricing, etc.) NOT just homepage
+- Meta Description <155 chars with clear value proposition
+
+## OUTPUT REQUIREMENTS
+Respond with ONLY valid JSON:
 
 {
-  "score": (overall SEO score 0-100),
-  "overallAssessment": (2-3 sentence summary),
-  "strengths": [3-4 things the post does well],
-  "weaknesses": [3-4 things that need improvement],
-  "recommendations": [4-5 specific actionable suggestions],
-  "contentQuality": {
-    "clarity": (1-10),
-    "depth": (1-10),
-    "engagement": (1-10),
-    "tone": "professional/casual/authoritative/friendly"
+  "scores": {
+    "keyword": {
+      "score": (0-25),
+      "hasKeywordInTitle": true/false,
+      "hasKeywordInFirstSentence": true/false,
+      "hasKeywordInSlug": true/false,
+      "hasUSEnglish": true/false,
+      "usTermsFound": [],
+      "issues": []
+    },
+    "hookReadability": {
+      "score": (0-20),
+      "hasEmotionalHook": true/false,
+      "hasLongParagraphs": true/false,
+      "bulletCount": 0,
+      "boldCount": 0,
+      "issues": []
+    },
+    "conversion": {
+      "score": (0-25),
+      "hasSoftCTA": true/false,
+      "hasHardCTA": true/false,
+      "softCTAsFound": [],
+      "hardCTAsFound": [],
+      "productIntegration": "strong/moderate/weak/none",
+      "issues": []
+    },
+    "authority": {
+      "score": (0-15),
+      "hasKnotCitation": true/false,
+      "hasWeddingWireCitation": true/false,
+      "hasVogueCitation": true/false,
+      "hasExternalSources": true/false,
+      "toneExpert": true/false,
+      "issues": []
+    },
+    "technical": {
+      "score": (0-15),
+      "metaDescriptionLength": 0,
+      "hasMetaDescription": true/false,
+      "internalLinks": [],
+      "featureLinks": [],
+      "issues": []
+    }
   },
-  "keywordAnalysis": {
-    "relevance": (1-10),
-    "placement": "brief assessment",
-    "suggestions": [2-3 suggestions]
-  },
-  "competitorInsights": "brief insight",
-  "viralPotential": (1-10)
+  "finalScore": (calculated weighted total),
+  "status": "FAIL if finalScore < 90, PUBLISH if finalScore >= 90",
+  "actionItems": [
+    {"category": "Keywords", "issue": "specific keyword issue", "action": "what to fix"},
+    {"category": "Hook", "issue": "specific hook issue", "action": "what to fix"},
+    {"category": "Conversion", "issue": "specific CTA issue", "action": "what to fix"},
+    {"category": "Authority", "issue": "specific citation issue", "action": "what to fix"},
+    {"category": "Technical", "issue": "specific technical issue", "action": "what to fix"}
+  ],
+  "summary": "One sentence summary"
 }`;
 
     const OpenAI = await import('openai');
@@ -788,8 +960,8 @@ Please analyze and respond with ONLY valid JSON:
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      max_tokens: 1500,
+      temperature: 0.3,
+      max_tokens: 2000,
     });
 
     const responseText = completion.choices[0]?.message?.content;
@@ -803,7 +975,25 @@ Please analyze and respond with ONLY valid JSON:
 
     try {
       const analysis = JSON.parse(cleanJson);
-      res.json(analysis);
+
+      const keywordScore = analysis.scores?.keyword?.score || 0;
+      const hookScore = analysis.scores?.hookReadability?.score || 0;
+      const conversionScore = analysis.scores?.conversion?.score || 0;
+      const authorityScore = analysis.scores?.authority?.score || 0;
+      const technicalScore = analysis.scores?.technical?.score || 0;
+
+      res.json({
+        keywordScore,
+        hookScore,
+        conversionScore,
+        authorityScore,
+        technicalScore,
+        finalScore: analysis.finalScore,
+        status: analysis.status,
+        scores: analysis.scores,
+        actionItems: analysis.actionItems,
+        summary: analysis.summary
+      });
     } catch {
       console.error('Failed to parse AI response:', cleanJson);
       res.status(500).json({ error: 'Failed to parse AI response' });
@@ -812,6 +1002,364 @@ Please analyze and respond with ONLY valid JSON:
     console.error('AI SEO analysis error:', err);
     res.status(500).json({ error: 'Failed to analyze SEO' });
   }
+});
+
+// ========== SEO Intelligence System API Routes ==========
+
+// SEO Health - get latest snapshot
+app.get('/api/v1/seo/health', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('seo_health_snapshots')
+      .select('*')
+      .order('date', { ascending: false })
+      .limit(1)
+      .single();
+    if (error && error.code !== 'PGRST116') throw error;
+    res.json({ health: data || null });
+  } catch (err) { errorHandler(res, err, '/v1/seo/health'); }
+});
+
+// SEO Health history (last 30 days)
+app.get('/api/v1/seo/health/history', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('seo_health_snapshots')
+      .select('*')
+      .order('date', { ascending: false })
+      .limit(30);
+    if (error) throw error;
+    res.json({ history: data || [] });
+  } catch (err) { errorHandler(res, err, '/v1/seo/health/history'); }
+});
+
+// Topic clusters
+app.get('/api/v1/seo/clusters', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('topic_clusters')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json({ clusters: data || [] });
+  } catch (err) { errorHandler(res, err, '/v1/seo/clusters'); }
+});
+
+app.post('/api/v1/seo/clusters', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('topic_clusters')
+      .insert(req.body)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ cluster: data });
+  } catch (err) { errorHandler(res, err, '/v1/seo/clusters'); }
+});
+
+// Keyword rankings
+app.get('/api/v1/seo/rankings', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('keyword_rankings')
+      .select('*')
+      .order('date', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    res.json({ rankings: data || [] });
+  } catch (err) { errorHandler(res, err, '/v1/seo/rankings'); }
+});
+
+// Topics pipeline - list all
+app.get('/api/v1/seo/topics', async (req: Request, res: Response) => {
+  try {
+    const status = req.query.status as string | undefined;
+    let query = supabase
+      .from('topics_pipeline')
+      .select('*')
+      .order('priority_score', { ascending: false });
+    if (status) query = query.eq('status', status);
+    const { data, error } = await query;
+    if (error) throw error;
+    res.json({ topics: data || [] });
+  } catch (err) { errorHandler(res, err, '/v1/seo/topics'); }
+});
+
+// Topics pipeline - get single
+app.get('/api/v1/seo/topics/:id', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('topics_pipeline')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+    if (error) throw error;
+    res.json({ topic: data });
+  } catch (err) { errorHandler(res, err, '/v1/seo/topics/:id'); }
+});
+
+// Topics pipeline - create (bulk)
+app.post('/api/v1/seo/topics', async (req: Request, res: Response) => {
+  try {
+    const topics = Array.isArray(req.body) ? req.body : [req.body];
+    const { data, error } = await supabase
+      .from('topics_pipeline')
+      .insert(topics)
+      .select();
+    if (error) throw error;
+    res.json({ topics: data, count: data?.length || 0 });
+  } catch (err) { errorHandler(res, err, '/v1/seo/topics'); }
+});
+
+// Topics pipeline - update
+app.patch('/api/v1/seo/topics/:id', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('topics_pipeline')
+      .update({ ...req.body, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ topic: data });
+  } catch (err) { errorHandler(res, err, '/v1/seo/topics/:id'); }
+});
+
+// Topics pipeline - delete
+app.delete('/api/v1/seo/topics/:id', async (req: Request, res: Response) => {
+  try {
+    const { error } = await supabase
+      .from('topics_pipeline')
+      .delete()
+      .eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) { errorHandler(res, err, '/v1/seo/topics/:id'); }
+});
+
+// Topics pipeline - bulk update status
+app.post('/api/v1/seo/topics/bulk-update', async (req: Request, res: Response) => {
+  try {
+    const { ids, updates } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids array required' });
+    }
+    const { data, error } = await supabase
+      .from('topics_pipeline')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .in('id', ids)
+      .select();
+    if (error) throw error;
+    res.json({ topics: data, count: data?.length || 0 });
+  } catch (err) { errorHandler(res, err, '/v1/seo/topics/bulk-update'); }
+});
+
+// Content briefs - get by topic
+app.get('/api/v1/seo/briefs/topic/:topicId', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('content_briefs')
+      .select('*')
+      .eq('topic_id', req.params.topicId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    if (error && error.code !== 'PGRST116') throw error;
+    res.json({ brief: data || null });
+  } catch (err) { errorHandler(res, err, '/v1/seo/briefs/topic/:topicId'); }
+});
+
+// Content briefs - create
+app.post('/api/v1/seo/briefs', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('content_briefs')
+      .insert(req.body)
+      .select()
+      .single();
+    if (error) throw error;
+
+    // Update topic status and brief_id
+    if (req.body.topic_id) {
+      await supabase
+        .from('topics_pipeline')
+        .update({ brief_id: data.id, status: 'brief_created', updated_at: new Date().toISOString() })
+        .eq('id', req.body.topic_id);
+    }
+
+    res.json({ brief: data });
+  } catch (err) { errorHandler(res, err, '/v1/seo/briefs'); }
+});
+
+// Content briefs - update
+app.patch('/api/v1/seo/briefs/:id', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('content_briefs')
+      .update({ ...req.body, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ brief: data });
+  } catch (err) { errorHandler(res, err, '/v1/seo/briefs/:id'); }
+});
+
+// Generate brief with AI
+app.post('/api/v1/seo/briefs/generate', async (req: Request, res: Response) => {
+  try {
+    const { keyword, topUrls, peopleAlsoAsk, relatedSearches } = req.body;
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) {
+      return res.status(500).json({ error: 'OpenAI API key not configured' });
+    }
+
+    const prompt = `You are a senior SEO content strategist for WedBoardPro, a B2B SaaS for professional wedding planners.
+
+Create a comprehensive content brief for the keyword: "${keyword}"
+
+Context:
+- Top ranking URLs: ${JSON.stringify(topUrls?.slice(0, 5) || [])}
+- People Also Ask: ${JSON.stringify(peopleAlsoAsk?.slice(0, 8) || [])}
+- Related searches: ${JSON.stringify(relatedSearches?.slice(0, 8) || [])}
+
+Return a JSON object with EXACTLY this structure:
+{
+  "target_word_count": <number between 1500-3000>,
+  "target_reading_level": "grade_8",
+  "required_sections": [
+    {"heading": "H2 heading text", "description": "what to cover", "target_words": 200}
+  ],
+  "keyword_density_target": 1.5,
+  "internal_links_required": ["relevant WedBoardPro feature pages"],
+  "external_authority_links": ["authority sources to cite"],
+  "unique_angles": ["unique perspectives to differentiate"],
+  "product_features_to_mention": ["WedBoardPro features relevant to this topic"],
+  "cta_placements": ["where to place CTAs and what they should say"],
+  "target_featured_snippet": true/false,
+  "featured_snippet_format": "paragraph|list|table",
+  "ai_prompt_template": "The full prompt to generate the article content"
+}
+
+Make the brief specific to wedding planners as a B2B audience. The ai_prompt_template should be a detailed 500+ word prompt that would generate a high-quality, SEO-optimized article.`;
+
+    const OpenAI = await import('openai');
+    const openai = new OpenAI.default({ apiKey: openaiApiKey });
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      temperature: 0.7,
+    });
+
+    const content = completion.choices[0]?.message?.content || '{}';
+    const briefData = JSON.parse(content);
+    res.json({ brief: briefData });
+  } catch (err) { errorHandler(res, err, '/v1/seo/briefs/generate'); }
+});
+
+// Generate article content with AI
+app.post('/api/v1/seo/content/generate', async (req: Request, res: Response) => {
+  try {
+    const { prompt } = req.body;
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) {
+      return res.status(500).json({ error: 'OpenAI API key not configured' });
+    }
+
+    const OpenAI = await import('openai');
+    const openai = new OpenAI.default({ apiKey: openaiApiKey });
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      max_tokens: 4000,
+    });
+
+    const content = completion.choices[0]?.message?.content || '';
+    res.json({ content });
+  } catch (err) { errorHandler(res, err, '/v1/seo/content/generate'); }
+});
+
+// Blog posts (SEO system) - create from content production
+app.post('/api/v1/seo/blog-posts', async (req: Request, res: Response) => {
+  try {
+    const post = req.body;
+    const wordCount = post.content?.split(/\s+/).length || 0;
+    const { data, error } = await supabase
+      .from('blog_posts')
+      .insert({
+        ...post,
+        actual_word_count: wordCount,
+        status: post.status || 'draft',
+        published_at: post.status === 'published' ? new Date().toISOString() : null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    // If linked to a topic, update the topic
+    if (post.topic_pipeline_id) {
+      await supabase
+        .from('topics_pipeline')
+        .update({ published_post_id: data.id, status: 'published', updated_at: new Date().toISOString() })
+        .eq('id', post.topic_pipeline_id);
+    }
+
+    res.json({ post: data });
+  } catch (err) { errorHandler(res, err, '/v1/seo/blog-posts'); }
+});
+
+// Blog posts - list for SEO dashboard
+app.get('/api/v1/seo/blog-posts', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('blog_posts')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    res.json({ posts: data || [] });
+  } catch (err) { errorHandler(res, err, '/v1/seo/blog-posts'); }
+});
+
+// Topic discovery - trigger scraping (server-side)
+app.post('/api/v1/seo/discover', async (req: Request, res: Response) => {
+  try {
+    const { seedKeywords, maxTopics, skipTrends } = req.body;
+    if (!Array.isArray(seedKeywords) || seedKeywords.length === 0) {
+      return res.status(400).json({ error: 'seedKeywords array required' });
+    }
+
+    const { discoverTopics } = await import('../src/lib/seo/scrapers/topicDiscovery');
+    const topics = await discoverTopics(seedKeywords, { maxTopics: maxTopics || 20, skipTrends: skipTrends ?? false });
+
+    // Save to database
+    if (topics.length > 0) {
+      const { data, error } = await supabase
+        .from('topics_pipeline')
+        .insert(topics)
+        .select();
+      if (error) throw error;
+      res.json({ topics: data, count: data?.length || 0 });
+    } else {
+      res.json({ topics: [], count: 0 });
+    }
+  } catch (err) { errorHandler(res, err, '/v1/seo/discover'); }
+});
+
+// Competitor analysis for brief generation
+app.post('/api/v1/seo/analyze-competitors', async (req: Request, res: Response) => {
+  try {
+    const { keyword } = req.body;
+    if (!keyword) return res.status(400).json({ error: 'keyword required' });
+
+    const { analyzeTopCompetitors } = await import('../src/lib/seo/scrapers/serp');
+    const result = await analyzeTopCompetitors(keyword, 5);
+    res.json(result);
+  } catch (err) { errorHandler(res, err, '/v1/seo/analyze-competitors'); }
 });
 
 app.post('/api/assistant', async (req: Request, res: Response) => {

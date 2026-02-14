@@ -16,6 +16,9 @@ import { AuthCallbackPage, AuthUrlHandler } from './auth/index.ts';
 import TeamLoginPage from './TeamLoginPage';
 import TeamDashboard from './TeamDashboard';
 
+// Lazy load SEO page
+const SEODashboard = lazy(() => import('./seo/SEODashboard'));
+
 function ScrollToTop() {
   const location = useLocation();
   useEffect(() => {
@@ -160,6 +163,7 @@ const App: React.FC = () => {
         <Route path="/about" element={<AboutUs />} />
         <Route path="/team-login" element={<TeamLoginPage />} />
         <Route path="/team" element={<TeamDashboard />} />
+        <Route path="/team/seo" element={<Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}><img src="/loadinglogo.png" alt="Loading" style={{ width: '160px', height: 'auto' }} /></div>}><SEODashboard /></Suspense>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

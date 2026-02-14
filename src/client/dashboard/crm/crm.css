@@ -30,12 +30,12 @@
 
 .crm-view-select {
   padding: 10px 36px 10px 16px;
-  border-radius: 999px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
   background: #ffffff;
   font-size: 14px;
   font-weight: 500;
-  color: #0f172a;
+  color: #374151;
   cursor: pointer;
   outline: none;
   appearance: none;
@@ -57,9 +57,9 @@
 
 .crm-new-deal-btn {
   padding: 12px 22px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: none;
-  background: #111111;
+  background: #111827;
   color: #ffffff;
   font-size: 14px;
   font-weight: 600;
@@ -68,15 +68,15 @@
 }
 
 .crm-new-deal-btn:hover {
-  background: #0f172a;
+  background: #1f2937;
 }
 
 .crm-import-btn {
   padding: 12px 22px;
-  border-radius: 999px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: #f8fafc;
-  color: #475569;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #374151;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -84,8 +84,8 @@
 }
 
 .crm-import-btn:hover {
-  background: #f1f5f9;
-  border-color: rgba(15, 23, 42, 0.2);
+  background: #f3f4f6;
+  border-color: #d1d5db;
 }
 
 .crm-toolbar {
@@ -125,23 +125,23 @@
 
 .crm-filter-btn {
   padding: 10px 16px;
-  border-radius: 999px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
   background: #ffffff;
   font-size: 14px;
-  color: #475467;
+  color: #374151;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .crm-filter-btn:hover {
-  border-color: rgba(15, 23, 42, 0.2);
-  color: #0f172a;
+  border-color: #d1d5db;
+  color: #111827;
 }
 
 .crm-filter-btn.active {
-  background: #0f172a;
-  border-color: #0f172a;
+  background: #111827;
+  border-color: #111827;
   color: #ffffff;
 }
 
@@ -268,7 +268,7 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
   color: #ffffff;
@@ -277,7 +277,7 @@
 .crm-metric-stage-count {
   background: rgba(255, 255, 255, 0.25);
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 8px;
   font-size: 11px;
 }
 
@@ -337,8 +337,8 @@
   min-width: 24px;
   height: 24px;
   padding: 0 8px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.06);
+  border-radius: 8px;
+  background: #f3f4f6;
   color: #374151;
   font-weight: 600;
   font-size: 12px;
@@ -427,7 +427,7 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: 8px;
   flex-shrink: 0;
 }
 
@@ -536,9 +536,9 @@
 
 .crm-empty-cta {
   padding: 14px 28px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: none;
-  background: #111111;
+  background: #111827;
   color: #ffffff;
   font-size: 14px;
   font-weight: 600;
@@ -547,7 +547,7 @@
 }
 
 .crm-empty-cta:hover {
-  background: #0f172a;
+  background: #1f2937;
 }
 
 .crm-loading {
@@ -593,7 +593,7 @@
 
 .crm-error button {
   padding: 12px 24px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: 1px solid rgba(239, 68, 68, 0.3);
   background: #ffffff;
   font-size: 13px;
@@ -734,9 +734,9 @@
 
 .crm-btn-primary {
   padding: 12px 24px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: none;
-  background: #111111;
+  background: #111827;
   color: #ffffff;
   font-size: 14px;
   font-weight: 600;
@@ -745,7 +745,7 @@
 }
 
 .crm-btn-primary:hover:not(:disabled) {
-  background: #0f172a;
+  background: #1f2937;
 }
 
 .crm-btn-primary:disabled {
@@ -755,10 +755,10 @@
 
 .crm-btn-secondary {
   padding: 12px 24px;
-  border-radius: 999px;
-  border: 1px solid rgba(15, 23, 42, 0.2);
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
   background: #ffffff;
-  color: #0f172a;
+  color: #374151;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -766,7 +766,8 @@
 }
 
 .crm-btn-secondary:hover:not(:disabled) {
-  background: #f8fafc;
+  background: #f3f4f6;
+  border-color: #d1d5db;
 }
 
 .crm-btn-secondary:disabled {
@@ -865,7 +866,7 @@
 .crm-drawer-stage-pill {
   display: inline-block;
   padding: 5px 12px;
-  border-radius: 999px;
+  border-radius: 8px;
   font-size: 11px;
   font-weight: 600;
   color: #ffffff;
@@ -1173,7 +1174,7 @@
 
 .crm-drawer-activity-type-badge {
   padding: 5px 10px;
-  border-radius: 999px;
+  border-radius: 8px;
   font-size: 11px;
   font-weight: 600;
   text-transform: capitalize;
@@ -1284,7 +1285,7 @@
 
 .crm-btn-destructive {
   padding: 12px 24px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: 1px solid rgba(239, 68, 68, 0.3);
   background: #ffffff;
   color: #dc2626;
@@ -1323,7 +1324,7 @@
   display: inline-flex;
   align-items: center;
   padding: 8px 16px;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 13px;
   font-weight: 600;
   color: #ffffff;
@@ -1332,7 +1333,7 @@
 .crm-focused-title {
   font-size: 20px;
   font-weight: 600;
-  color: #0f172a;
+  color: #111827;
   margin: 0;
 }
 
@@ -1344,19 +1345,19 @@
 
 .crm-focused-back-btn {
   padding: 10px 18px;
-  border-radius: 999px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
   background: #ffffff;
   font-size: 13px;
   font-weight: 600;
-  color: #475467;
+  color: #374151;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .crm-focused-back-btn:hover {
-  border-color: #0f172a;
-  color: #0f172a;
+  border-color: #d1d5db;
+  color: #111827;
 }
 
 .crm-focused-metrics {
@@ -1408,24 +1409,24 @@
 
 .crm-focused-sort-btn {
   padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
   background: #ffffff;
   font-size: 12px;
   font-weight: 600;
-  color: #475467;
+  color: #374151;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .crm-focused-sort-btn:hover {
-  border-color: rgba(15, 23, 42, 0.2);
-  color: #0f172a;
+  border-color: #d1d5db;
+  color: #111827;
 }
 
 .crm-focused-sort-btn.active {
-  background: #0f172a;
-  border-color: #0f172a;
+  background: #111827;
+  border-color: #111827;
   color: #ffffff;
 }
 
@@ -1513,7 +1514,7 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: 8px;
   flex-shrink: 0;
 }
 
@@ -1576,30 +1577,30 @@
 
 .crm-focused-action-btn {
   padding: 10px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
   background: #ffffff;
   font-size: 12px;
-  color: #475467;
+  color: #374151;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
 }
 
 .crm-focused-action-btn:hover {
-  border-color: rgba(15, 23, 42, 0.2);
-  background: #f8fafc;
-  color: #0f172a;
+  border-color: #d1d5db;
+  background: #f3f4f6;
+  color: #111827;
 }
 
 .crm-focused-action-btn.primary {
-  background: #111111;
+  background: #111827;
   border-color: transparent;
   color: #ffffff;
 }
 
 .crm-focused-action-btn.primary:hover {
-  background: #0f172a;
+  background: #1f2937;
 }
 
 .crm-focused-action-btn.destructive {
@@ -1663,22 +1664,23 @@
     left: 20px;
     width: 56px;
     height: 56px;
-    border-radius: 50%;
-    background: #0c0c0c;
+    border-radius: 16px;
+    background: #111827;
     color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
     z-index: 100;
     border: none;
     cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: all 0.2s ease;
   }
 
   .crm-fab:hover {
     transform: scale(1.05);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    background: #1f2937;
   }
 
   .crm-fab:active {

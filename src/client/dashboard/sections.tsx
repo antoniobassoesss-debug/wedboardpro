@@ -249,7 +249,7 @@ export const WorkSection: React.FC = () => {
           )}
         </div>
       </div>
-      {isMobile && selectedEvent && (
+      {isMobile && (
         <button
           type="button"
           className="work-fab"
@@ -260,15 +260,26 @@ export const WorkSection: React.FC = () => {
             left: 20,
             width: 56,
             height: 56,
-            borderRadius: '50%',
-            background: '#0c0c0c',
+            borderRadius: 16,
+            background: '#111827',
             border: 'none',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)',
             zIndex: 100,
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)';
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.25)';
+            e.currentTarget.style.background = '#1f2937';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.2)';
+            e.currentTarget.style.background = '#111827';
           }}
         >
           <PlusIcon />

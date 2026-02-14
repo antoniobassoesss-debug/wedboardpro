@@ -650,13 +650,13 @@ const TaskCreateModal: React.FC<{
             type="button"
             onClick={onClose}
             style={{
-              width: 32,
-              height: 32,
+              width: 36,
+              height: 36,
               border: 'none',
-              background: '#f1f5f9',
-              borderRadius: 999,
+              background: '#f3f4f6',
+              borderRadius: 10,
               fontSize: 18,
-              color: '#64748b',
+              color: '#374151',
               cursor: 'pointer',
               transition: 'all 150ms ease',
               display: 'flex',
@@ -664,12 +664,12 @@ const TaskCreateModal: React.FC<{
               justifyContent: 'center',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#e2e8f0';
-              e.currentTarget.style.color = '#0f172a';
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.color = '#111827';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#f1f5f9';
-              e.currentTarget.style.color = '#64748b';
+              e.currentTarget.style.background = '#f3f4f6';
+              e.currentTarget.style.color = '#374151';
             }}
           >
             ×
@@ -692,16 +692,17 @@ const TaskCreateModal: React.FC<{
                 fontSize: 14, 
                 fontWeight: 500, 
                 border: '1px solid #e5e7eb', 
-                borderRadius: 8,
-                padding: '10px 12px', 
+                borderRadius: 12,
+                padding: '12px 14px', 
                 outline: 'none',
                 transition: 'all 150ms ease',
                 background: '#ffffff',
-                color: '#0f172a',
+                color: '#111827',
+                width: '100%',
               }}
               onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#0f172a';
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.08)';
+                e.currentTarget.style.borderColor = '#111827';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(17, 24, 39, 0.05)';
               }}
               onBlur={(e) => {
                 e.currentTarget.style.borderColor = '#e5e7eb';
@@ -723,7 +724,7 @@ const TaskCreateModal: React.FC<{
                   onClick={() => setShowAssigneeMenu(!showAssigneeMenu)}
                   style={{
                     padding: '10px 16px',
-                    borderRadius: 999,
+                    borderRadius: 12,
                     border: '1px solid #e5e7eb',
                     background: '#ffffff',
                     cursor: 'pointer',
@@ -734,13 +735,15 @@ const TaskCreateModal: React.FC<{
                     width: '100%',
                     textAlign: 'left',
                     transition: 'all 150ms ease',
-                    color: '#0f172a',
+                    color: '#374151',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = '#cbd5e1';
+                    e.currentTarget.style.borderColor = '#d1d5db';
+                    e.currentTarget.style.background = '#f3f4f6';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.borderColor = '#e5e7eb';
+                    e.currentTarget.style.background = '#ffffff';
                   }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -844,10 +847,10 @@ const TaskCreateModal: React.FC<{
               <div style={{ position: 'relative' }}>
                 <button
                   type="button"
-                  onClick={() => setShowProjectMenu(!showProjectMenu)}
+                  onClick={() => setShowPriorityMenu(!showPriorityMenu)}
                   style={{
                     padding: '10px 16px',
-                    borderRadius: 999,
+                    borderRadius: 12,
                     border: '1px solid #e5e7eb',
                     background: '#ffffff',
                     cursor: 'pointer',
@@ -858,13 +861,15 @@ const TaskCreateModal: React.FC<{
                     width: '100%',
                     textAlign: 'left',
                     transition: 'all 150ms ease',
-                    color: '#0f172a',
+                    color: '#374151',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = '#cbd5e1';
+                    e.currentTarget.style.borderColor = '#d1d5db';
+                    e.currentTarget.style.background = '#f3f4f6';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.borderColor = '#e5e7eb';
+                    e.currentTarget.style.background = '#ffffff';
                   }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -977,7 +982,7 @@ const TaskCreateModal: React.FC<{
                     alignItems: 'center', 
                     justifyContent: 'space-between',
                     padding: '10px 16px',
-                    borderRadius: 999,
+                    borderRadius: 12,
                     fontSize: 14,
                     fontWeight: 600,
                     textTransform: 'capitalize',
@@ -1071,19 +1076,19 @@ const TaskCreateModal: React.FC<{
                   onChange={(e) => setNewTaskData((prev) => ({ ...prev, dueDate: e.target.value }))}
                   style={{
                     padding: '10px 16px 10px 42px',
-                    borderRadius: 999,
+                    borderRadius: 12,
                     border: '1px solid #e5e7eb',
                     background: '#ffffff',
                     cursor: 'pointer',
                     fontSize: 14,
-                    color: '#0f172a',
+                    color: '#374151',
                     width: '100%',
                     outline: 'none',
                     transition: 'all 150ms ease',
                   }}
                   onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#0f172a';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.08)';
+                    e.currentTarget.style.borderColor = '#111827';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(17, 24, 39, 0.05)';
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.borderColor = '#e5e7eb';
@@ -1107,18 +1112,19 @@ const TaskCreateModal: React.FC<{
               style={{ 
                 width: '100%', 
                 border: '1px solid #e5e7eb', 
-                borderRadius: 8, 
-                padding: '10px 12px', 
+                borderRadius: 12, 
+                padding: '12px 14px', 
                 fontSize: 14, 
-                color: '#0f172a',
+                color: '#111827',
                 resize: 'vertical',
                 outline: 'none',
                 transition: 'all 150ms ease',
                 background: '#ffffff',
+                fontFamily: 'inherit',
               }}
               onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#0f172a';
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 23, 42, 0.08)';
+                e.currentTarget.style.borderColor = '#111827';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(17, 24, 39, 0.05)';
               }}
               onBlur={(e) => {
                 e.currentTarget.style.borderColor = '#e5e7eb';
@@ -1183,31 +1189,31 @@ const TaskCreateModal: React.FC<{
         <div style={{ 
           display: 'flex', 
           justifyContent: 'flex-end', 
-          gap: 10, 
+          gap: 12, 
           padding: '16px 24px',
-          borderTop: '1px solid #f1f5f9',
+          borderTop: '1px solid #f3f4f6',
         }}>
           <button 
             type="button" 
             onClick={onClose}
             style={{
               padding: '10px 24px',
-              borderRadius: 999,
+              borderRadius: 12,
               border: '1px solid #e5e7eb',
               background: '#ffffff',
-              color: '#64748b',
+              color: '#374151',
               fontSize: 14,
-              fontWeight: 600,
+              fontWeight: 500,
               cursor: 'pointer',
               transition: 'all 150ms ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#f8fafc';
-              e.currentTarget.style.color = '#0f172a';
+              e.currentTarget.style.background = '#f3f4f6';
+              e.currentTarget.style.borderColor = '#d1d5db';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = '#ffffff';
-              e.currentTarget.style.color = '#64748b';
+              e.currentTarget.style.borderColor = '#e5e7eb';
             }}
           >
             Cancel
@@ -1218,23 +1224,23 @@ const TaskCreateModal: React.FC<{
             disabled={!newTaskData.title.trim()}
             style={{
               padding: '10px 24px',
-              borderRadius: 999,
+              borderRadius: 12,
               border: 'none',
-              background: newTaskData.title.trim() ? '#0f172a' : '#e5e7eb',
-              color: newTaskData.title.trim() ? '#ffffff' : '#94a3b8',
+              background: newTaskData.title.trim() ? '#111827' : '#e5e7eb',
+              color: newTaskData.title.trim() ? '#ffffff' : '#9ca3af',
               fontSize: 14,
-              fontWeight: 600,
+              fontWeight: 500,
               cursor: newTaskData.title.trim() ? 'pointer' : 'not-allowed',
               transition: 'all 150ms ease',
             }}
             onMouseEnter={(e) => {
               if (newTaskData.title.trim()) {
-                e.currentTarget.style.background = '#1e293b';
+                e.currentTarget.style.background = '#1f2937';
               }
             }}
             onMouseLeave={(e) => {
               if (newTaskData.title.trim()) {
-                e.currentTarget.style.background = '#0f172a';
+                e.currentTarget.style.background = '#111827';
               }
             }}
           >

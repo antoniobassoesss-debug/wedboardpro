@@ -73,7 +73,7 @@
   background: #0f172a;
   color: white;
   border: none;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -121,7 +121,7 @@
   align-items: center;
   justify-content: center;
   border: 1px solid #e5e7eb;
-  border-radius: 999px;
+  border-radius: 12px;
   background: white;
   font-size: 14px;
   cursor: pointer;
@@ -368,7 +368,7 @@
   background: #0f172a;
   color: white;
   border: none;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -478,7 +478,7 @@
 .budget-status-badge {
   display: inline-block;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 11px;
   font-weight: 600;
 }
@@ -496,7 +496,7 @@
   align-items: center;
   justify-content: center;
   border: 1px solid #e5e7eb;
-  border-radius: 999px;
+  border-radius: 12px;
   background: white;
   font-size: 12px;
   cursor: pointer;
@@ -573,7 +573,7 @@
   font-size: 11px;
   font-weight: 600;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: 12px;
 }
 
 .budget-payment-status.paid {
@@ -617,7 +617,7 @@
   background: #0f172a;
   color: white;
   border: none;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -807,7 +807,7 @@
   align-items: center;
   justify-content: center;
   border: 2px solid #d1d5db;
-  border-radius: 999px;
+  border-radius: 12px;
   background: white;
   font-size: 12px;
   cursor: pointer;
@@ -958,7 +958,7 @@
   font-size: 24px;
   color: #9ca3af;
   cursor: pointer;
-  border-radius: 999px;
+  border-radius: 12px;
 }
 
 .budget-modal-close:hover {
@@ -1012,7 +1012,7 @@
   width: 100%;
   padding: 10px 14px;
   border: 1px solid #e5e7eb;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 14px;
   outline: none;
 }
@@ -1025,7 +1025,7 @@
   width: 100%;
   padding: 10px 14px;
   border: 1px solid #e5e7eb;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 14px;
   background: white;
   cursor: pointer;
@@ -1088,7 +1088,7 @@
   background: #0f172a;
   color: white;
   border: none;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -1108,7 +1108,7 @@
   background: white;
   color: #374151;
   border: 1px solid #e5e7eb;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -1290,7 +1290,7 @@
   background: #0f172a;
   color: white;
   border: none;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 18px;
   cursor: pointer;
   flex-shrink: 0;
@@ -1659,7 +1659,7 @@
   background: #0f172a;
   color: white;
   border: none;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -1712,7 +1712,7 @@
   padding: 8px 16px;
   background: #f3f4f6;
   border: 1px solid #e5e7eb;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 13px;
   font-weight: 500;
   color: #374151;
@@ -1733,7 +1733,7 @@
 .fcc-view-toggle {
   display: flex;
   background: #f3f4f6;
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 4px;
 }
 
@@ -1741,7 +1741,7 @@
   padding: 6px 14px;
   background: transparent;
   border: none;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 13px;
   font-weight: 500;
   color: #6b7280;
@@ -1790,7 +1790,7 @@
 
 .fcc-health-badge {
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 11px;
   font-weight: 600;
 }
@@ -1846,7 +1846,7 @@
 .fcc-accordion-count {
   padding: 4px 10px;
   background: #f3f4f6;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 12px;
   color: #6b7280;
 }
@@ -1927,7 +1927,7 @@
   background: #0f172a;
   color: white;
   border: none;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -1994,7 +1994,7 @@
   background: #0f172a;
   color: white;
   border: none;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;

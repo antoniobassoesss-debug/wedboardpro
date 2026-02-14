@@ -55,7 +55,7 @@
   background: #0f172a;
   color: #ffffff;
   border: none;
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 8px 16px;
   font-size: 13px;
   font-weight: 600;
@@ -112,11 +112,11 @@
   gap: 4px;
   background: #f8fafc;
   padding: 3px;
-  border-radius: 999px;
+  border-radius: 12px;
 }
 
 .chat-filter-tab {
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 7px 16px;
   border: none;
   background: transparent;
@@ -240,7 +240,7 @@
   color: #ffffff;
   font-size: 11px;
   font-weight: 700;
-  border-radius: 999px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -473,7 +473,7 @@
   background: #0f172a;
   color: #ffffff;
   border: none;
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 12px 24px;
   font-size: 14px;
   font-weight: 600;
@@ -805,7 +805,7 @@
   width: 100%;
   padding: 14px 20px;
   border: 1px solid #e2e8f0;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 14px;
   background: #f8fafc;
   outline: none;
@@ -850,7 +850,7 @@
   background: #0f172a;
   color: #ffffff;
   border: none;
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 12px 24px;
   font-size: 14px;
   font-weight: 600;
@@ -1170,7 +1170,7 @@
   color: #94a3b8;
   padding: 4px 10px;
   background: #f1f5f9;
-  border-radius: 999px;
+  border-radius: 12px;
   text-transform: capitalize;
   flex-shrink: 0;
 }
@@ -1327,7 +1327,7 @@
   color: #94a3b8;
   background: #f1f5f9;
   padding: 6px 16px;
-  border-radius: 999px;
+  border-radius: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }

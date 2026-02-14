@@ -578,8 +578,19 @@ export async function listLayoutsWithEvents(): Promise<ApiResponse<Array<LayoutR
       .order('updated_at', { ascending: false });
 
     if (error) {
-      console.error('[layoutsApi] listLayoutsWithEvents error:', error);
-      return { data: null, error: error.message };
+      console.warn('[layoutsApi] Foreign key query failed, falling back to simple query:', error.message);
+      const { data: simpleData, error: simpleError } = await getSupabaseClient()
+        .from('layouts')
+        .select('*')
+        .eq('account_id', accountId)
+        .eq('status', 'active')
+        .order('updated_at', { ascending: false });
+      
+      if (simpleError) {
+        console.error('[layoutsApi] Simple query also failed:', simpleError);
+        return { data: null, error: simpleError.message };
+      }
+      return { data: simpleData as any, error: null };
     }
 
     console.log('[layoutsApi] listLayoutsWithEvents fetched:', data?.length, 'layouts');

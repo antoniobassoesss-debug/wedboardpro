@@ -280,9 +280,10 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           access_token: accessToken,
           refresh_token: storedSession?.refresh_token,
         });
+        // Only select columns that exist in the profiles table
         const { data, error } = await browserSupabaseClient
           .from("profiles")
-          .select("full_name, avatar_url, email, business_name, phone, address")
+          .select("full_name, avatar_url, email")
           .eq("id", userId)
           .single();
         if (!error && data) {
@@ -290,9 +291,9 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
             full_name: data.full_name || resolvedName || null,
             avatar_url: data.avatar_url ?? null,
             email: data.email ?? userEmail ?? null,
-            business_name: data.business_name ?? null,
-            phone: data.phone ?? null,
-            address: data.address ?? null,
+            business_name: null,
+            phone: null,
+            address: null,
           });
         } else {
           // If profile doesn't exist, use what we have

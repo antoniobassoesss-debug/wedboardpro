@@ -451,7 +451,7 @@
 
 .files-badge {
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: 12px;
   background: #f1f5f9;
   color: #64748b;
   font-size: 11px;

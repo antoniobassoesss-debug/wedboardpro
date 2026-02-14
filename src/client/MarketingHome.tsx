@@ -3,45 +3,43 @@ import { Link } from 'react-router-dom';
 
 const MarketingHome: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
+  const [blogPosts, setBlogPosts] = useState<Array<{
+    id: string;
+    title: string;
+    slug: string;
+    excerpt: string;
+    category: string;
+    readingTime: number;
+    publishedAt: string;
+  }>>([]);
+  const [blogLoading, setBlogLoading] = useState(true);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+
+    document.body.classList.add('marketing-home');
+
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+      document.body.classList.remove('marketing-home');
+    };
   }, []);
 
   useEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
-    const root = document.getElementById('root');
-
-    const originalHtmlOverflow = html.style.overflow;
-    const originalBodyOverflow = body.style.overflow;
-    const originalBodyHeight = body.style.height;
-    const originalRootPosition = root?.style.position;
-    const originalRootOverflow = root?.style.overflow;
-    const originalRootHeight = root?.style.height;
-
-    html.style.overflow = 'auto';
-    body.style.overflow = 'auto';
-    body.style.height = 'auto';
-    if (root) {
-      root.style.position = 'relative';
-      root.style.overflow = 'visible';
-      root.style.height = 'auto';
-    }
-
-    return () => {
-      html.style.overflow = originalHtmlOverflow;
-      body.style.overflow = originalBodyOverflow;
-      body.style.height = originalBodyHeight;
-      if (root) {
-        root.style.position = originalRootPosition || '';
-        root.style.overflow = originalRootOverflow || '';
-        root.style.height = originalRootHeight || '';
+    const fetchBlogPosts = async () => {
+      try {
+        const response = await fetch('/api/v1/blog/featured');
+        const data = await response.json();
+        setBlogPosts(data.posts || []);
+      } catch (error) {
+        console.error('Failed to fetch blog posts:', error);
+      } finally {
+        setBlogLoading(false);
       }
     };
+    fetchBlogPosts();
   }, []);
 
   return (
@@ -346,6 +344,169 @@ const MarketingHome: React.FC = () => {
                 isMobile={isMobile}
               />
             </div>
+          </div>
+        </section>
+
+        {/* Blog Posts */}
+        <section style={{ padding: isMobile ? '48px 0' : '100px 0', backgroundColor: '#ffffff' }}>
+          <div style={{ maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '0 20px' : '0 32px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isMobile ? '24px' : '48px', flexWrap: 'wrap', gap: '16px' }}>
+              <div>
+                <h2 style={{ fontSize: isMobile ? '24px' : '32px', fontWeight: 600, color: '#111827', letterSpacing: '-0.025em', margin: 0 }}>
+                  Latest from the blog
+                </h2>
+                <p style={{ marginTop: isMobile ? '8px' : '12px', fontSize: isMobile ? '15px' : '17px', color: '#6b7280' }}>
+                  Insights for growing your wedding planning business
+                </p>
+              </div>
+              <Link
+                to="/blog"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  color: '#111827',
+                  textDecoration: 'none'
+                }}
+              >
+                View all posts
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </Link>
+            </div>
+
+            {blogLoading ? (
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: isMobile ? '16px' : '24px' }}>
+                {[1, 2, 3].map((i) => (
+                  <div key={i} style={{ borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+                    <div style={{ height: isMobile ? '160px' : '200px', backgroundColor: '#f3f4f6', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+                    <div style={{ padding: isMobile ? '16px' : '24px' }}>
+                      <div style={{ height: '14px', width: '60%', backgroundColor: '#f3f4f6', borderRadius: '4px', marginBottom: '12px', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+                      <div style={{ height: '20px', width: '90%', backgroundColor: '#f3f4f6', borderRadius: '4px', marginBottom: '8px', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+                      <div style={{ height: '20px', width: '70%', backgroundColor: '#f3f4f6', borderRadius: '4px', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: isMobile ? '16px' : '24px' }}>
+                {blogPosts.map((post) => (
+                  <Link
+                    key={post.id}
+                    to={`/blog/${post.slug}`}
+                    style={{
+                      display: 'block',
+                      textDecoration: 'none',
+                      borderRadius: '16px',
+                      border: '1px solid #e5e7eb',
+                      overflow: 'hidden',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      backgroundColor: '#ffffff',
+                      position: 'relative'
+                    }}
+                    onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                      e.currentTarget.style.transform = 'translateY(-6px)';
+                      e.currentTarget.style.boxShadow = '0 20px 40px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.05)';
+                    }}
+                    onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    <div style={{
+                      height: isMobile ? '140px' : '160px',
+                      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: '4px',
+                        background: 'linear-gradient(90deg, #111827, #374151)'
+                      }} />
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '100%',
+                        color: '#94a3b8'
+                      }}>
+                        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
+                          <rect x="3" y="3" width="18" height="18" rx="2" />
+                          <circle cx="8.5" cy="8.5" r="1.5" />
+                          <path d="M21 15l-5-5L5 21" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div style={{ padding: isMobile ? '16px' : '24px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          color: '#111827',
+                          backgroundColor: '#f3f4f6',
+                          padding: '5px 10px',
+                          borderRadius: '6px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          {post.category}
+                        </span>
+                        <span style={{ fontSize: '12px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12,6 12,12 16,14" />
+                          </svg>
+                          {post.readingTime} min
+                        </span>
+                      </div>
+                      <h3 style={{
+                        fontSize: isMobile ? '16px' : '18px',
+                        fontWeight: 600,
+                        color: '#111827',
+                        lineHeight: 1.4,
+                        margin: '0 0 10px 0',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                      }}>
+                        {post.title}
+                      </h3>
+                      <p style={{
+                        fontSize: '14px',
+                        color: '#64748b',
+                        lineHeight: 1.6,
+                        margin: '0 0 16px 0',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden'
+                      }}>
+                        {post.excerpt}
+                      </p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{
+                          fontSize: '13px',
+                          fontWeight: 500,
+                          color: '#111827'
+                        }}>
+                          Read article
+                        </span>
+                        <span className="arrow-icon" style={{ transition: 'transform 0.2s ease' }}>
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M6 12L10 8L6 4" stroke="#111827" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 

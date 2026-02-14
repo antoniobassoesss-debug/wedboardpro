@@ -817,6 +817,16 @@ const WeekView: React.FC<WeekViewProps> = ({
           <PlusIcon />
         </button>
 
+        <button
+          type="button"
+          className="wp-calendar-mobile-menu"
+          onClick={() => window.dispatchEvent(new CustomEvent('wbp:toggle-mobile-menu'))}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+
         {/* Mobile Event Editor Modal */}
         {editorOpen && (
           <div

@@ -31,23 +31,25 @@
 }
 
 .vendors-add-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 10px 18px;
   background: #0f172a;
   color: white;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.15);
 }
 
 .vendors-add-btn:hover {
   background: #1e293b;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
 }
 
 .vendors-tab-content {
@@ -714,7 +716,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: 2px solid transparent;
   font-size: 14px;
   font-weight: 600;
@@ -797,7 +799,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: 2px solid transparent;
   font-size: 13px;
   font-weight: 600;
@@ -922,7 +924,7 @@
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: none;
   background: #111827;
   color: #ffffff;
@@ -947,7 +949,7 @@
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: 1px solid #14b8a6;
   background: #ffffff;
   color: #14b8a6;
@@ -979,6 +981,10 @@
     max-width: 100%;
     max-height: 95vh;
     border-radius: 12px;
+  }
+
+  .vendors-tab-header .vendors-add-btn {
+    display: none;
   }
 
   .modal-filters {

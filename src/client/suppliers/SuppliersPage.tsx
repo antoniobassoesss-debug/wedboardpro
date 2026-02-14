@@ -98,11 +98,11 @@ const SupplierCard: React.FC<{ supplier: Supplier; isMobile: boolean }> = ({ sup
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div
+              <div
             style={{
               width: 26,
               height: 26,
-              borderRadius: 999,
+              borderRadius: 12,
               background: '#020617',
               color: '#f9fafb',
               fontSize: 11,
@@ -147,21 +147,21 @@ const SupplierCard: React.FC<{ supplier: Supplier; isMobile: boolean }> = ({ sup
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 999,
-              background: '#020617',
-              color: '#f9fafb',
-              fontSize: 14,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 600,
-              flexShrink: 0,
-            }}
-          >
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 12,
+                background: '#020617',
+                color: '#f9fafb',
+                fontSize: 14,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 600,
+                flexShrink: 0,
+              }}
+            >
             {supplier.name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -438,6 +438,42 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
               </>
             )}
           </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              type="button"
+              onClick={() => setShowCreateCategory(true)}
+              style={{
+                borderRadius: 12,
+                border: '1px solid #e5e5e5',
+                padding: '10px 16px',
+                background: '#ffffff',
+                color: '#0f172a',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+              }}
+            >
+              + Create Category
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowCreate(true)}
+              style={{
+                borderRadius: 12,
+                border: 'none',
+                padding: '10px 18px',
+                background: '#0f172a',
+                color: '#ffffff',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(15, 23, 42, 0.15)',
+              }}
+            >
+              + Add Supplier
+            </button>
+          </div>
         </div>
 
         <div
@@ -457,7 +493,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
             style={{
               flex: 1,
               minWidth: 180,
-              borderRadius: 999,
+              borderRadius: 12,
               border: '1px solid rgba(148,163,184,0.6)',
               padding: '8px 14px',
               fontSize: 13,
@@ -467,7 +503,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             style={{
-              borderRadius: 999,
+              borderRadius: 12,
               border: '1px solid #e5e7eb',
               padding: '9px 36px 9px 16px',
               fontSize: 14,
@@ -488,23 +524,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
                 {opt.label}
               </option>
             ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => setShowCreateCategory(true)}
-            style={{
-              borderRadius: 999,
-              border: '1px solid #e5e7eb',
-              padding: '8px 16px',
-              background: '#ffffff',
-              color: '#0f172a',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            + Create category
-          </button>
+            </select>
         </div>
 
         <div
@@ -564,10 +584,10 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
             style={{
               position: 'fixed',
               bottom: 24,
-              left: 20,
+              right: 24,
               width: 56,
               height: 56,
-              borderRadius: '50%',
+              borderRadius: 16,
               background: '#0c0c0c',
               color: '#fff',
               border: 'none',
@@ -575,7 +595,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
               zIndex: 100,
               transition: 'transform 0.15s ease',
             }}
@@ -772,7 +792,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
                   type="button"
                   onClick={() => setShowCreate(false)}
                   style={{
-                    borderRadius: 999,
+                    borderRadius: 12,
                     border: '1px solid rgba(148,163,184,0.7)',
                     padding: '8px 14px',
                     background: '#ffffff',
@@ -786,7 +806,7 @@ const SuppliersPage: React.FC<SuppliersPageProps> = ({ embedded = false }) => {
                   type="submit"
                   disabled={creating}
                   style={{
-                    borderRadius: 999,
+                    borderRadius: 12,
                     border: 'none',
                     padding: '8px 18px',
                     background: '#020617',

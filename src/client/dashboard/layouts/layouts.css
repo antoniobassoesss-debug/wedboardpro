@@ -51,7 +51,7 @@
   align-items: center;
   gap: 6px;
   padding: 10px 20px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: none;
   background: #0f172a;
   color: #ffffff;
@@ -130,7 +130,7 @@
 
 .layouts-chip {
   padding: 6px 12px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: 1px solid #e5e5e5;
   background: #ffffff;
   font-size: 12px;
@@ -442,7 +442,7 @@
 /* Status Badge */
 .layouts-status-badge {
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 11px;
   font-weight: 600;
   text-transform: capitalize;
@@ -526,7 +526,7 @@
 
 .layouts-empty-cta {
   padding: 14px 28px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: none;
   background: #0f172a;
   color: #ffffff;

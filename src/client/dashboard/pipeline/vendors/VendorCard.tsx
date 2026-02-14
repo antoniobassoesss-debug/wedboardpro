@@ -56,7 +56,7 @@ const VendorCard: React.FC<VendorCardProps> = ({ vendor, onClick }) => {
           fontSize: 11,
           fontWeight: 600,
           padding: '4px 10px',
-          borderRadius: 999,
+          borderRadius: 12,
           background: statusInfo.color === 'teal' ? 'rgba(20, 184, 166, 0.1)' :
                      statusInfo.color === 'coral' ? 'rgba(239, 68, 68, 0.1)' :
                      'rgba(100, 116, 139, 0.1)',

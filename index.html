@@ -15,19 +15,19 @@
       }
       
       html, body {
-        width: 100vw;
-        height: 100vh;
-        overflow: hidden;
-        touch-action: none;
+        width: 100%;
+        min-height: 100vh;
+        overflow-x: hidden;
       }
-      
+
       #root {
-        width: 100vw;
-        height: 100vh;
-        position: fixed;
-        top: 0;
-        left: 0;
-        overflow: hidden;
+        width: 100%;
+        min-height: 100vh;
+        position: relative;
+      }
+
+      body.marketing-home #root {
+        position: relative;
       }
 
       /* Grid background - renders immediately */
@@ -93,7 +93,7 @@
     <!-- Pre-rendered grid that shows immediately -->
     <div data-grid-overlay="true" class="preload-grid"></div>
     
-    <div id="root"></div>
+    <div id="root" class="marketing-home"></div>
     <script type="module" src="/src/client/main.tsx"></script>
   </body>
 </html>

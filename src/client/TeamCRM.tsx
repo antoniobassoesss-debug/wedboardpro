@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isToday, isTomorrow, isPast } from 'date-fns';
 import './team-crm.css';
 
 interface Lead {
@@ -21,6 +21,21 @@ interface Lead {
   created_at: string;
 }
 
+interface Booking {
+  id: string;
+  name: string;
+  email: string;
+  company: string | null;
+  phone: string | null;
+  booking_date: string;
+  booking_time: string;
+  goal: string | null;
+  team_size: string | null;
+  status: string;
+  meeting_link: string | null;
+  created_at: string;
+}
+
 const LEAD_STAGES = [
   { key: 'meeting_scheduled', label: 'Scheduled' },
   { key: 'demo_completed', label: 'Demo Done' },
@@ -35,9 +50,10 @@ interface TeamCRMProps {
 
 const TeamCRM: React.FC<TeamCRMProps> = ({ onLogout }) => {
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [view, setView] = useState<'pipeline' | 'list'>('pipeline');
+  const [view, setView] = useState<'pipeline' | 'list' | 'bookings'>('pipeline');
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
 
@@ -60,9 +76,38 @@ const TeamCRM: React.FC<TeamCRMProps> = ({ onLogout }) => {
     }
   }, []);
 
+  const fetchBookings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/v1/team/bookings');
+      if (res.ok) {
+        const data = await res.json();
+        setBookings(data.bookings || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch bookings:', error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchLeads();
-  }, [fetchLeads]);
+    fetchBookings();
+  }, [fetchLeads, fetchBookings]);
+
+  const upcomingBookings = bookings.filter(b => 
+    b.status !== 'cancelled' && 
+    !isPast(parseISO(`${b.booking_date}T${b.booking_time}`))
+  ).sort((a, b) => {
+    const dateA = parseISO(`${a.booking_date}T${a.booking_time}`);
+    const dateB = parseISO(`${b.booking_date}T${b.booking_time}`);
+    return dateA.getTime() - dateB.getTime();
+  });
+
+  const formatBookingDate = (dateStr: string, timeStr: string) => {
+    const date = parseISO(`${dateStr}T${timeStr}`);
+    if (isToday(date)) return 'Today';
+    if (isTomorrow(date)) return 'Tomorrow';
+    return format(date, 'MMM d');
+  };
 
   const updateLeadStage = async (leadId: string, stage: string) => {
     const token = sessionStorage.getItem('team_token');
@@ -130,11 +175,15 @@ const TeamCRM: React.FC<TeamCRMProps> = ({ onLogout }) => {
     <div className="crm-page">
       <header className="crm-header">
         <div className="crm-header-left">
-          <h1>Leads</h1>
+          <h1>{view === 'bookings' ? 'Demo Bookings' : 'Leads'}</h1>
           <div className="crm-stats">
             <div className="crm-stat">
               <span className="crm-stat-value">{leads.length}</span>
-              <span className="crm-stat-label">Total</span>
+              <span className="crm-stat-label">Leads</span>
+            </div>
+            <div className="crm-stat">
+              <span className="crm-stat-value">{upcomingBookings.length}</span>
+              <span className="crm-stat-label">Bookings</span>
             </div>
             <div className="crm-stat">
               <span className="crm-stat-value">{formatValue(totalValue)}</span>
@@ -176,6 +225,12 @@ const TeamCRM: React.FC<TeamCRMProps> = ({ onLogout }) => {
               onClick={() => setView('list')}
             >
               List
+            </button>
+            <button 
+              className={`crm-view-btn ${view === 'bookings' ? 'active' : ''}`}
+              onClick={() => setView('bookings')}
+            >
+              Bookings ({upcomingBookings.length})
             </button>
           </div>
         </div>
@@ -251,6 +306,89 @@ const TeamCRM: React.FC<TeamCRMProps> = ({ onLogout }) => {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {view === 'bookings' && (
+        <div className="crm-list">
+          <div className="bookings-section">
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16, color: '#111827' }}>
+              Upcoming Demo Bookings
+            </h3>
+            {upcomingBookings.length === 0 ? (
+              <div className="empty-state" style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
+                <p>No upcoming bookings</p>
+                <p className="text-xs" style={{ color: '#9ca3af', marginTop: 4 }}>Booked demos will appear here</p>
+              </div>
+            ) : (
+              <div className="bookings-list" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {upcomingBookings.map(booking => (
+                  <div 
+                    key={booking.id}
+                    className="booking-item"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 16,
+                      padding: 16,
+                      background: '#f9fafb',
+                      borderRadius: 10,
+                      border: '1px solid #e5e7eb'
+                    }}
+                  >
+                    <div 
+                      className="booking-date"
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 8,
+                        background: booking.status === 'pending' ? '#fef3c7' : '#dbeafe',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <span style={{ fontSize: 10, fontWeight: 600, color: '#92400e' }}>
+                        {formatBookingDate(booking.booking_date, booking.booking_time)}
+                      </span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#111827' }}>
+                        {booking.booking_time}
+                      </span>
+                    </div>
+                    <div className="booking-info" style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>
+                        {booking.name}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>
+                        {booking.email} {booking.company && `· ${booking.company}`}
+                      </div>
+                      {booking.goal && (
+                        <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                          Goal: {booking.goal}
+                        </div>
+                      )}
+                    </div>
+                    <div className="booking-status">
+                      <span 
+                        className={`status-badge`}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: 6,
+                          fontSize: 11,
+                          fontWeight: 500,
+                          background: booking.status === 'confirmed' ? '#dcfce7' : '#fef3c7',
+                          color: booking.status === 'confirmed' ? '#166534' : '#92400e'
+                        }}
+                      >
+                        {booking.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns';
 import { analyzeSEO, getSeoScoreColor, getSeoScoreLabel } from '../../lib/seo-analyzer';
+import { getAIScoreColor, getAIScoreLabel, type AIAnalysis } from '../../lib/ai-seo-analyzer';
 
 interface BlogPost {
   id: string;
@@ -62,27 +63,6 @@ interface Settings {
   blogDescription: string;
 }
 
-interface AIAnalysis {
-  score: number;
-  overallAssessment: string;
-  strengths: string[];
-  weaknesses: string[];
-  recommendations: string[];
-  contentQuality: {
-    clarity: number;
-    depth: number;
-    engagement: number;
-    tone: string;
-  };
-  keywordAnalysis: {
-    relevance: number;
-    placement: string;
-    suggestions: string[];
-  };
-  competitorInsights?: string;
-  viralPotential: number;
-}
-
 const CATEGORIES = [
   'Business Growth',
   'Operations',
@@ -123,6 +103,37 @@ const BlogDashboard: React.FC = () => {
     slackWebhook: '',
     blogTitle: 'WedBoardPro Blog',
     blogDescription: 'Expert insights for wedding planners'
+  });
+
+  const [editorPost, setEditorPost] = useState<{
+    id: string | null;
+    title: string;
+    content: string;
+    slug: string;
+    metaDescription: string;
+    primaryKeyword: string;
+    category: string;
+  }>({
+    id: null,
+    title: '',
+    content: '',
+    slug: '',
+    metaDescription: '',
+    primaryKeyword: '',
+    category: ''
+  });
+
+  const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [showAIGenerateModal, setShowAIGenerateModal] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiGenerateOptions, setAiGenerateOptions] = useState({
+    topic: '',
+    keyword: '',
+    category: '',
+    tone: 'professional',
+    length: 'medium',
+    includeIdeas: true
   });
 
   useEffect(() => {
@@ -215,6 +226,87 @@ const BlogDashboard: React.FC = () => {
       alert('Error fetching analytics. Make sure the API endpoint is configured.');
     } finally {
       setLoadingAnalytics(false);
+    }
+  };
+
+  const analyzeWithAI = async () => {
+    if (!editorPost.title || !editorPost.content) {
+      alert('Please add a title and content first.');
+      return;
+    }
+
+    setAiAnalyzing(true);
+    try {
+      const response = await fetch('/api/v1/blog/ai-seo-analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editorPost.title,
+          content: editorPost.content,
+          slug: editorPost.slug,
+          metaDescription: editorPost.metaDescription,
+          keyword: editorPost.primaryKeyword
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAiAnalysis(data);
+      } else {
+        const error = await response.json();
+        alert(`AI Analysis failed: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('AI analysis error:', error);
+      alert('Error running AI analysis. Please try again.');
+    } finally {
+      setAiAnalyzing(false);
+    }
+  };
+
+  const generateAIPost = async () => {
+    if (!aiGenerateOptions.topic || !aiGenerateOptions.keyword) {
+      alert('Please enter a topic and keyword');
+      return;
+    }
+
+    setAiGenerating(true);
+    try {
+      const response = await fetch('/api/v1/blog/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: aiGenerateOptions.topic,
+          keyword: aiGenerateOptions.keyword,
+          category: aiGenerateOptions.category,
+          tone: aiGenerateOptions.tone,
+          length: aiGenerateOptions.length,
+          includeIdeas: aiGenerateOptions.includeIdeas
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setEditorPost(prev => ({
+          ...prev,
+          title: data.title,
+          content: data.content,
+          slug: data.slug,
+          metaDescription: data.metaDescription,
+          primaryKeyword: data.primaryKeyword,
+          category: data.category
+        }));
+        setShowAIGenerateModal(false);
+        alert('Post generated successfully! Click "Analyze with AI" to verify the 95+ score.');
+      } else {
+        const error = await response.json();
+        alert(`Generation failed: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('AI generation error:', error);
+      alert('Error generating post. Please try again.');
+    } finally {
+      setAiGenerating(false);
     }
   };
 
@@ -558,41 +650,337 @@ const BlogDashboard: React.FC = () => {
         )}
 
         {activeTab === 'editor' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24 }}>
-            <div className="team-section">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 24, height: 'calc(100vh - 120px)', overflow: 'hidden' }}>
+            <div className="team-section" style={{ overflowY: 'auto', height: '100%' }}>
               <div className="team-section-header">
-                <button className="team-action-btn" onClick={() => setActiveTab('posts')}>← Back</button>
+                <button className="team-action-btn" onClick={() => { setActiveTab('posts'); setAiAnalysis(null); }}>← Back</button>
                 <div style={{ display: 'flex', gap: 12 }}>
                   <button className="team-action-btn">Save Draft</button>
                   <button className="team-action-btn" style={{ background: '#111827', color: '#fff' }}>Publish</button>
                 </div>
               </div>
-              <input type="text" placeholder="Post title..." style={{ width: '100%', padding: '16px 20px', fontSize: 24, fontWeight: 600, border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none', marginBottom: 16 }} />
-              <textarea placeholder="Write content..." style={{ width: '100%', minHeight: 300, padding: 20, fontSize: 15, lineHeight: 1.7, border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }} />
+              <input
+                type="text"
+                placeholder="Post title..."
+                value={editorPost.title}
+                onChange={(e) => setEditorPost(prev => ({ ...prev, title: e.target.value }))}
+                style={{ width: '100%', padding: '16px 20px', fontSize: 24, fontWeight: 600, border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none', marginBottom: 16 }}
+              />
+              <textarea
+                placeholder="Write content..."
+                value={editorPost.content}
+                onChange={(e) => setEditorPost(prev => ({ ...prev, content: e.target.value }))}
+                style={{ width: '100%', minHeight: 400, padding: 20, fontSize: 15, lineHeight: 1.7, border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+              />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto', height: '100%', paddingBottom: 20 }}>
               <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e5e7eb' }}>
-                <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>SEO Score</h3>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                  <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 20, fontWeight: 700 }}>--</div>
-                </div>
-                <p style={{ fontSize: 12, color: '#6b7280', textAlign: 'center' }}>Add title & content to see score</p>
+                <button
+                  onClick={() => setShowAIGenerateModal(true)}
+                  style={{
+                    width: '100%',
+                    padding: '14px 16px',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    marginBottom: 16
+                  }}
+                >
+                  ✨ AI Generate Post
+                </button>
+                <p style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', marginBottom: 16 }}>
+                  Creates SEO-optimized posts that score 95+
+                </p>
+                <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>AI SEO Analysis</h3>
+                <button
+                  onClick={analyzeWithAI}
+                  disabled={aiAnalyzing || !editorPost.title || !editorPost.content}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: aiAnalyzing ? '#9ca3af' : '#111827',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    cursor: aiAnalyzing ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8
+                  }}
+                >
+                  {aiAnalyzing ? 'Analyzing...' : '🤖 Analyze with AI'}
+                </button>
+                {aiAnalysis && (
+                  <div style={{ marginTop: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                      <div style={{
+                        width: 72,
+                        height: 72,
+                        borderRadius: '50%',
+                        background: getAIScoreColor(aiAnalysis.finalScore),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#fff',
+                        fontSize: 24,
+                        fontWeight: 700
+                      }}>
+                        {aiAnalysis.finalScore}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 12px',
+                        borderRadius: 20,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        background: aiAnalysis.status === 'PUBLISH' ? '#dcfce7' : '#fee2e2',
+                        color: aiAnalysis.status === 'PUBLISH' ? '#166534' : '#991b1b'
+                      }}>
+                        {aiAnalysis.status}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 16, textAlign: 'center' }}>
+                      {aiAnalysis.summary}
+                    </div>
+                    <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
+                      <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                        <tbody>
+                          <tr>
+                            <td style={{ padding: '6px 0', color: '#6b7280' }}>Keywords</td>
+                            <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 600 }}>{aiAnalysis.keywordScore}/25</td>
+                            <td style={{ padding: '6px 0', textAlign: 'right' }}>●</td>
+                          </tr>
+                          <tr>
+                            <td style={{ padding: '6px 0', color: '#6b7280' }}>Hook & Readability</td>
+                            <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 600 }}>{aiAnalysis.hookScore}/20</td>
+                            <td style={{ padding: '6px 0', textAlign: 'right' }}>●</td>
+                          </tr>
+                          <tr>
+                            <td style={{ padding: '6px 0', color: '#6b7280' }}>Conversion</td>
+                            <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 600 }}>{aiAnalysis.conversionScore}/25</td>
+                            <td style={{ padding: '6px 0', textAlign: 'right' }}>●</td>
+                          </tr>
+                          <tr>
+                            <td style={{ padding: '6px 0', color: '#6b7280' }}>Authority</td>
+                            <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 600 }}>{aiAnalysis.authorityScore}/15</td>
+                            <td style={{ padding: '6px 0', textAlign: 'right' }}>●</td>
+                          </tr>
+                          <tr>
+                            <td style={{ padding: '6px 0', color: '#6b7280' }}>Technical</td>
+                            <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 600 }}>{aiAnalysis.technicalScore}/15</td>
+                            <td style={{ padding: '6px 0', textAlign: 'right' }}>●</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    {aiAnalysis.actionItems && aiAnalysis.actionItems.length > 0 && (
+                      <div style={{ marginTop: 16, borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
+                        <h4 style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Action Items</h4>
+                        {aiAnalysis.actionItems.map((item, idx) => (
+                          <div key={idx} style={{ fontSize: 11, color: '#6b7280', padding: '6px 0', borderBottom: '1px solid #f3f4f6' }}>
+                            <strong>{item.category}:</strong> {item.action}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e5e7eb' }}>
                 <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 8 }}>Category</label>
-                <select style={{ width: '100%', padding: '10px 12px', fontSize: 14, border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none', background: '#fff' }}>
+                <select
+                  value={editorPost.category}
+                  onChange={(e) => setEditorPost(prev => ({ ...prev, category: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', fontSize: 14, border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none', background: '#fff' }}
+                >
                   <option value="">Select...</option>
                   {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
               </div>
               <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e5e7eb' }}>
                 <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 8 }}>Primary Keyword</label>
-                <input type="text" placeholder="e.g., wedding planning" style={{ width: '100%', padding: '10px 12px', fontSize: 14, border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none' }} />
+                <input
+                  type="text"
+                  placeholder="e.g., wedding planning"
+                  value={editorPost.primaryKeyword}
+                  onChange={(e) => setEditorPost(prev => ({ ...prev, primaryKeyword: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', fontSize: 14, border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none' }}
+                />
+              </div>
+              <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e5e7eb' }}>
+                <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 8 }}>URL Slug</label>
+                <input
+                  type="text"
+                  placeholder="e.g., raise-wedding-prices"
+                  value={editorPost.slug}
+                  onChange={(e) => setEditorPost(prev => ({ ...prev, slug: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', fontSize: 14, border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none' }}
+                />
+              </div>
+              <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e5e7eb' }}>
+                <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 8 }}>Meta Description</label>
+                <textarea
+                  placeholder="Brief description for search results..."
+                  value={editorPost.metaDescription}
+                  onChange={(e) => setEditorPost(prev => ({ ...prev, metaDescription: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', fontSize: 14, border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none', resize: 'vertical', minHeight: 80, fontFamily: 'inherit' }}
+                />
+                <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>{editorPost.metaDescription.length}/155 characters</p>
               </div>
             </div>
           </div>
         )}
       </main>
+
+      {showAIGenerateModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 16,
+            padding: 24,
+            width: '90%',
+            maxWidth: 500,
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 600 }}>✨ AI Generate Post</h2>
+              <button onClick={() => setShowAIGenerateModal(false)} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer' }}>×</button>
+            </div>
+
+            <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 20 }}>
+              Creates an SEO-optimized blog post guaranteed to score 95+ on our 5-pillar analysis.
+            </p>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 6 }}>Topic *</label>
+              <input
+                type="text"
+                placeholder="e.g., How to price wedding planning services"
+                value={aiGenerateOptions.topic}
+                onChange={(e) => setAiGenerateOptions(prev => ({ ...prev, topic: e.target.value }))}
+                style={{ width: '100%', padding: '10px 12px', fontSize: 14, border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 6 }}>Primary Keyword *</label>
+              <input
+                type="text"
+                placeholder="e.g., wedding planning prices"
+                value={aiGenerateOptions.keyword}
+                onChange={(e) => setAiGenerateOptions(prev => ({ ...prev, keyword: e.target.value }))}
+                style={{ width: '100%', padding: '10px 12px', fontSize: 14, border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none' }}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 6 }}>Category</label>
+                <select
+                  value={aiGenerateOptions.category}
+                  onChange={(e) => setAiGenerateOptions(prev => ({ ...prev, category: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', fontSize: 14, border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none', background: '#fff' }}
+                >
+                  <option value="">Auto-detect</option>
+                  {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 6 }}>Tone</label>
+                <select
+                  value={aiGenerateOptions.tone}
+                  onChange={(e) => setAiGenerateOptions(prev => ({ ...prev, tone: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', fontSize: 14, border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none', background: '#fff' }}
+                >
+                  <option value="professional">Professional</option>
+                  <option value="conversational">Conversational</option>
+                  <option value="authoritative">Authoritative</option>
+                  <option value="friendly">Friendly</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 6 }}>Length</label>
+                <select
+                  value={aiGenerateOptions.length}
+                  onChange={(e) => setAiGenerateOptions(prev => ({ ...prev, length: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', fontSize: 14, border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none', background: '#fff' }}
+                >
+                  <option value="short">Short (~500 words)</option>
+                  <option value="medium">Medium (~1000 words)</option>
+                  <option value="long">Long (~2000 words)</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={aiGenerateOptions.includeIdeas}
+                    onChange={(e) => setAiGenerateOptions(prev => ({ ...prev, includeIdeas: e.target.checked }))}
+                  />
+                  <span style={{ fontSize: 13 }}>Include content ideas</span>
+                </label>
+              </div>
+            </div>
+
+            <button
+              onClick={generateAIPost}
+              disabled={aiGenerating || !aiGenerateOptions.topic || !aiGenerateOptions.keyword}
+              style={{
+                width: '100%',
+                padding: '14px 16px',
+                background: aiGenerating || !aiGenerateOptions.topic || !aiGenerateOptions.keyword ? '#9ca3af' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: aiGenerating || !aiGenerateOptions.topic || !aiGenerateOptions.keyword ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8
+              }}
+            >
+              {aiGenerating ? 'Generating...' : '✨ Generate SEO-Optimized Post'}
+            </button>
+
+            {aiGenerating && (
+              <div style={{ marginTop: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, textAlign: 'center' }}>
+                <p style={{ fontSize: 13, color: '#166534' }}>🤖 AI is crafting your post...</p>
+                <p style={{ fontSize: 11, color: '#15803d', marginTop: 4 }}>This ensures 95+ SEO score with proper keywords, CTAs, and citations.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

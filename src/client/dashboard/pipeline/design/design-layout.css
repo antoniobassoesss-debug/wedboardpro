@@ -80,7 +80,7 @@
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: none;
   background: #0f172a;
   color: #ffffff;
@@ -99,7 +99,7 @@
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: 1px solid #e5e5e5;
   background: #ffffff;
   color: #475569;
@@ -653,7 +653,7 @@
 
 .design-rental-status {
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: none;
   font-size: 11px;
   font-weight: 600;

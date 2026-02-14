@@ -71,7 +71,7 @@ const CategoryAccordion: React.FC<CategoryAccordionProps> = ({
             }}
             style={{
               fontSize: 11,
-              borderRadius: 999,
+              borderRadius: 12,
               border: '1px solid #d1d5db',
               padding: '4px 10px',
               background: '#f9fafb',
@@ -124,7 +124,7 @@ const CategoryAccordion: React.FC<CategoryAccordionProps> = ({
               <button
                 onClick={() => onAddVendor(categoryId)}
                 style={{
-                  borderRadius: 999,
+                  borderRadius: 12,
                   border: '1px solid #d1d5db',
                   padding: '6px 14px',
                   background: '#ffffff',

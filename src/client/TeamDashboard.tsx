@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO, startOfWeek, endOfWeek } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO, startOfWeek, endOfWeek, getDay, isBefore, startOfDay, addDays } from 'date-fns';
 import TeamCRM from './TeamCRM';
 import BlogDashboard from './blog/BlogDashboard';
 import './team.css';
@@ -24,14 +24,230 @@ interface Booking {
   meeting_link: string | null;
 }
 
-interface Availability {
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
+interface UnavailableDate {
+  id: string;
+  date: string;
+  type: string;
+  reason?: string;
+}
+
+interface BlockedSlot {
+  id: string;
+  date: string;
+  time_slot: string;
+  reason?: string;
+}
+
+interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'manager' | 'member' | 'viewer';
+  phone?: string;
+  department?: string;
   is_active: boolean;
+  permissions?: Record<string, unknown>;
+  created_at: string;
+}
+
+interface MemberFormData {
+  name: string;
+  email: string;
+  role: 'admin' | 'manager' | 'member' | 'viewer';
+  department: string;
+  phone: string;
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// Member Modal Component
+const MemberModal: React.FC<{
+  member?: TeamMember;
+  onClose: () => void;
+  onSubmit: (data: MemberFormData) => Promise<void>;
+  isLoading: boolean;
+}> = ({ member, onClose, onSubmit, isLoading }) => {
+  const [formData, setFormData] = useState<MemberFormData>({
+    name: member?.name || '',
+    email: member?.email || '',
+    role: member?.role || 'member',
+    department: member?.department || '',
+    phone: member?.phone || ''
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await onSubmit(formData);
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 100
+    }}>
+      <div style={{
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 32,
+        maxWidth: 480,
+        width: '90%'
+      }}>
+        <h3 style={{ fontSize: 20, fontWeight: 600, color: '#111827', marginBottom: 24 }}>
+          {member ? 'Edit Team Member' : 'Add Team Member'}
+        </h3>
+        
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>
+              Full Name *
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: 8,
+                border: '1px solid #e5e7eb',
+                fontSize: 14,
+                outline: 'none'
+              }}
+            />
+          </div>
+          
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>
+              Email Address *
+            </label>
+            <input
+              type="email"
+              required
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: 8,
+                border: '1px solid #e5e7eb',
+                fontSize: 14,
+                outline: 'none'
+              }}
+            />
+          </div>
+          
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>
+              Role
+            </label>
+            <select
+              value={formData.role}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'manager' | 'member' | 'viewer' })}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: 8,
+                border: '1px solid #e5e7eb',
+                fontSize: 14,
+                outline: 'none',
+                background: '#fff'
+              }}
+            >
+              <option value="admin">Admin - Full access</option>
+              <option value="manager">Manager - Manage bookings & leads</option>
+              <option value="member">Member - View & edit</option>
+              <option value="viewer">Viewer - Read only</option>
+            </select>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>
+                Department
+              </label>
+              <input
+                type="text"
+                value={formData.department}
+                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                placeholder="e.g. Sales"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #e5e7eb',
+                  fontSize: 14,
+                  outline: 'none'
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>
+                Phone
+              </label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="+1 234 567 8900"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #e5e7eb',
+                  fontSize: 14,
+                  outline: 'none'
+                }}
+              />
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: '10px 20px',
+                borderRadius: 8,
+                border: '1px solid #e5e7eb',
+                background: '#fff',
+                color: '#374151',
+                fontSize: 14,
+                cursor: 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              style={{
+                padding: '10px 20px',
+                borderRadius: 8,
+                border: 'none',
+                background: '#111827',
+                color: '#fff',
+                fontSize: 14,
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                opacity: isLoading ? 0.7 : 1
+              }}
+            >
+              {isLoading ? 'Saving...' : member ? 'Update Member' : 'Add Member'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 const TeamDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -39,9 +255,28 @@ const TeamDashboard: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [availability, setAvailability] = useState<Availability[]>([]);
+  const [blockedDates, setBlockedDates] = useState<UnavailableDate[]>([]);
+  const [blockedSlots, setBlockedSlots] = useState<BlockedSlot[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [showEditMember, setShowEditMember] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [user, setUser] = useState<TeamUser | null>(null);
+  const [blockReason, setBlockReason] = useState('');
+  const [showBlockModal, setShowBlockModal] = useState<string | null>(null);
+  const [showSlotModal, setShowSlotModal] = useState<{date: string, time: string} | null>(null);
+  const [slotBlockReason, setSlotBlockReason] = useState('');
+  const [selectedDateDetails, setSelectedDateDetails] = useState<{date: Date, blocked: boolean, bookings: Booking[]} | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const token = sessionStorage.getItem('team_token');
@@ -65,11 +300,13 @@ const TeamDashboard: React.FC = () => {
 
     setLoading(true);
     try {
-      const [bookingsRes, availabilityRes] = await Promise.all([
+      const [bookingsRes, availabilityRes, blockedSlotsRes, membersRes] = await Promise.all([
         fetch('/api/v1/team/bookings', {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch('/api/v1/team/availability', {
+        fetch('/api/v1/team/availability'),
+        fetch('/api/v1/team/blocked-slots'),
+        fetch('/api/v1/team/members', {
           headers: { 'Authorization': `Bearer ${token}` }
         })
       ]);
@@ -80,7 +317,15 @@ const TeamDashboard: React.FC = () => {
       }
       if (availabilityRes.ok) {
         const data = await availabilityRes.json();
-        setAvailability(data.availability || []);
+        setBlockedDates(data.availability || []);
+      }
+      if (blockedSlotsRes.ok) {
+        const data = await blockedSlotsRes.json();
+        setBlockedSlots(data.blockedSlots || []);
+      }
+      if (membersRes.ok) {
+        const data = await membersRes.json();
+        setTeamMembers(data.members || []);
       }
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -137,10 +382,6 @@ const TeamDashboard: React.FC = () => {
     }
   };
 
-  const getBookingsForDate = (date: Date) => {
-    return bookings.filter(b => isSameDay(parseISO(b.booking_date), date));
-  };
-
   const getTimeSlots = () => {
     const slots = [];
     for (let h = 9; h < 17; h++) {
@@ -157,12 +398,173 @@ const TeamDashboard: React.FC = () => {
     );
   };
 
-  const isDayAvailable = (day: number) => {
-    return availability.find(a => a.day_of_week === day)?.is_active ?? false;
+  const isDateBlocked = (dateStr: string) => {
+    return blockedDates.some(b => b.date === dateStr && b.type === 'unavailable');
   };
 
-  const getDayAvailability = (day: number) => {
-    return availability.find(a => a.day_of_week === day);
+  const handleBlockDate = async (dateStr: string, reason: string) => {
+    try {
+      const res = await fetch('/api/v1/team/availability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: dateStr,
+          type: 'unavailable',
+          reason: reason || 'Unavailable'
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setBlockedDates(prev => [...prev.filter(b => b.date !== dateStr), data.availability]);
+        setShowBlockModal(null);
+        setBlockReason('');
+      }
+    } catch (error) {
+      console.error('Failed to block date:', error);
+    }
+  };
+
+  const handleUnblockDate = async (dateStr: string) => {
+    const blocked = blockedDates.find(b => b.date === dateStr);
+    if (!blocked) return;
+
+    try {
+      await fetch(`/api/v1/team/availability/${blocked.id}`, {
+        method: 'DELETE'
+      });
+      setBlockedDates(prev => prev.filter(b => b.date !== dateStr));
+    } catch (error) {
+      console.error('Failed to unblock date:', error);
+    }
+  };
+
+  const handleBlockSlot = async (dateStr: string, time: string, reason: string) => {
+    try {
+      const res = await fetch('/api/v1/team/blocked-slots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: dateStr,
+          time_slot: time,
+          reason: reason || 'Blocked'
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setBlockedSlots(prev => [...prev, data.blockedSlot]);
+        setShowSlotModal(null);
+        setSlotBlockReason('');
+      }
+    } catch (error) {
+      console.error('Failed to block slot:', error);
+    }
+  };
+
+  const handleUnblockSlot = async (slotId: string) => {
+    try {
+      await fetch(`/api/v1/team/blocked-slots/${slotId}`, {
+        method: 'DELETE'
+      });
+      setBlockedSlots(prev => prev.filter(s => s.id !== slotId));
+    } catch (error) {
+      console.error('Failed to unblock slot:', error);
+    }
+  };
+
+  const getBlockedSlotsForDate = (dateStr: string) => {
+    return blockedSlots.filter(s => s.date === dateStr);
+  };
+
+  const isSlotBlocked = (dateStr: string, time: string) => {
+    return blockedSlots.some(s => s.date === dateStr && s.time_slot === time);
+  };
+
+  const timeSlots = (): string[] => {
+    return ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00'];
+  };
+
+  const formatTime = (time: string): string => {
+    const parts = time.split(':');
+    const hours = parts[0] || '09';
+    const minutes = parts[1] || '00';
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
+  };
+
+  const handleAddMember = async (data: MemberFormData) => {
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/v1/team/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setTeamMembers(prev => [data.member, ...prev]);
+        setShowAddMember(false);
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to add member');
+      }
+    } catch (error) {
+      console.error('Failed to add member:', error);
+      alert('Failed to add member');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdateMember = async (data: MemberFormData) => {
+    if (!selectedMember) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/v1/team/members/${selectedMember.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        setTeamMembers(prev => prev.map(m => m.id === selectedMember.id ? result.member : m));
+        setShowEditMember(false);
+        setSelectedMember(null);
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to update member');
+      }
+    } catch (error) {
+      console.error('Failed to update member:', error);
+      alert('Failed to update member');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteMember = async (id: string) => {
+    if (!confirm('Are you sure you want to remove this team member?')) return;
+    
+    try {
+      const res = await fetch(`/api/v1/team/members/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (res.ok) {
+        setTeamMembers(prev => prev.filter(m => m.id !== id));
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to delete member');
+      }
+    } catch (error) {
+      console.error('Failed to delete member:', error);
+      alert('Failed to delete member');
+    }
   };
 
   const calendarDays = () => {
@@ -171,6 +573,13 @@ const TeamDashboard: React.FC = () => {
     const startDate = startOfWeek(monthStart);
     const endDate = endOfWeek(monthEnd);
     return eachDayOfInterval({ start: startDate, end: endDate });
+  };
+
+  const getBookingsForDate = (date: Date) => {
+    return bookings.filter(b => 
+      isSameDay(parseISO(b.booking_date), date) && 
+      b.status !== 'cancelled'
+    );
   };
 
   if (!user) return null;
@@ -204,13 +613,19 @@ const TeamDashboard: React.FC = () => {
           >
             Availability
           </button>
-          <button 
+          <button
             className={`team-nav-btn ${activeTab === 'blog' ? 'active' : ''}`}
             onClick={() => setActiveTab('blog')}
           >
             Blog
           </button>
-          <button 
+          <button
+            className="team-nav-btn"
+            onClick={() => navigate('/team/seo')}
+          >
+            SEO Intelligence
+          </button>
+          <button
             className={`team-nav-btn ${activeTab === 'users' ? 'active' : ''}`}
             onClick={() => setActiveTab('users')}
           >
@@ -321,27 +736,31 @@ const TeamDashboard: React.FC = () => {
                   
                   {selectedDate && (
                     <>
-                      <div style={{ marginBottom: 16 }}>
-                        <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
-                          Time Slots
-                        </p>
-                        <div className="team-time-slots">
-                          {getTimeSlots().map(time => {
-                            const booked = isSlotBooked(selectedDate, time);
-                            const dayOfWeek = selectedDate.getDay();
-                            const available = isDayAvailable(dayOfWeek);
-                            
-                            return (
-                              <div
-                                key={time}
-                                className={`team-time-slot ${booked ? 'booked' : ''} ${available && !booked ? 'available' : ''}`}
-                              >
-                                {time}
+                        <div style={{ marginBottom: 16 }}>
+                          <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
+                            Time Slots
+                          </p>
+                          <div className="team-time-slots">
+                            {isDateBlocked(format(selectedDate, 'yyyy-MM-dd')) ? (
+                              <div style={{ padding: 20, textAlign: 'center', color: '#ef4444', fontSize: 14, background: '#fef2f2', borderRadius: 8 }}>
+                                This date is blocked - no bookings allowed
                               </div>
-                            );
-                          })}
+                            ) : (
+                              getTimeSlots().map(time => {
+                                const booked = isSlotBooked(selectedDate, time);
+                                
+                                return (
+                                  <div
+                                    key={time}
+                                    className={`team-time-slot ${booked ? 'booked' : 'available'}`}
+                                  >
+                                    {time}
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
                         </div>
-                      </div>
 
                       <div>
                         <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
@@ -425,55 +844,499 @@ const TeamDashboard: React.FC = () => {
         {activeTab === 'availability' && (
           <div className="team-section">
             <div className="team-section-header">
-              <h2 className="team-section-title">Your Availability</h2>
+              <h2 className="team-section-title">Availability Management</h2>
               <p style={{ fontSize: 13, color: '#6b7280' }}>
-                Configure when you're available for demos
+                Block entire days or specific time slots - users won't be able to book on blocked dates/slots
               </p>
             </div>
 
-            <div className="team-availability-grid">
-              {[0, 1, 2, 3, 4, 5, 6].map(day => {
-                const dayAvail = getDayAvailability(day);
-                const dayName = DAYS[day];
-                const isActive = dayAvail?.is_active ?? false;
-                const startTime = dayAvail?.start_time ?? '09:00';
-                const endTime = dayAvail?.end_time ?? '17:00';
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: 24 }}>
+              {/* Calendar */}
+              <div>
+                {/* Month Navigation */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <button
+                    onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      border: '1px solid #e5e7eb',
+                      backgroundColor: '#fff',
+                      cursor: 'pointer',
+                      fontSize: 14
+                    }}
+                  >
+                    ← Previous
+                  </button>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, color: '#111827', margin: 0 }}>
+                    {format(currentMonth, 'MMMM yyyy')}
+                  </h3>
+                  <button
+                    onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      border: '1px solid #e5e7eb',
+                      backgroundColor: '#fff',
+                      cursor: 'pointer',
+                      fontSize: 14
+                    }}
+                  >
+                    Next →
+                  </button>
+                </div>
 
-                return (
-                  <div key={day} className="team-availability-day">
-                    <div className="team-availability-day-name">{dayName}</div>
-                    <div className="team-availability-toggle">
-                      <div
-                        className={`team-toggle-switch ${isActive ? 'active' : ''}`}
-                        onClick={() => handleAvailabilityChange(day, 'is_active', !isActive)}
-                      />
+                {/* Weekday Headers */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 8 }}>
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                    <div key={day} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#9ca3af', padding: '8px 0' }}>
+                      {day}
                     </div>
-                    {isActive && (
-                      <div className="team-availability-times">
-                        <input
-                          type="time"
-                          className="team-time-input"
-                          value={startTime}
-                          onChange={(e) => handleAvailabilityChange(day, 'start_time', e.target.value)}
-                        />
-                        <span style={{ fontSize: 11, color: '#9ca3af' }}>to</span>
-                        <input
-                          type="time"
-                          className="team-time-input"
-                          value={endTime}
-                          onChange={(e) => handleAvailabilityChange(day, 'end_time', e.target.value)}
-                        />
+                  ))}
+                </div>
+
+                {/* Calendar Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                  {calendarDays().map((day, i) => {
+                    const dateStr = format(day, 'yyyy-MM-dd');
+                    const blocked = isDateBlocked(dateStr);
+                    const isToday = isSameDay(day, new Date());
+                    const isPast = isBefore(day, startOfDay(new Date()));
+                    const isCurrentMonth = isSameMonth(day, currentMonth);
+                    const bookings = getBookingsForDate(day);
+                    const hasBookings = bookings.length > 0;
+                    const blockedReason = blockedDates.find(b => b.date === dateStr)?.reason;
+                    const dateBlockedSlots = getBlockedSlotsForDate(dateStr);
+
+                    return (
+                      <div key={i} style={{ position: 'relative' }}>
+                        <button
+                          onClick={() => {
+                            if (!blocked && !isPast) {
+                              setSelectedDateDetails({ date: day, blocked, bookings });
+                            }
+                          }}
+                          disabled={isPast}
+                          style={{
+                            width: '100%',
+                            aspectRatio: '1',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: 8,
+                            border: isToday ? '2px solid #059669' : blocked ? '2px solid #ef4444' : '1px solid #e5e7eb',
+                            backgroundColor: blocked ? '#fef2f2' : isCurrentMonth ? '#ffffff' : '#f9fafb',
+                            color: isPast ? '#d1d5db' : blocked ? '#ef4444' : isCurrentMonth ? '#111827' : '#d1d5db',
+                            cursor: isPast ? 'not-allowed' : 'pointer',
+                            opacity: isPast ? 0.5 : 1,
+                            fontSize: 13,
+                            fontWeight: blocked || hasBookings ? 600 : 400
+                          }}
+                        >
+                          {format(day, 'd')}
+                          {blocked && <span style={{ fontSize: 7 }}>BLOCKED</span>}
+                          {!blocked && hasBookings && (
+                            <span style={{ fontSize: 7, color: '#059669' }}>{bookings.length} booking</span>
+                          )}
+                          {!blocked && !hasBookings && dateBlockedSlots.length > 0 && (
+                            <span style={{ fontSize: 7, color: '#f59e0b' }}>{dateBlockedSlots.length} slot</span>
+                          )}
+                        </button>
                       </div>
-                    )}
-                    {!isActive && (
-                      <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8 }}>
-                        Unavailable
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Right Panel - Blocked Items */}
+              <div>
+                <h4 style={{ fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 12 }}>
+                  Blocked Items
+                </h4>
+                
+                {/* Blocked Dates */}
+                <div style={{ marginBottom: 20 }}>
+                  <h5 style={{ fontSize: 12, fontWeight: 500, color: '#6b7280', marginBottom: 8 }}>
+                    Blocked Dates
+                  </h5>
+                  {blockedDates.length === 0 ? (
+                    <div style={{ padding: 16, textAlign: 'center', color: '#9ca3af', fontSize: 13, background: '#f9fafb', borderRadius: 8 }}>
+                      No blocked dates
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {blockedDates.map(blocked => (
+                        <div
+                          key={blocked.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: 10,
+                            background: '#fef2f2',
+                            borderRadius: 8,
+                            border: '1px solid #fecaca'
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: '#991b1b' }}>
+                              {format(parseISO(blocked.date), 'MMM d, yyyy')}
+                            </div>
+                            {blocked.reason && (
+                              <div style={{ fontSize: 11, color: '#dc2626', marginTop: 2 }}>
+                                {blocked.reason}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleUnblockDate(blocked.date)}
+                            style={{
+                              padding: '4px 8px',
+                              borderRadius: 4,
+                              border: 'none',
+                              background: '#dc2626',
+                              color: '#fff',
+                              fontSize: 11,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Unblock
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Blocked Slots */}
+                <div>
+                  <h5 style={{ fontSize: 12, fontWeight: 500, color: '#6b7280', marginBottom: 8 }}>
+                    Blocked Time Slots
+                  </h5>
+                  {blockedSlots.length === 0 ? (
+                    <div style={{ padding: 16, textAlign: 'center', color: '#9ca3af', fontSize: 13, background: '#f9fafb', borderRadius: 8 }}>
+                      No blocked slots
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {blockedSlots.map(slot => (
+                        <div
+                          key={slot.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: 8,
+                            background: '#fffbeb',
+                            borderRadius: 6,
+                            border: '1px solid #fde68a'
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 500, color: '#92400e' }}>
+                              {format(parseISO(slot.date), 'MMM d')} · {formatTime(slot.time_slot)}
+                            </div>
+                            {slot.reason && (
+                              <div style={{ fontSize: 10, color: '#d97706', marginTop: 1 }}>
+                                {slot.reason}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleUnblockSlot(slot.id)}
+                            style={{
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              border: 'none',
+                              background: '#d97706',
+                              color: '#fff',
+                              fontSize: 10,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
+
+            {/* Date Details Modal/Panel */}
+            {selectedDateDetails && (
+              <div style={{
+                marginTop: 24,
+                padding: 20,
+                background: '#fff',
+                borderRadius: 12,
+                border: '1px solid #e5e7eb'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <h4 style={{ fontSize: 15, fontWeight: 600, color: '#111827', margin: 0 }}>
+                    {format(selectedDateDetails.date, 'EEEE, MMMM d, yyyy')}
+                  </h4>
+                  <button
+                    onClick={() => setSelectedDateDetails(null)}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: 4,
+                      border: '1px solid #e5e7eb',
+                      background: '#fff',
+                      cursor: 'pointer',
+                      fontSize: 12
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+
+                {/* Time Slots */}
+                <div>
+                  <p style={{ fontSize: 12, fontWeight: 500, color: '#6b7280', marginBottom: 10 }}>
+                    Click on time slots to block/unblock them
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {timeSlots().map(time => {
+                      const isBlocked = isSlotBlocked(format(selectedDateDetails.date, 'yyyy-MM-dd'), time);
+                      const booking = bookings.find(b => 
+                        b.booking_date === format(selectedDateDetails.date, 'yyyy-MM-dd') &&
+                        b.booking_time.startsWith(time)
+                      );
+
+                      return (
+                        <button
+                          key={time}
+                          onClick={() => {
+                            if (!isBlocked && !booking) {
+                              setShowSlotModal({ date: format(selectedDateDetails.date, 'yyyy-MM-dd'), time });
+                            } else if (isBlocked) {
+                              const slot = blockedSlots.find(s => 
+                                s.date === format(selectedDateDetails.date, 'yyyy-MM-dd') && 
+                                s.time_slot === time
+                              );
+                              if (slot) handleUnblockSlot(slot.id);
+                            }
+                          }}
+                          disabled={!!booking}
+                          style={{
+                            padding: '10px 16px',
+                            borderRadius: 8,
+                            border: isBlocked ? '2px solid #ef4444' : booking ? '2px solid #059669' : '1px solid #e5e7eb',
+                            backgroundColor: isBlocked ? '#fef2f2' : booking ? '#dcfce7' : '#fff',
+                            color: isBlocked ? '#ef4444' : booking ? '#059669' : '#374151',
+                            cursor: booking ? 'not-allowed' : 'pointer',
+                            fontSize: 13,
+                            fontWeight: 500,
+                            minWidth: 90
+                          }}
+                        >
+                          {formatTime(time)}
+                          {isBlocked && <span style={{ fontSize: 10, display: 'block' }}>BLOCKED</span>}
+                          {booking && <span style={{ fontSize: 10, display: 'block' }}>{booking.name}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Block/Unblock Whole Day */}
+                <div style={{ marginTop: 16, display: 'flex', gap: 12 }}>
+                  {!isDateBlocked(format(selectedDateDetails.date, 'yyyy-MM-dd')) && (
+                    <button
+                      onClick={() => {
+                        setShowBlockModal(format(selectedDateDetails.date, 'yyyy-MM-dd'));
+                      }}
+                      style={{
+                        padding: '10px 16px',
+                        borderRadius: 8,
+                        border: 'none',
+                        background: '#ef4444',
+                        color: '#fff',
+                        fontSize: 13,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Block Entire Day
+                    </button>
+                  )}
+                  {isDateBlocked(format(selectedDateDetails.date, 'yyyy-MM-dd')) && (
+                    <button
+                      onClick={() => handleUnblockDate(format(selectedDateDetails.date, 'yyyy-MM-dd'))}
+                      style={{
+                        padding: '10px 16px',
+                        borderRadius: 8,
+                        border: '1px solid #ef4444',
+                        background: '#fff',
+                        color: '#ef4444',
+                        fontSize: 13,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Unblock Entire Day
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Block Date Modal */}
+            {showBlockModal && (
+              <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 100
+              }}>
+                <div style={{
+                  backgroundColor: '#fff',
+                  borderRadius: 12,
+                  padding: 24,
+                  maxWidth: 400,
+                  width: '90%'
+                }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, color: '#111827', marginBottom: 16 }}>
+                    Block Entire Day
+                  </h3>
+                  <p style={{ fontSize: 14, color: '#6b7280', marginBottom: 16 }}>
+                    Blocking {format(parseISO(showBlockModal), 'MMMM d, yyyy')}
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="Reason (optional)"
+                    value={blockReason}
+                    onChange={(e) => setBlockReason(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      border: '1px solid #e5e7eb',
+                      fontSize: 14,
+                      marginBottom: 16,
+                      outline: 'none'
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => {
+                        setShowBlockModal(null);
+                        setBlockReason('');
+                      }}
+                      style={{
+                        padding: '10px 16px',
+                        borderRadius: 8,
+                        border: '1px solid #e5e7eb',
+                        background: '#fff',
+                        fontSize: 14,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleBlockDate(showBlockModal, blockReason)}
+                      style={{
+                        padding: '10px 16px',
+                        borderRadius: 8,
+                        border: 'none',
+                        background: '#ef4444',
+                        color: '#fff',
+                        fontSize: 14,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Block Day
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Block Slot Modal */}
+            {showSlotModal && (
+              <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 100
+              }}>
+                <div style={{
+                  backgroundColor: '#fff',
+                  borderRadius: 12,
+                  padding: 24,
+                  maxWidth: 400,
+                  width: '90%'
+                }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, color: '#111827', marginBottom: 16 }}>
+                    Block Time Slot
+                  </h3>
+                  <p style={{ fontSize: 14, color: '#6b7280', marginBottom: 16 }}>
+                    Blocking {formatTime(showSlotModal.time)} on {format(parseISO(showSlotModal.date), 'MMMM d, yyyy')}
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="Reason (optional)"
+                    value={slotBlockReason}
+                    onChange={(e) => setSlotBlockReason(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      border: '1px solid #e5e7eb',
+                      fontSize: 14,
+                      marginBottom: 16,
+                      outline: 'none'
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => {
+                        setShowSlotModal(null);
+                        setSlotBlockReason('');
+                      }}
+                      style={{
+                        padding: '10px 16px',
+                        borderRadius: 8,
+                        border: '1px solid #e5e7eb',
+                        background: '#fff',
+                        fontSize: 14,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleBlockSlot(showSlotModal.date, showSlotModal.time, slotBlockReason)}
+                      style={{
+                        padding: '10px 16px',
+                        borderRadius: 8,
+                        border: 'none',
+                        background: '#f59e0b',
+                        color: '#fff',
+                        fontSize: 14,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Block Slot
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -489,12 +1352,154 @@ const TeamDashboard: React.FC = () => {
           <div className="team-section">
             <div className="team-section-header">
               <h2 className="team-section-title">Team Members</h2>
-              <button className="team-action-btn">Add Member</button>
+              <button 
+                className="team-action-btn"
+                onClick={() => setShowAddMember(true)}
+              >
+                + Add Member
+              </button>
             </div>
             
-            <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-              Team members management coming soon...
-            </div>
+            {loading ? (
+              <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
+                Loading...
+              </div>
+            ) : teamMembers.length === 0 ? (
+              <div style={{ padding: 60, textAlign: 'center', color: '#6b7280' }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>👥</div>
+                <p style={{ fontSize: 16, marginBottom: 8 }}>No team members yet</p>
+                <p style={{ fontSize: 14, color: '#9ca3af' }}>Add team members to give them access to the dashboard</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: 12 }}>
+                {teamMembers.map(member => (
+                  <div 
+                    key={member.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 16,
+                      padding: 16,
+                      background: '#fff',
+                      borderRadius: 12,
+                      border: '1px solid #e5e7eb',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                    }}
+                  >
+                    {/* Avatar */}
+                    <div style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: '50%',
+                      background: member.role === 'admin' ? '#fef3c7' : member.role === 'manager' ? '#dbeafe' : '#f3f4f6',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 18,
+                      fontWeight: 600,
+                      color: member.role === 'admin' ? '#92400e' : member.role === 'manager' ? '#1e40af' : '#374151'
+                    }}>
+                      {member.name.charAt(0).toUpperCase()}
+                    </div>
+                    
+                    {/* Info */}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>{member.name}</span>
+                        {!member.is_active && (
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: 4,
+                            fontSize: 11,
+                            fontWeight: 500,
+                            background: '#fef2f2',
+                            color: '#dc2626'
+                          }}>
+                            Inactive
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>{member.email}</div>
+                      {member.department && (
+                        <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{member.department}</div>
+                      )}
+                    </div>
+                    
+                    {/* Role Badge */}
+                    <div style={{
+                      padding: '6px 12px',
+                      borderRadius: 6,
+                      fontSize: 12,
+                      fontWeight: 500,
+                      background: member.role === 'admin' ? '#fef3c7' : member.role === 'manager' ? '#dbeafe' : '#f3f4f6',
+                      color: member.role === 'admin' ? '#92400e' : member.role === 'manager' ? '#1e40af' : '#374151',
+                      textTransform: 'capitalize'
+                    }}>
+                      {member.role}
+                    </div>
+                    
+                    {/* Actions */}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => {
+                          setSelectedMember(member);
+                          setShowEditMember(true);
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          borderRadius: 6,
+                          border: '1px solid #e5e7eb',
+                          background: '#fff',
+                          color: '#374151',
+                          fontSize: 13,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteMember(member.id)}
+                        style={{
+                          padding: '8px 12px',
+                          borderRadius: 6,
+                          border: 'none',
+                          background: '#fef2f2',
+                          color: '#dc2626',
+                          fontSize: 13,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* Add Member Modal */}
+            {showAddMember && (
+              <MemberModal
+                onClose={() => {
+                  setShowAddMember(false);
+                }}
+                onSubmit={handleAddMember}
+                isLoading={submitting}
+              />
+            )}
+            
+            {/* Edit Member Modal */}
+            {showEditMember && selectedMember && (
+              <MemberModal
+                member={selectedMember}
+                onClose={() => {
+                  setShowEditMember(false);
+                  setSelectedMember(null);
+                }}
+                onSubmit={handleUpdateMember}
+                isLoading={submitting}
+              />
+            )}
           </div>
         )}
       </main>

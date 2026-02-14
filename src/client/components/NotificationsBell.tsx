@@ -7,36 +7,15 @@ interface NotificationsBellProps {
   className?: string;
 }
 
-// SVG Icons (monochrome line-based)
 const BellIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
     <path d="M13.73 21a2 2 0 0 1-3.46 0" />
   </svg>
 );
 
 const TaskIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
     <path d="M14 2v6h6" />
     <path d="M16 13H8" />
@@ -46,69 +25,29 @@ const TaskIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 const UsersIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-    <circle cx="9" cy="7" r="4"></circle>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 );
 
 const CheckIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M20 6L9 17l-5-5" />
   </svg>
 );
 
 const XIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M18 6L6 18" />
     <path d="M6 6l12 12" />
   </svg>
 );
 
 const EmptyBellIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg
-    width="48"
-    height="48"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
     <path d="M13.73 21a2 2 0 0 1-3.46 0" />
     <path d="M9 8l6 6" />
@@ -160,12 +99,10 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
     }
   }, []);
 
-  // Set up Supabase session for realtime
   const setSupabaseSession = useCallback(async () => {
     if (!browserSupabaseClient) return;
     const session = getStoredSession();
     if (!session?.access_token || !session?.refresh_token) return;
-
     try {
       await browserSupabaseClient.auth.setSession({
         access_token: session.access_token,
@@ -176,72 +113,47 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
     }
   }, []);
 
-  // Subscribe to realtime notifications
   useEffect(() => {
     const subscribeToRealtime = async () => {
       if (!browserSupabaseClient) return;
-
       const session = getStoredSession();
-      // Try to get user ID from session.user.id or from the user object stored separately
       const userId = session?.user?.id || (session as any)?.user_id;
       if (!userId) {
-        // Try to get from localStorage user object
         const userStr = typeof window !== 'undefined' ? window.localStorage.getItem('wedboarpro_user') : null;
         if (userStr) {
           try {
             const user = JSON.parse(userStr);
             const extractedUserId = user?.id;
             if (extractedUserId) {
-              // Use extracted user ID
               const finalUserId = extractedUserId;
               await setSupabaseSession();
-
-              // Remove existing channel if any
               if (channelRef.current) {
                 await browserSupabaseClient.removeChannel(channelRef.current);
                 channelRef.current = null;
               }
-
               const channelName = `notifications:${finalUserId}:${Date.now()}`;
               const channel = browserSupabaseClient.channel(channelName);
-
               channel.on(
                 'postgres_changes',
-                {
-                  event: 'INSERT',
-                  schema: 'public',
-                  table: 'notifications',
-                  filter: `user_id=eq.${finalUserId}`,
-                },
+                { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${finalUserId}` },
                 (payload) => {
-                  console.log('[NotificationsBell] New notification received via realtime:', payload);
                   const newNotification = payload.new as Notification;
                   if (newNotification) {
-                    // Prepend to notifications list (even if read, to show it was received)
                     setNotifications((prev) => {
-                      // Avoid duplicates
-                      if (prev.some((n) => n.id === newNotification.id)) {
-                        return prev;
-                      }
+                      if (prev.some((n) => n.id === newNotification.id)) return prev;
                       return [newNotification, ...prev];
                     });
-                    // Increment unread count only if unread
-                    if (!newNotification.is_read) {
-                      setUnreadCount((prev) => prev + 1);
-                    }
+                    if (!newNotification.is_read) setUnreadCount((prev) => prev + 1);
                   }
                 }
               );
-
               channel.subscribe((status) => {
-                console.log('[NotificationsBell] Realtime subscription status:', status);
                 if (status === 'SUBSCRIBED') {
                   console.log('[NotificationsBell] Successfully subscribed to notifications');
                 } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
                   console.warn('[NotificationsBell] Realtime subscription error:', status);
                 }
               });
-
               channelRef.current = channel;
               return;
             }
@@ -249,66 +161,37 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
             console.warn('[NotificationsBell] Failed to parse user from localStorage:', err);
           }
         }
-        console.log('[NotificationsBell] No user ID available for realtime subscription');
         return;
       }
-
       const finalUserId = userId;
-
       await setSupabaseSession();
-
-      // Remove existing channel if any
       if (channelRef.current) {
         await browserSupabaseClient.removeChannel(channelRef.current);
         channelRef.current = null;
       }
-
       const channelName = `notifications:${userId}:${Date.now()}`;
       const channel = browserSupabaseClient.channel(channelName);
-
       channel.on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${userId}`,
-        },
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
         (payload) => {
-          console.log('[NotificationsBell] New notification received via realtime:', payload);
           const newNotification = payload.new as Notification;
           if (newNotification && !newNotification.is_read) {
-            // Prepend to notifications list
             setNotifications((prev) => [newNotification, ...prev]);
-            // Increment unread count
             setUnreadCount((prev) => prev + 1);
-            // Optional: gentle pulse animation could be added here
           }
         }
       );
-
       channel.subscribe((status) => {
-        console.log('[NotificationsBell] Realtime subscription status:', status);
         if (status === 'SUBSCRIBED') {
           console.log('[NotificationsBell] Successfully subscribed to notifications');
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           console.warn('[NotificationsBell] Realtime subscription error:', status);
         }
       });
-
       channelRef.current = channel;
-
-      return () => {
-        if (channelRef.current) {
-          browserSupabaseClient.removeChannel(channelRef.current);
-          channelRef.current = null;
-        }
-      };
     };
-
     subscribeToRealtime();
-
-    // Cleanup on unmount
     return () => {
       if (channelRef.current && browserSupabaseClient) {
         browserSupabaseClient.removeChannel(channelRef.current);
@@ -320,15 +203,10 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
   useEffect(() => {
     fetchNotifications();
     fetchUnreadCount();
-
-    // Poll for new notifications every 30 seconds as fallback (more frequent to catch missed realtime)
     const interval = setInterval(() => {
       fetchUnreadCount();
-      if (isOpen) {
-        fetchNotifications();
-      }
+      if (isOpen) fetchNotifications();
     }, 30000);
-
     return () => clearInterval(interval);
   }, [fetchNotifications, fetchUnreadCount, isOpen]);
 
@@ -338,19 +216,14 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
         setIsOpen(false);
       }
     };
-
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isOpen) {
-        setIsOpen(false);
-      }
+      if (event.key === 'Escape' && isOpen) setIsOpen(false);
     };
-
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleEscape);
       fetchNotifications();
     }
-
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
@@ -358,9 +231,7 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
   }, [isOpen, fetchNotifications]);
 
   const handleMarkAsRead = async (id: string, e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation();
-    }
+    if (e) e.stopPropagation();
     const { error } = await markNotificationRead(id);
     if (error) {
       console.error('Failed to mark notification as read:', error);
@@ -371,9 +242,7 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
   };
 
   const handleMarkAsUnread = async (id: string, e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation();
-    }
+    if (e) e.stopPropagation();
     const { error } = await markNotificationUnread(id);
     if (error) {
       console.error('Failed to mark notification as unread:', error);
@@ -385,23 +254,16 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
 
   const handleDismiss = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const notification = notifications.find((n) => n.id === id);
-    const wasUnread = notification?.is_read === false;
-
     const { error } = await deleteNotification(id);
     if (error) {
       console.error('Failed to delete notification:', error);
       return;
     }
-
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-    if (wasUnread) {
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    }
+    setUnreadCount((prev) => Math.max(0, prev - 1));
   };
 
-  const handleMarkAllAsRead = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleMarkAllAsRead = async () => {
     const { error } = await markAllNotificationsRead();
     if (error) {
       console.error('Failed to mark all as read:', error);
@@ -418,7 +280,6 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
-
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
@@ -428,21 +289,15 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
   };
 
   const handleNotificationClick = (notification: Notification) => {
-    if (!notification.is_read) {
-      handleMarkAsRead(notification.id);
-    }
-
-    // Navigate based on notification type
+    if (!notification.is_read) handleMarkAsRead(notification.id);
     if (notification.related_entity_type === 'task' && notification.related_entity_id) {
       window.dispatchEvent(new CustomEvent('wbp:navigate', { detail: { tab: 'todo' } }));
     } else if (notification.type === 'team_invitation' || notification.related_entity_type === 'team') {
       window.dispatchEvent(new CustomEvent('wbp:navigate', { detail: { tab: 'teams' } }));
     }
-
     setIsOpen(false);
   };
 
-  // Parse message to extract task title and project name, or team name
   const parseNotificationMessage = (message: string, type?: string) => {
     if (type === 'team_invitation') {
       const lines = message.split('\n');
@@ -458,412 +313,262 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ className }) => {
   const hasUnread = unreadCount > 0;
   const bellColor = isOpen || hasUnread ? '#14B8A6' : '#6B7280';
 
-  // Mobile modal content
-  const renderMobileModal = () => (
-    <div className="notifications-mobile-overlay" onClick={() => setIsOpen(false)}>
-      <div className="notifications-mobile-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="notifications-mobile-header">
-          <h3 className="notifications-mobile-title">Notifications</h3>
-          <button
-            type="button"
-            className="notifications-mobile-close"
-            onClick={() => setIsOpen(false)}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+  const renderMobileModal = () => {
+    if (!isMobile) return null;
+    return React.createElement('div', { className: 'notifications-mobile-overlay', onClick: () => setIsOpen(false) },
+      React.createElement('div', { className: 'notifications-mobile-modal', onClick: (e: React.MouseEvent) => e.stopPropagation() },
+        React.createElement('div', { className: 'notifications-mobile-header' },
+          React.createElement('h3', { className: 'notifications-mobile-title' }, 'Notifications'),
+          React.createElement('button', {
+            type: 'button',
+            className: 'notifications-mobile-close',
+            onClick: () => setIsOpen(false)
+          },
+            React.createElement('svg', { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2 },
+              React.createElement('path', { d: 'M18 6L6 18M6 6l12 12' })
+            )
+          )
+        ),
+        unreadCount > 0 && React.createElement('button', {
+          type: 'button',
+          className: 'notifications-mobile-mark-read',
+          onClick: handleMarkAllAsRead
+        }, 'Mark all as read'),
+        React.createElement('div', { className: 'notifications-mobile-list' },
+          loading ? React.createElement('div', { className: 'notifications-mobile-loading' }, 'Loading...') :
+          notifications.length === 0 ? React.createElement('div', { className: 'notifications-mobile-empty' },
+            React.createElement(EmptyBellIcon, null),
+            React.createElement('p', null, 'No notifications yet'),
+            React.createElement('span', null, "You'll be notified when someone assigns you a task")
+          ) :
+          notifications.map((notification) => {
+            const { taskTitle, projectName, isTeamInvitation } = parseNotificationMessage(notification.message, notification.type);
+            const isUnread = !notification.is_read;
+            return React.createElement('div', {
+              key: notification.id,
+              className: `notifications-mobile-item ${isUnread ? 'unread' : ''}`,
+              onClick: () => handleNotificationClick(notification)
+            },
+              React.createElement('div', { className: 'notifications-mobile-item-icon' },
+                (isTeamInvitation || notification.type === 'team_invitation') ?
+                  React.createElement(UsersIcon, null) :
+                  React.createElement(TaskIcon, null)
+              ),
+              React.createElement('div', { className: 'notifications-mobile-item-content' },
+                React.createElement('div', { className: 'notifications-mobile-item-title' }, notification.title),
+                React.createElement('div', { className: 'notifications-mobile-item-message' },
+                  isTeamInvitation ? `Team: ${taskTitle}` : taskTitle
+                ),
+                projectName && !isTeamInvitation && React.createElement('div', { className: 'notifications-mobile-item-project' }, `in ${projectName}`),
+                React.createElement('div', { className: 'notifications-mobile-item-time' }, formatTimeAgo(notification.created_at))
+              ),
+              React.createElement('button', {
+                type: 'button',
+                className: 'notifications-mobile-dismiss',
+                onClick: (e: React.MouseEvent) => handleDismiss(notification.id, e)
+              },
+                React.createElement('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2 },
+                  React.createElement('path', { d: 'M18 6L6 18M6 6l12 12' })
+                )
+              )
+            );
+          })
+        )
+      )
+    );
+  };
 
-        {unreadCount > 0 && (
-          <button
-            type="button"
-            className="notifications-mobile-mark-read"
-            onClick={handleMarkAllAsRead}
-          >
-            Mark all as read
-          </button>
-        )}
-
-        <div className="notifications-mobile-list">
-          {loading ? (
-            <div className="notifications-mobile-loading">Loading...</div>
-          ) : notifications.length === 0 ? (
-            <div className="notifications-mobile-empty">
-              <EmptyBellIcon />
-              <p>No notifications yet</p>
-              <span>You'll be notified when someone assigns you a task</span>
-            </div>
-          ) : (
-            notifications.map((notification) => {
-              const { taskTitle, projectName, isTeamInvitation } = parseNotificationMessage(notification.message, notification.type);
-              const isUnread = !notification.is_read;
-
-              return (
-                <div
-                  key={notification.id}
-                  className={`notifications-mobile-item ${isUnread ? 'unread' : ''}`}
-                  onClick={() => handleNotificationClick(notification)}
-                >
-                  <div className="notifications-mobile-item-icon">
-                    {isTeamInvitation || notification.type === 'team_invitation' ? (
-                      <UsersIcon />
-                    ) : (
-                      <TaskIcon />
-                    )}
-                  </div>
-                  <div className="notifications-mobile-item-content">
-                    <div className="notifications-mobile-item-title">{notification.title}</div>
-                    <div className="notifications-mobile-item-message">
-                      {isTeamInvitation ? `Team: ${taskTitle}` : taskTitle}
-                    </div>
-                    {projectName && !isTeamInvitation && (
-                      <div className="notifications-mobile-item-project">in {projectName}</div>
-                    )}
-                    <div className="notifications-mobile-item-time">{formatTimeAgo(notification.created_at)}</div>
-                  </div>
-                  <button
-                    type="button"
-                    className="notifications-mobile-dismiss"
-                    onClick={(e) => handleDismiss(notification.id, e)}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M18 6L6 18M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className={className} style={{ position: 'relative' }} ref={dropdownRef}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="wp-floating-notifications"
-        title="Notifications"
-        style={{
-          color: bellColor,
-        }}
-        onMouseEnter={(e) => {
-          if (!isOpen && !hasUnread) {
-            e.currentTarget.style.color = '#14B8A6';
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!isOpen && !hasUnread) {
-            e.currentTarget.style.color = '#6B7280';
-          }
-        }}
-      >
-        <BellIcon />
-        {unreadCount > 0 && (
-          <span className="wp-floating-notifications-badge">
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
-        )}
-      </button>
-
-      {isOpen && (isMobile ? renderMobileModal() : (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            right: 0,
-            marginTop: '8px',
-            width: '380px',
-            maxHeight: '600px',
-            background: '#FFFFFF',
-            border: '1px solid #E5E7EB',
-            borderRadius: '12px',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.12)',
-            zIndex: 1000,
+  return React.createElement(React.Fragment, null,
+    isOpen && isMobile && renderMobileModal(),
+    React.createElement('div', { className: className, ref: dropdownRef, style: { position: 'relative' } },
+      React.createElement('button', {
+        type: 'button',
+        onClick: () => setIsOpen(!isOpen),
+        className: 'wp-floating-notifications',
+        title: 'Notifications',
+        style: { color: bellColor }
+      },
+        React.createElement(BellIcon, null),
+        unreadCount > 0 && React.createElement('span', { className: 'wp-floating-notifications-badge' },
+          unreadCount > 9 ? '9+' : unreadCount
+        )
+      ),
+      isOpen && !isMobile && React.createElement('div', {
+        className: 'notifications-desktop-dropdown',
+        style: {
+          position: 'absolute',
+          top: '100%',
+          right: 0,
+          marginTop: '8px',
+          width: '380px',
+          maxHeight: '600px',
+          background: '#FFFFFF',
+          border: '1px solid #E5E7EB',
+          borderRadius: '12px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.12)',
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }
+      },
+        React.createElement('div', {
+          style: {
+            padding: '16px 20px',
+            borderBottom: '1px solid #E5E7EB',
             display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-          }}
-        >
-          {/* Header */}
-          <div
-            style={{
-              padding: '16px 20px',
-              borderBottom: '1px solid #E5E7EB',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#1F2937' }}>
-              Notifications
-            </h3>
-            {unreadCount > 0 && (
-              <button
-                type="button"
-                onClick={handleMarkAllAsRead}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#14B8A6',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  transition: 'all 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = '#0f766e';
-                  e.currentTarget.style.textDecoration = 'underline';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = '#14B8A6';
-                  e.currentTarget.style.textDecoration = 'none';
-                }}
-              >
-                Mark all as read
-              </button>
-            )}
-          </div>
-
-          {/* Body */}
-          <div
-            style={{
-              overflowY: 'auto',
-              maxHeight: '500px',
-              minHeight: '200px',
-            }}
-          >
-            {loading ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#9CA3AF', fontSize: '14px' }}>
-                Loading...
-              </div>
-            ) : notifications.length === 0 ? (
-              <div
-                style={{
-                  padding: '40px 20px',
-                  textAlign: 'center',
-                  color: '#9CA3AF',
-                }}
-              >
-                <EmptyBellIcon style={{ color: '#D1D5DB', margin: '0 auto 16px' }} />
-                <div style={{ fontSize: '14px', fontWeight: 500, color: '#6B7280', marginBottom: '4px' }}>
-                  No notifications yet
-                </div>
-                <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
-                  You'll be notified when someone assigns you a task
-                </div>
-              </div>
-            ) : (
-              notifications.map((notification, index) => {
-                const { taskTitle, projectName, isTeamInvitation } = parseNotificationMessage(notification.message, notification.type);
-                const isUnread = !notification.is_read;
-                const isHovered = hoveredNotificationId === notification.id;
-                const bgColor = isUnread
-                  ? 'rgba(20, 184, 166, 0.04)'
-                  : isHovered
-                    ? 'rgba(20, 184, 166, 0.08)'
-                    : '#FFFFFF';
-
-                return (
-                  <div
-                    key={notification.id}
-                    onClick={() => handleNotificationClick(notification)}
-                    onMouseEnter={() => setHoveredNotificationId(notification.id)}
-                    onMouseLeave={() => setHoveredNotificationId(null)}
-                    style={{
-                      padding: '14px 16px',
-                      borderBottom: index < notifications.length - 1 ? '1px solid #E5E7EB' : 'none',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexShrink: 0
+          }
+        },
+          React.createElement('h3', { style: { margin: 0, fontSize: '16px', fontWeight: 600, color: '#1F2937' } }, 'Notifications'),
+          unreadCount > 0 && React.createElement('button', {
+            type: 'button',
+            onClick: handleMarkAllAsRead,
+            style: {
+              background: 'transparent',
+              border: 'none',
+              color: '#14B8A6',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: 500,
+              padding: '4px 8px',
+              borderRadius: '4px'
+            }
+          }, 'Mark all as read')
+        ),
+        React.createElement('div', {
+          style: { overflowY: 'auto', maxHeight: '500px', minHeight: '200px' }
+        },
+          loading ? React.createElement('div', { style: { padding: '40px', textAlign: 'center', color: '#9CA3AF', fontSize: '14px' } }, 'Loading...') :
+          notifications.length === 0 ? React.createElement('div', {
+            style: { padding: '40px 20px', textAlign: 'center', color: '#9CA3AF' }
+          },
+            React.createElement(EmptyBellIcon, { style: { color: '#D1D5DB', margin: '0 auto 16px' } }),
+            React.createElement('div', { style: { fontSize: '14px', fontWeight: 500, color: '#6B7280', marginBottom: '4px' } }, 'No notifications yet'),
+            React.createElement('div', { style: { fontSize: '12px', color: '#9CA3AF' } }, "You'll be notified when someone assigns you a task")
+          ) :
+          notifications.map((notification, index) => {
+            const { taskTitle, projectName, isTeamInvitation } = parseNotificationMessage(notification.message, notification.type);
+            const isUnread = !notification.is_read;
+            const isHovered = hoveredNotificationId === notification.id;
+            const bgColor = isUnread ? 'rgba(20, 184, 166, 0.04)' : isHovered ? 'rgba(20, 184, 166, 0.08)' : '#FFFFFF';
+            return React.createElement('div', {
+              key: notification.id,
+              onClick: () => handleNotificationClick(notification),
+              onMouseEnter: () => setHoveredNotificationId(notification.id),
+              onMouseLeave: () => setHoveredNotificationId(null),
+              style: {
+                padding: '14px 16px',
+                borderBottom: index < notifications.length - 1 ? '1px solid #E5E7EB' : 'none',
+                cursor: 'pointer',
+                background: bgColor,
+                transition: 'background 0.15s ease',
+                position: 'relative',
+                borderLeft: isUnread ? '3px solid #14B8A6' : '3px solid transparent'
+              }
+            },
+              React.createElement('div', { style: { display: 'flex', gap: '12px', alignItems: 'flex-start' } },
+                React.createElement('div', {
+                  style: {
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    background: '#F3F4F6',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    border: '1px solid #E5E7EB'
+                  }
+                },
+                  (isTeamInvitation || notification.type === 'team_invitation') ?
+                    React.createElement(UsersIcon, { style: { color: '#6B7280' } }) :
+                    React.createElement(TaskIcon, { style: { color: '#6B7280' } })
+                ),
+                React.createElement('div', { style: { flex: 1, minWidth: 0 } },
+                  React.createElement('div', {
+                    style: {
+                      fontWeight: isUnread ? 600 : 500,
+                      fontSize: '14px',
+                      marginBottom: '4px',
+                      color: '#1F2937',
+                      lineHeight: '1.4'
+                    }
+                  }, notification.title),
+                  React.createElement('div', {
+                    style: { fontSize: '14px', color: '#374151', marginBottom: '2px', fontWeight: 500, lineHeight: '1.4' }
+                  }, isTeamInvitation ? `Team: ${taskTitle}` : taskTitle),
+                  projectName && !isTeamInvitation && React.createElement('div', {
+                    style: { fontSize: '12px', color: '#6B7280', marginBottom: '4px', lineHeight: '1.4' }
+                  }, `in ${projectName}`),
+                  React.createElement('div', { style: { fontSize: '11px', color: '#9CA3AF', marginTop: '4px' } },
+                    formatTimeAgo(notification.created_at)
+                  )
+                ),
+                isHovered && React.createElement('div', {
+                  style: { display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 },
+                  onClick: (e: React.MouseEvent) => e.stopPropagation()
+                },
+                  notification.is_read ? React.createElement('button', {
+                    type: 'button',
+                    onClick: (e: React.MouseEvent) => handleMarkAsUnread(notification.id, e),
+                    title: 'Mark as unread',
+                    style: {
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#6B7280',
                       cursor: 'pointer',
-                      background: bgColor,
-                      transition: 'background 0.15s ease',
-                      position: 'relative',
-                      borderLeft: isUnread ? '3px solid #14B8A6' : '3px solid transparent',
-                    }}
-                  >
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                      {/* Icon */}
-                      <div
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          background: '#F3F4F6',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                          border: '1px solid #E5E7EB',
-                        }}
-                      >
-                        {isTeamInvitation || notification.type === 'team_invitation' ? (
-                          <UsersIcon style={{ color: '#6B7280' }} />
-                        ) : (
-                          <TaskIcon style={{ color: '#6B7280' }} />
-                        )}
-                      </div>
-
-                      {/* Content */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontWeight: isUnread ? 600 : 500,
-                            fontSize: '14px',
-                            marginBottom: '4px',
-                            color: '#1F2937',
-                            lineHeight: '1.4',
-                          }}
-                        >
-                          {notification.title}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: '14px',
-                            color: '#374151',
-                            marginBottom: '2px',
-                            fontWeight: 500,
-                            lineHeight: '1.4',
-                          }}
-                        >
-                          {isTeamInvitation ? `Team: ${taskTitle}` : taskTitle}
-                        </div>
-                        {projectName && !isTeamInvitation && (
-                          <div
-                            style={{
-                              fontSize: '12px',
-                              color: '#6B7280',
-                              marginBottom: '4px',
-                              lineHeight: '1.4',
-                            }}
-                          >
-                            in {projectName}
-                          </div>
-                        )}
-                        <div
-                          style={{
-                            fontSize: '11px',
-                            color: '#9CA3AF',
-                            marginTop: '4px',
-                          }}
-                        >
-                          {formatTimeAgo(notification.created_at)}
-                        </div>
-                      </div>
-
-                      {/* Hover Actions */}
-                      {isHovered && (
-                        <div
-                          style={{
-                            display: 'flex',
-                            gap: '4px',
-                            alignItems: 'center',
-                            flexShrink: 0,
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {notification.is_read ? (
-                            <button
-                              type="button"
-                              onClick={(e) => handleMarkAsUnread(notification.id, e)}
-                              title="Mark as unread"
-                              style={{
-                                width: '24px',
-                                height: '24px',
-                                borderRadius: '4px',
-                                border: 'none',
-                                background: 'transparent',
-                                color: '#6B7280',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.15s ease',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.background = 'rgba(20, 184, 166, 0.1)';
-                                e.currentTarget.style.color = '#14B8A6';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = 'transparent';
-                                e.currentTarget.style.color = '#6B7280';
-                              }}
-                            >
-                              <CheckIcon />
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => handleMarkAsRead(notification.id, e)}
-                              title="Mark as read"
-                              style={{
-                                width: '24px',
-                                height: '24px',
-                                borderRadius: '4px',
-                                border: 'none',
-                                background: 'transparent',
-                                color: '#6B7280',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.15s ease',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.background = 'rgba(20, 184, 166, 0.1)';
-                                e.currentTarget.style.color = '#14B8A6';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = 'transparent';
-                                e.currentTarget.style.color = '#6B7280';
-                              }}
-                            >
-                              <CheckIcon />
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={(e) => handleDismiss(notification.id, e)}
-                            title="Dismiss"
-                            style={{
-                              width: '24px',
-                              height: '24px',
-                              borderRadius: '4px',
-                              border: 'none',
-                              background: 'transparent',
-                              color: '#6B7280',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'all 0.15s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                              e.currentTarget.style.color = '#EF4444';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'transparent';
-                              e.currentTarget.style.color = '#6B7280';
-                            }}
-                          >
-                            <XIcon />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }
+                  }, React.createElement(CheckIcon, null)) :
+                  React.createElement('button', {
+                    type: 'button',
+                    onClick: (e: React.MouseEvent) => handleMarkAsRead(notification.id, e),
+                    title: 'Mark as read',
+                    style: {
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#6B7280',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }
+                  }, React.createElement(CheckIcon, null)),
+                  React.createElement('button', {
+                    type: 'button',
+                    onClick: (e: React.MouseEvent) => handleDismiss(notification.id, e),
+                    title: 'Dismiss',
+                    style: {
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#6B7280',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }
+                  }, React.createElement(XIcon, null))
+                )
+              )
+            );
+          })
+        )
+      )
+    )
   );
 };
 
