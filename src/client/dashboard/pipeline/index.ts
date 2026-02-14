@@ -1,4 +1,14 @@
-export { default as PipelineBoard } from './PipelineBoard';
-export * from './projectsData.js';
-
-
+export { default as EventProjectPage } from './EventProjectPage';
+export { default as VendorsTab } from './vendors/VendorsTab';
+export { default as VisionStyleTab } from './vision/VisionStyleTab';
+export { default as VenueDateTab } from './venue/VenueDateTab';
+export { default as GuestListTab } from './guests/GuestListTab';
+export { default as FinancialCommandCenter } from './budget/FinancialCommandCenter';
+export { default as DesignLayoutTab } from './design/DesignLayoutTab';
+export { default as BudgetTab } from './budget/BudgetTab';
+export { default as CategoryTable } from './budget/CategoryTable';
+export { default as BudgetSummary } from './budget/BudgetSummary';
+export { default as BudgetAlerts } from './budget/BudgetAlerts';
+export { default as PaymentTimeline } from './budget/PaymentTimeline';
+export { default as ProjectFilesSection } from './files/ProjectFilesSection';
+export * from './vendors/types';
