@@ -360,6 +360,9 @@ export const WorkSection: React.FC = () => {
 
 export const CalendarSection: React.FC = () => {
   const [accountId, setAccountId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showAddEventModal, setShowAddEventModal] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -374,6 +377,13 @@ export const CalendarSection: React.FC = () => {
     }
   }, []);
 
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   return (
     <SectionCard title="Calendar">
       {accountId ? (
@@ -382,6 +392,50 @@ export const CalendarSection: React.FC = () => {
         <p style={{ marginTop: 0, marginBottom: 0, color: '#7b7b7b' }}>
           Log in to load your calendar events.
         </p>
+      )}
+
+      {isMobile && (
+        <>
+          <div className="calendar-fab-menu">
+            <button
+              className="calendar-fab-hamburger"
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+            >
+              {showMobileMenu ? '✕' : '☰'}
+            </button>
+            <button
+              className="calendar-fab-plus"
+              onClick={() => setShowAddEventModal(true)}
+            >
+              +
+            </button>
+          </div>
+
+          {showMobileMenu && (
+            <div className="calendar-menu-overlay" onClick={() => setShowMobileMenu(false)}>
+              <div className="calendar-menu" onClick={e => e.stopPropagation()}>
+                <div className="calendar-menu-header">
+                  <span>WedBoardPro</span>
+                  <button onClick={() => setShowMobileMenu(false)}>✕</button>
+                </div>
+                <nav className="calendar-menu-nav">
+                  <button onClick={() => { window.location.href = '/dashboard'; setShowMobileMenu(false); }}>
+                    🏠 Dashboard
+                  </button>
+                  <button onClick={() => { window.location.href = '/dashboard'; setShowMobileMenu(false); }}>
+                    📅 Calendar
+                  </button>
+                  <button onClick={() => { window.location.href = '/dashboard'; setShowMobileMenu(false); }}>
+                    📋 To-Do
+                  </button>
+                  <button onClick={() => { window.location.href = '/suppliers'; setShowMobileMenu(false); }}>
+                    🏪 Suppliers
+                  </button>
+                </nav>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </SectionCard>
   );
