@@ -575,6 +575,8 @@ const TeamDashboard: React.FC = () => {
     return eachDayOfInterval({ start: startDate, end: endDate });
   };
 
+  const isWideScreen = () => window.innerWidth >= 768;
+
   const getBookingsForDate = (date: Date) => {
     return bookings.filter(b => 
       isSameDay(parseISO(b.booking_date), date) && 
@@ -686,7 +688,7 @@ const TeamDashboard: React.FC = () => {
                 <h2 className="team-section-title">Demo Calendar</h2>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isWideScreen() ? '1fr 1fr' : '1fr', gap: isWideScreen() ? 24 : 16 }}>
                 <div className="team-calendar">
                   <div className="team-calendar-header">
                     <div className="team-calendar-nav">
@@ -850,7 +852,7 @@ const TeamDashboard: React.FC = () => {
               </p>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isWideScreen() ? '2fr 1fr' : '1fr', gap: isWideScreen() ? 24 : 16 }}>
               {/* Calendar */}
               <div>
                 {/* Month Navigation */}
@@ -887,16 +889,16 @@ const TeamDashboard: React.FC = () => {
                 </div>
 
                 {/* Weekday Headers */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 6 }}>
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                    <div key={day} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#9ca3af', padding: '8px 0' }}>
+                    <div key={day} style={{ textAlign: 'center', fontSize: 10, fontWeight: 600, color: '#9ca3af', padding: '6px 0' }}>
                       {day}
                     </div>
                   ))}
                 </div>
 
                 {/* Calendar Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
                   {calendarDays().map((day, i) => {
                     const dateStr = format(day, 'yyyy-MM-dd');
                     const blocked = isDateBlocked(dateStr);

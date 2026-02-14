@@ -164,6 +164,7 @@ const App: React.FC = () => {
         <Route path="/team-login" element={<TeamLoginPage />} />
         <Route path="/team" element={<TeamDashboard />} />
         <Route path="/team/seo" element={<Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}><img src="/loadinglogo.png" alt="Loading" style={{ width: '160px', height: 'auto' }} /></div>}><SEODashboard /></Suspense>} />
+        <Route path="/team/seo" element={<Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}><img src="/loadinglogo.png" alt="Loading" style={{ width: '160px', height: 'auto' }} /></div>}><SEODashboard /></Suspense>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
