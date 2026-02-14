@@ -10363,8 +10363,8 @@ app.post('/api/v1/blog/ai-generate', express.json(), async (req, res) => {
   "contentIdeas": ["Handle price objections", "Create service packages", "Communicate value"]
 }`;
 
-    async function generateAndAnalyze(attempt: number): Promise<any> {
-      const completion = await openaiClient.chat.completions.create({
+    async function generateAndAnalyze(attempt: number, client: OpenAI): Promise<any> {
+      const completion = await client.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
@@ -10378,7 +10378,7 @@ app.post('/api/v1/blog/ai-generate', express.json(), async (req, res) => {
       const data = JSON.parse(cleanJson);
 
       // Analyze the generated content
-      const analyzeCompletion = await openaiClient.chat.completions.create({
+      const analyzeCompletion = await client.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [{
           role: 'user',
@@ -10415,7 +10415,7 @@ Content: ${(data.content || '').replace(/<[^>]*>/g, '').substring(0, 1500)}`
 
     while (attempts < maxAttempts && !result) {
       attempts++;
-      const candidate = await generateAndAnalyze(attempts);
+      const candidate = await generateAndAnalyze(attempts, openaiClient);
       if (candidate && (candidate.analysisPassed || candidate.finalScore >= 70)) {
         result = { ...candidate, autoAnalyzed: true };
         break;
@@ -10424,7 +10424,7 @@ Content: ${(data.content || '').replace(/<[^>]*>/g, '').substring(0, 1500)}`
     }
 
     if (!result) {
-      const last = await generateAndAnalyze(maxAttempts);
+      const last = await generateAndAnalyze(maxAttempts, openaiClient);
       result = { ...last, finalScore: last.finalScore || 75, autoAnalyzed: false, warning: 'Best effort - manual review recommended' };
     }
 
@@ -11004,7 +11004,7 @@ app.post('/api/v1/team/members', express.json(), async (req, res) => {
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
       email,
       password: tempPassword,
-      email_confirmed: true,
+      email_confirm: true,
       user_metadata: { full_name: name }
     });
 
