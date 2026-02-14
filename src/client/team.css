@@ -960,6 +960,7 @@
 
   .team-content {
     padding: 10px;
+    padding-bottom: 100px;
   }
 
   .team-section {
@@ -1007,5 +1008,137 @@
   .team-calendar-day.has-bookings::after {
     width: 3px;
     height: 3px;
+  }
+}
+
+.team-mobile-fab-menu {
+  position: fixed;
+  bottom: 24px;
+  right: 20px;
+  display: flex;
+  gap: 16px;
+  z-index: 100;
+}
+
+.team-fab-hamburger,
+.team-fab-plus {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.team-fab-hamburger {
+  background: #ffffff;
+  color: #111827;
+}
+
+.team-fab-plus {
+  background: #111827;
+  color: #ffffff;
+}
+
+.team-fab-hamburger:hover,
+.team-fab-plus:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.team-mobile-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 200;
+}
+
+.team-mobile-menu {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 280px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+}
+
+.team-mobile-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.team-mobile-menu-header span {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.team-mobile-menu-header button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: #f3f4f6;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.team-mobile-menu-nav {
+  flex: 1;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.team-mobile-menu-nav button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.team-mobile-menu-nav button:hover {
+  background: #f3f4f6;
+}
+
+.team-mobile-menu-logout {
+  margin: 16px;
+  padding: 14px;
+  background: #fef2f2;
+  border: none;
+  border-radius: 10px;
+  color: #dc2626;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+@media (min-width: 768px) {
+  .team-mobile-fab-menu,
+  .team-mobile-menu-overlay,
+  .team-mobile-menu {
+    display: none !important;
   }
 }

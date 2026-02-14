@@ -249,6 +249,194 @@ const MemberModal: React.FC<{
   );
 };
 
+interface AddBookingModalProps {
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const AddBookingModal: React.FC<AddBookingModalProps> = ({ onClose, onSuccess }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    company: '',
+    phone: '',
+    booking_date: format(new Date(), 'yyyy-MM-dd'),
+    booking_time: '10:00',
+    goal: '',
+    team_size: ''
+  });
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const res = await fetch('/api/v1/team/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+
+      if (res.ok) {
+        onSuccess();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to create booking');
+      }
+    } catch (error) {
+      console.error('Failed to create booking:', error);
+      alert('Failed to create booking');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 100,
+      padding: 20
+    }}>
+      <div style={{
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 24,
+        maxWidth: 400,
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h3 style={{ fontSize: 18, fontWeight: 600, color: '#111827', margin: 0 }}>Add Booking</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#6b7280' }}>✕</button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>Name *</label>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 14 }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>Email *</label>
+            <input
+              type="email"
+              required
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 14 }}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>Date</label>
+              <input
+                type="date"
+                value={formData.booking_date}
+                onChange={(e) => setFormData({ ...formData, booking_date: e.target.value })}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 14 }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>Time</label>
+              <input
+                type="time"
+                value={formData.booking_time}
+                onChange={(e) => setFormData({ ...formData, booking_time: e.target.value })}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 14 }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>Company</label>
+              <input
+                type="text"
+                value={formData.company}
+                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 14 }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>Phone</label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 14 }}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>Goal</label>
+            <input
+              type="text"
+              value={formData.goal}
+              onChange={(e) => setFormData({ ...formData, goal: e.target.value })}
+              placeholder="e.g. Wedding planning"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 14 }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                flex: 1,
+                padding: '12px 20px',
+                borderRadius: 8,
+                border: '1px solid #e5e7eb',
+                background: '#fff',
+                color: '#374151',
+                fontSize: 14,
+                cursor: 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              style={{
+                flex: 1,
+                padding: '12px 20px',
+                borderRadius: 8,
+                border: 'none',
+                background: '#111827',
+                color: '#fff',
+                fontSize: 14,
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                opacity: isLoading ? 0.7 : 1
+              }}
+            >
+              {isLoading ? 'Creating...' : 'Create Booking'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 const TeamDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'bookings' | 'crm' | 'availability' | 'blog' | 'users'>('bookings');
@@ -270,6 +458,8 @@ const TeamDashboard: React.FC = () => {
   const [slotBlockReason, setSlotBlockReason] = useState('');
   const [selectedDateDetails, setSelectedDateDetails] = useState<{date: Date, blocked: boolean, bookings: Booking[]} | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showAddBookingModal, setShowAddBookingModal] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -1505,6 +1695,76 @@ const TeamDashboard: React.FC = () => {
           </div>
         )}
       </main>
+
+      {isMobile && (
+        <>
+          <div className="team-mobile-fab-menu">
+            <button
+              className="team-fab-hamburger"
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+            >
+              {showMobileMenu ? '✕' : '☰'}
+            </button>
+            <button
+              className="team-fab-plus"
+              onClick={() => {
+                if (activeTab === 'availability') {
+                  const today = format(new Date(), 'yyyy-MM-dd');
+                  setShowBlockModal(today);
+                } else {
+                  setShowAddBookingModal(true);
+                }
+              }}
+            >
+              +
+            </button>
+          </div>
+
+          {showMobileMenu && (
+            <div className="team-mobile-menu-overlay" onClick={() => setShowMobileMenu(false)}>
+              <div className="team-mobile-menu" onClick={e => e.stopPropagation()}>
+                <div className="team-mobile-menu-header">
+                  <span>WedBoardPro</span>
+                  <button onClick={() => setShowMobileMenu(false)}>✕</button>
+                </div>
+                <nav className="team-mobile-menu-nav">
+                  <button onClick={() => { setActiveTab('bookings'); setShowMobileMenu(false); }}>
+                    📅 Demo Bookings
+                  </button>
+                  <button onClick={() => { setActiveTab('crm'); setShowMobileMenu(false); }}>
+                    👥 CRM
+                  </button>
+                  <button onClick={() => { setActiveTab('availability'); setShowMobileMenu(false); }}>
+                    📆 Availability
+                  </button>
+                  <button onClick={() => { navigate('/team/blog'); setShowMobileMenu(false); }}>
+                    📝 Blog
+                  </button>
+                  <button onClick={() => { navigate('/team/seo'); setShowMobileMenu(false); }}>
+                    📊 SEO
+                  </button>
+                  <button onClick={() => { setActiveTab('users'); setShowMobileMenu(false); }}>
+                    👥 Users
+                  </button>
+                </nav>
+                <button className="team-mobile-menu-logout" onClick={handleLogout}>
+                  Logout
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {showAddBookingModal && (
+        <AddBookingModal
+          onClose={() => setShowAddBookingModal(false)}
+          onSuccess={() => {
+            setShowAddBookingModal(false);
+            fetchData();
+          }}
+        />
+      )}
     </div>
   );
 };
