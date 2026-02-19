@@ -4,6 +4,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
 import Stripe from 'stripe';
+import seoRouter from './api/seo.js';
 
 // Get __dirname equivalent for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -11103,6 +11104,9 @@ app.delete('/api/v1/team/members/:id', async (req, res) => {
     res.status(500).json({ error: err.message || 'Failed to delete team member' });
   }
 });
+
+// SEO Intelligence API routes
+app.use('/api/seo', seoRouter);
 
 // 404 handler for API routes
 app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {

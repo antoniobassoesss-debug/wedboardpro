@@ -3,6 +3,32 @@ import './BeautifulCalendar.css';
 import { listCalendarEvents, createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from '../api/calendarEventsApi.js';
 import type { CalendarEvent, CreateCalendarEventInput, UpdateCalendarEventInput } from '../api/calendarEventsApi.js';
 
+const EVENT_COLORS: Record<string, string> = {
+  red: '#ef4444',
+  orange: '#f97316',
+  green: '#22c55e',
+  blue: '#3b82f6',
+  purple: '#a855f7',
+  event: '#3b82f6',
+  meeting: '#f97316',
+  task: '#22c55e',
+  other: '#6b7280',
+};
+
+const EVENT_TYPE_ICONS: Record<string, string> = {
+  event: '📅',
+  meeting: '🤝',
+  task: '✅',
+  other: '📌',
+};
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  event: 'Event',
+  meeting: 'Meeting',
+  task: 'Task',
+  other: 'Other',
+};
+
 type CalendarViewMode = 'month' | 'week' | 'list';
 
 type CalendarProps = {
@@ -11,6 +37,44 @@ type CalendarProps = {
   weekStartsOn?: 'monday' | 'sunday';
   openEditorTrigger?: number;
 };
+
+function formatMonthLabel(date: Date): string {
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+function formatDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+function addMonths(date: Date, months: number): Date {
+  const result = new Date(date);
+  result.setMonth(result.getMonth() + months);
+  return result;
+}
+
+function groupEventsByDay(events: CalendarEvent[]): Map<string, CalendarEvent[]> {
+  const map = new Map<string, CalendarEvent[]>();
+  for (const event of events) {
+    const key = formatDateKey(new Date(event.start_at));
+    const list = map.get(key) || [];
+    list.push(event);
+    map.set(key, list);
+  }
+  return map;
+}
 
 export function BeautifulCalendar({ accountId, currentUserId, weekStartsOn = 'monday', openEditorTrigger }: CalendarProps) {
   const [view, setView] = useState<CalendarViewMode>('month');

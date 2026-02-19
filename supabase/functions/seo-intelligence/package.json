@@ -1,0 +1,16 @@
+{
+  "name": "seo-intelligence",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "openai": "^4.82.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

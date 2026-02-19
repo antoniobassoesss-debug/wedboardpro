@@ -30,7 +30,7 @@ const MarketingHome: React.FC = () => {
   useEffect(() => {
     const fetchBlogPosts = async () => {
       try {
-        const response = await fetch('/api/v1/blog/featured');
+        const response = await fetch('/api/seo/blog/featured');
         const data = await response.json();
         setBlogPosts(data.posts || []);
       } catch (error) {

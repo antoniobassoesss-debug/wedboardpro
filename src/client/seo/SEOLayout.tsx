@@ -3,10 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   BarChart3,
   Kanban,
-  FileText,
   PenTool,
   ChevronLeft,
-  Search,
   TrendingUp,
 } from 'lucide-react';
 

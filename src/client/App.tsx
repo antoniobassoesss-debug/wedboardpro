@@ -16,8 +16,11 @@ import { AuthCallbackPage, AuthUrlHandler } from './auth/index.ts';
 import TeamLoginPage from './TeamLoginPage';
 import TeamDashboard from './TeamDashboard';
 
-// Lazy load SEO page
-const SEODashboard = lazy(() => import('./seo/SEODashboard'));
+// Lazy load SEO pages
+const SEOIntelligence = lazy(() => import('./seo/SEOIntelligence'));
+
+// Lazy load blog post page
+const BlogPostPage = lazy(() => import('./BlogPostPage'));
 
 function ScrollToTop() {
   const location = useLocation();
@@ -92,6 +95,7 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/" element={<MarketingHome />} />
         <Route path="/blog" element={<BlogPage />} />
+        <Route path="/blog/:slug" element={<Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#ffffff' }}><img src="/loadinglogo.png" alt="Loading" style={{ width: '160px', height: 'auto' }} /></div>}><BlogPostPage /></Suspense>} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -163,8 +167,7 @@ const App: React.FC = () => {
         <Route path="/about" element={<AboutUs />} />
         <Route path="/team-login" element={<TeamLoginPage />} />
         <Route path="/team" element={<TeamDashboard />} />
-        <Route path="/team/seo" element={<Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}><img src="/loadinglogo.png" alt="Loading" style={{ width: '160px', height: 'auto' }} /></div>}><SEODashboard /></Suspense>} />
-        <Route path="/team/seo" element={<Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}><img src="/loadinglogo.png" alt="Loading" style={{ width: '160px', height: 'auto' }} /></div>}><SEODashboard /></Suspense>} />
+        <Route path="/team/seo" element={<Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}><img src="/loadinglogo.png" alt="Loading" style={{ width: '160px', height: 'auto' }} /></div>}><SEOIntelligence /></Suspense>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
