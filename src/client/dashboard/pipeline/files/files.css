@@ -32,8 +32,8 @@
 
 /* Shell Layout */
 .files-shell {
-  display: grid;
-  grid-template-columns: 280px 1fr;
+  display: flex;
+  flex-direction: column;
   height: 100%;
   min-height: 480px;
   background: var(--files-bg);
@@ -42,10 +42,20 @@
   letter-spacing: -0.01em;
 }
 
+/* Desktop wrapper — makes sidebar + main sit side by side */
+.files-desktop-view {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* ====== SIDEBAR ====== */
 .files-sidebar {
   display: flex;
   flex-direction: column;
+  width: 240px;
+  flex-shrink: 0;
   background: var(--files-card-bg);
   border-right: 1px solid var(--files-border-light);
   overflow-y: auto;
@@ -272,6 +282,8 @@
 .files-main {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
   position: relative;
   background: var(--files-bg);
@@ -1081,11 +1093,6 @@
 }
 
 @media (max-width: 900px) {
-  .files-shell {
-    grid-template-columns: 1fr;
-    max-height: none;
-  }
-
   .files-sidebar {
     position: fixed;
     top: 0;
@@ -1351,7 +1358,8 @@
 .files-mobile-view {
   display: none;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   background: #fff;
 }
 
