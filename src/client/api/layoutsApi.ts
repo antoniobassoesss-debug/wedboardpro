@@ -575,6 +575,7 @@ export async function listLayoutsWithEvents(): Promise<ApiResponse<Array<LayoutR
       `)
       .eq('account_id', accountId)
       .eq('status', 'active')
+      .not('event_id', 'is', null)
       .order('updated_at', { ascending: false });
 
     if (error) {
@@ -584,6 +585,7 @@ export async function listLayoutsWithEvents(): Promise<ApiResponse<Array<LayoutR
         .select('*')
         .eq('account_id', accountId)
         .eq('status', 'active')
+        .not('event_id', 'is', null)
         .order('updated_at', { ascending: false });
       
       if (simpleError) {
