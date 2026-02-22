@@ -358,7 +358,6 @@ const ProjectFilesSection: React.FC<ProjectFilesSectionProps> = ({ projectId }) 
           <div className={`files-sidebar ${sidebarOpen ? 'open' : ''}`}>
             <div className="files-sidebar-header">
               <div className="files-sidebar-title">
-                <span className="dot" />
                 <span>Files</span>
               </div>
               <button type="button" className="files-btn subtle hide-desktop" onClick={() => setSidebarOpen(false)}>
