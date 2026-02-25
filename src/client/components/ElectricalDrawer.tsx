@@ -1,15 +1,12 @@
 /**
- * ElectricalDrawer - Right-side sliding drawer for electrical point configuration.
- * Glassmorphism backdrop, breaker calculator, and embedded AI chat for load validation.
+ * ElectricalDrawer - Minimalist right-side panel for power point configuration.
  */
-import React, { useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState } from 'react';
 import type { PowerPoint } from '../types/powerPoint';
 import type { ElectricalStandard } from '../types/electrical';
 import { MAX_OUTLETS } from '../types/electrical';
-import ElectricalBreakerCalculator from './ElectricalBreakerCalculator.js';
-import ElectricalAIChat from './ElectricalAIChat.js';
-import { useCircuitCalculations } from '../hooks/useCircuitCalculations.js';
+import ElectricalBreakerCalculator from './ElectricalBreakerCalculator';
+import ElectricalAIChat from './ElectricalAIChat';
 
 interface ElectricalDrawerProps {
   isOpen: boolean;
@@ -19,6 +16,16 @@ interface ElectricalDrawerProps {
   onDelete: (id: string) => void;
 }
 
+const STANDARDS: { value: ElectricalStandard; label: string }[] = [
+  { value: 'EU_PT', label: 'EU (230V)' },
+  { value: 'US_NEC', label: 'US (120V)' },
+];
+
+const BREAKER_OPTIONS = {
+  EU_PT: [10, 16, 20, 25, 32, 40, 63],
+  US_NEC: [15, 20, 25, 30, 40, 50],
+};
+
 const ElectricalDrawer: React.FC<ElectricalDrawerProps> = ({
   isOpen,
   onClose,
@@ -27,262 +34,287 @@ const ElectricalDrawer: React.FC<ElectricalDrawerProps> = ({
   onDelete,
 }) => {
   const [refreshKey, setRefreshKey] = useState(0);
-  
-  // Use circuit calculations hook to get current totals (for circuits linked to Supabase)
-  const circuitCalcs = useCircuitCalculations({
-    circuitId: powerPoint?.circuitId || null,
-    localMode: !powerPoint?.circuitId,
-    initialStandard: powerPoint?.standard || 'EU_PT',
-    initialBreakerAmps: powerPoint?.breaker_amps,
-  });
 
-  if (!powerPoint) return null;
+  if (!isOpen || !powerPoint) return null;
 
-  const handleCalculatorChange = (data: { standard: ElectricalStandard; breakerAmps: number; voltage: number }) => {
+  const maxOutlets = MAX_OUTLETS[powerPoint.standard];
+  const capacityWatts = (powerPoint.breaker_amps || 16) * (powerPoint.voltage || 230);
+
+  const handleStandardChange = (standard: ElectricalStandard) => {
+    const breakers = BREAKER_OPTIONS[standard];
     onUpdate({
       ...powerPoint,
-      standard: data.standard,
-      breaker_amps: data.breakerAmps,
-      voltage: data.voltage,
+      standard,
+      breaker_amps: breakers[0] || 16,
+      voltage: standard === 'EU_PT' ? 230 : 120,
     });
   };
 
-  const handleLabelChange = (label: string) => {
-    onUpdate({ ...powerPoint, label });
+  const handleLoadConfirmed = () => {
+    setRefreshKey(k => k + 1);
   };
 
-  // Refresh circuit calculations after a load is confirmed
-  const handleLoadConfirmed = useCallback(() => {
-    circuitCalcs.refresh();
-    setRefreshKey((k) => k + 1);
-  }, [circuitCalcs]);
-
-  // Get current values from hook or fallback to power point values
-  const currentWatts = circuitCalcs.totalWatts;
-  const currentOutlets = circuitCalcs.totalOutlets;
-  const maxOutlets = MAX_OUTLETS[powerPoint.standard];
-
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop with glassmorphism */}
-          <motion.div
-            className="electrical-drawer-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.3)',
+          zIndex: 200000,
+        }}
+      />
+
+      {/* Drawer Panel */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          width: '420px',
+          height: '100vh',
+          background: '#ffffff',
+          borderLeft: '1px solid #e5e7eb',
+          boxShadow: '-4px 0 20px rgba(0, 0, 0, 0.1)',
+          zIndex: 200001,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: '20px 24px',
+            borderBottom: '1px solid #e5e7eb',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div>
+            <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#111827' }}>
+              Power Point
+            </h2>
+            <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#6b7280' }}>
+              Configure outlet
+            </p>
+          </div>
+          <button
             onClick={onClose}
             style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0, 0, 0, 0.3)',
-              backdropFilter: 'blur(4px)',
-              WebkitBackdropFilter: 'blur(4px)',
-              zIndex: 50000,
-            }}
-          />
-
-          {/* Drawer panel */}
-          <motion.div
-            className="electrical-drawer"
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            style={{
-              position: 'fixed',
-              top: 0,
-              right: 0,
-              width: '420px',
-              maxWidth: '90vw',
-              height: '100vh',
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(250,250,250,0.98) 100%)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              boxShadow: '-8px 0 40px rgba(0,0,0,0.15)',
-              zIndex: 50001,
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              border: 'none',
+              background: '#f3f4f6',
+              cursor: 'pointer',
               display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#6b7280',
             }}
           >
-            {/* Header */}
-            <div
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+          {/* Label */}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
+              Label
+            </label>
+            <input
+              type="text"
+              value={powerPoint.label || ''}
+              onChange={(e) => onUpdate({ ...powerPoint, label: e.target.value })}
+              placeholder="e.g., Dance floor, DJ booth"
               style={{
-                padding: '24px',
-                borderBottom: '1px solid rgba(0,0,0,0.08)',
-                background: 'linear-gradient(180deg, rgba(245,158,11,0.08) 0%, transparent 100%)',
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid #d1d5db',
+                fontSize: '14px',
+                outline: 'none',
+                boxSizing: 'border-box',
               }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div
-                    style={{
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '12px',
-                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 4px 12px rgba(245,158,11,0.3)',
-                    }}
-                  >
-                    <span style={{ fontSize: '20px' }}>⚡</span>
-                  </div>
-                  <div>
-                    <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#1f2937' }}>
-                      Power Point
-                    </h2>
-                    <p style={{ margin: 0, fontSize: '13px', color: '#6b7280' }}>
-                      Configure electrical settings
-                    </p>
-                  </div>
-                </div>
+            />
+          </div>
+
+          {/* Standard */}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
+              Standard
+            </label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {STANDARDS.map((std) => (
                 <button
-                  onClick={onClose}
+                  key={std.value}
+                  onClick={() => handleStandardChange(std.value)}
                   style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: 'rgba(0,0,0,0.05)',
+                    flex: 1,
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: powerPoint.standard === std.value ? '2px solid #111827' : '1px solid #d1d5db',
+                    background: powerPoint.standard === std.value ? '#111827' : '#ffffff',
+                    color: powerPoint.standard === std.value ? '#ffffff' : '#374151',
+                    fontSize: '13px',
+                    fontWeight: 500,
                     cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '18px',
-                    color: '#6b7280',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(0,0,0,0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(0,0,0,0.05)';
                   }}
                 >
-                  ✕
+                  {std.label}
                 </button>
-              </div>
+              ))}
             </div>
+          </div>
 
-            {/* Content */}
-            <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
-              {/* Label Input */}
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '8px' }}>
-                  Label (optional)
-                </label>
-                <input
-                  type="text"
-                  value={powerPoint.label || ''}
-                  onChange={(e) => handleLabelChange(e.target.value)}
-                  placeholder="e.g., DJ Booth, Stage Left..."
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    border: '1px solid rgba(0,0,0,0.1)',
-                    background: 'white',
-                    fontSize: '14px',
-                    outline: 'none',
-                    transition: 'border-color 0.2s, box-shadow 0.2s',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#f59e0b';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245,158,11,0.15)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(0,0,0,0.1)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                />
-              </div>
-
-              {/* Electrical Breaker Calculator - Toggle, Breaker, Capacity, Progress */}
-              <div style={{ marginBottom: '24px' }}>
-                <ElectricalBreakerCalculator
-                  circuitId={powerPoint.circuitId || null}
-                  initialStandard={powerPoint.standard}
-                  initialBreakerAmps={powerPoint.breaker_amps}
-                  onChange={handleCalculatorChange}
-                />
-              </div>
-
-              {/* AI Electrical Chat - Load validation and addition */}
-              <div style={{ height: '400px', marginBottom: '16px' }}>
-                <ElectricalAIChat
-                  key={refreshKey}
-                  circuitId={powerPoint.circuitId || null}
-                  standard={powerPoint.standard}
-                  breakerAmps={powerPoint.breaker_amps}
-                  voltage={powerPoint.voltage}
-                  maxOutlets={maxOutlets}
-                  currentWatts={currentWatts}
-                  currentOutlets={currentOutlets}
-                  onConfirmed={handleLoadConfirmed}
-                />
-              </div>
-            </div>
-
-            {/* Footer Actions */}
-            <div
+          {/* Breaker */}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
+              Breaker (Amps)
+            </label>
+            <select
+              value={powerPoint.breaker_amps}
+              onChange={(e) => onUpdate({ ...powerPoint, breaker_amps: parseInt(e.target.value) })}
               style={{
-                padding: '16px 24px',
-                borderTop: '1px solid rgba(0,0,0,0.08)',
-                display: 'flex',
-                gap: '12px',
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid #d1d5db',
+                fontSize: '14px',
+                outline: 'none',
+                background: '#ffffff',
+                cursor: 'pointer',
               }}
             >
-              <button
-                onClick={() => onDelete(powerPoint.id)}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  borderRadius: '10px',
-                  border: '1px solid #ef4444',
-                  background: 'white',
-                  color: '#ef4444',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#fef2f2';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'white';
-                }}
-              >
-                Delete Point
-              </button>
-              <button
-                onClick={onClose}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  color: 'white',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(245,158,11,0.3)',
-                }}
-              >
-                Done
-              </button>
+              {BREAKER_OPTIONS[powerPoint.standard].map((amps) => (
+                <option key={amps} value={amps}>
+                  {amps}A
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Capacity Info */}
+          <div
+            style={{
+              padding: '16px',
+              borderRadius: '12px',
+              background: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              marginBottom: '24px',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#6b7280' }}>Capacity</span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827' }}>
+                {capacityWatts}W
+              </span>
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#6b7280' }}>Max outlets</span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827' }}>
+                {maxOutlets}
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '13px', color: '#6b7280' }}>Voltage</span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827' }}>
+                {powerPoint.voltage}V
+              </span>
+            </div>
+          </div>
+
+          {/* AI Assistant Section */}
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              marginBottom: '12px',
+              paddingBottom: '12px',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
+              </svg>
+              <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>AI Electrical Assistant</span>
+            </div>
+            <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 12px' }}>
+              Get help with electrical rules, load calculations, and safety.
+            </p>
+          </div>
+
+          {/* AI Chat */}
+          <div style={{ height: '320px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+            <ElectricalAIChat
+              key={refreshKey}
+              circuitId={powerPoint.circuitId || null}
+              standard={powerPoint.standard}
+              breakerAmps={powerPoint.breaker_amps || 16}
+              voltage={powerPoint.voltage || 230}
+              maxOutlets={maxOutlets}
+              currentWatts={0}
+              currentOutlets={0}
+              onConfirmed={handleLoadConfirmed}
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div
+          style={{
+            padding: '16px 24px',
+            borderTop: '1px solid #e5e7eb',
+            display: 'flex',
+            gap: '12px',
+          }}
+        >
+          <button
+            onClick={() => onDelete(powerPoint.id)}
+            style={{
+              flex: 1,
+              padding: '12px',
+              borderRadius: '8px',
+              border: '1px solid #ef4444',
+              background: '#ffffff',
+              color: '#ef4444',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            Delete
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 2,
+              padding: '12px',
+              borderRadius: '8px',
+              border: 'none',
+              background: '#111827',
+              color: '#ffffff',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </>
   );
 };
 
 export default ElectricalDrawer;
-

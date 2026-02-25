@@ -794,8 +794,9 @@ const ElectricalAIChat: React.FC<ElectricalAIChatProps> = ({
         </motion.button>
       </div>
       
-      {/* No Circuit Warning */}
-      {!circuitId && (
+      {/* No Circuit Warning - Hidden for now since Supabase connection has RLS issues */}
+      {/* {!circuitId && ( */}
+      {false && !circuitId && (
         <div
           style={{
             position: 'absolute',

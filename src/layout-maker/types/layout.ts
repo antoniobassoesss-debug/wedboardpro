@@ -23,6 +23,8 @@ export type MeasurementUnit = 'meters' | 'feet';
  * Represents a wall segment in the venue space.
  * Coordinates are in the same unit system as elements (meters).
  */
+export type WallCurveControl = null | { type: 'bezier'; point: { x: number; y: number } } | { type: 'arc'; direction: 1 | -1 };
+
 export interface Wall {
   id: string;
   startX: number;
@@ -31,6 +33,7 @@ export interface Wall {
   endY: number;
   thickness: number;
   color?: string;
+  curve?: WallCurveControl;
 }
 
 /**

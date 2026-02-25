@@ -20,7 +20,7 @@ export const GridLayer: React.FC<GridLayerProps> = ({
   viewport,
   pixelsPerMeter,
   gridSize = 0.5,
-  showMajorEvery = 5,
+  showMajorEvery = 10, // Every 10 cells = 5m at default 0.5m grid
 }) => {
   const { width, height, zoom } = viewport;
 

@@ -16,6 +16,7 @@ interface ChairElementProps {
   isSelected?: boolean;
   isHovered?: boolean;
   isColliding?: boolean;
+  isViewMode?: boolean;
   onClick?: (event: React.MouseEvent) => void;
   onDoubleClick?: (event: React.MouseEvent) => void;
   onMouseEnter?: () => void;
@@ -29,6 +30,7 @@ export const ChairElementComponent: React.FC<ChairElementProps> = ({
   isSelected = false,
   isHovered = false,
   isColliding = false,
+  isViewMode = false,
   onClick,
   onDoubleClick,
   onMouseEnter,
@@ -37,13 +39,27 @@ export const ChairElementComponent: React.FC<ChairElementProps> = ({
 }) => {
   const centerX = element.x + element.width / 2;
   const centerY = element.y + element.height / 2;
-  const radius = 0.025 * pixelsPerMeter;
+  // Use actual element dimensions (0.45m default = 45cm diameter chair)
+  const radius = (element.width / 2) * pixelsPerMeter;
 
   const strokeColor = isColliding ? '#EF4444' : isSelected ? '#3b82f6' : isHovered ? '#2563eb' : '#1a1a1a';
   const strokeWidth = isSelected ? 2 : 1;
   const opacity = element.locked ? 0.6 : 1;
 
   const isAssigned = element.assignedGuestId != null;
+
+  const dietaryColors: Record<string, string> = {
+    vegetarian: '#22c55e',
+    vegan: '#84cc16',
+    halal: '#8b5cf6',
+    kosher: '#f59e0b',
+    'gluten-free': '#f97316',
+    other: '#6b7280',
+  };
+
+  const chairColor = isAssigned 
+    ? (isViewMode ? '#3b82f6' : '#1a1a1a')
+    : 'transparent';
 
   const renderChair = () => {
     if (isAssigned) {
@@ -53,17 +69,17 @@ export const ChairElementComponent: React.FC<ChairElementProps> = ({
             cx={centerX * pixelsPerMeter}
             cy={centerY * pixelsPerMeter}
             r={radius}
-            fill="transparent"
+            fill={chairColor}
             stroke={strokeColor}
             strokeWidth={strokeWidth}
             className="layout-element element-seat"
           />
           <line
-            x1={(centerX - radius * 0.5) * pixelsPerMeter}
+            x1={centerX * pixelsPerMeter - radius * 0.5}
             y1={centerY * pixelsPerMeter}
-            x2={(centerX + radius * 0.5) * pixelsPerMeter}
+            x2={centerX * pixelsPerMeter + radius * 0.5}
             y2={centerY * pixelsPerMeter}
-            stroke={strokeColor}
+            stroke={isViewMode ? '#ffffff' : strokeColor}
             strokeWidth={strokeWidth * 0.7}
           />
         </g>
@@ -118,8 +134,8 @@ export const ChairElementComponent: React.FC<ChairElementProps> = ({
 
     return (
       <circle
-        cx={(element.x + element.width - 0.015) * pixelsPerMeter}
-        cy={(element.y + 0.015) * pixelsPerMeter}
+        cx={(element.x + element.width) * pixelsPerMeter - indicatorRadius}
+        cy={element.y * pixelsPerMeter + indicatorRadius}
         r={indicatorRadius}
         fill={color}
         stroke="white"

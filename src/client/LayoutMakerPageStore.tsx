@@ -21,6 +21,7 @@ import AssistantChat from './AssistantChat';
 import AssociateProjectModal from './AssociateProjectModal';
 import ElectricalDashboard from './components/ElectricalDashboard';
 import ErrorBoundary from './components/ErrorBoundary';
+import ExportButton from './components/ExportButton';
 import A4Canvas, { type A4Dimensions, getInitialA4Dimensions } from './components/A4Canvas';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator';
 import ZoomControls from './components/ZoomControls';
@@ -38,6 +39,7 @@ import type { CustomElementTemplate } from '../layout-maker/types/elements';
 import type { Wall, Door } from './types/wall';
 import type { PowerPoint } from './types/powerPoint';
 import type { ElementType } from '../layout-maker/types/elements';
+import type { Connection, WorkflowNote } from './components/WorkflowCanvas';
 import { ELEMENT_DEFAULTS, getElementDefault } from '../layout-maker/constants';
 import { generateChairPositions } from '../layout-maker/utils/chairGeneration';
 import { v4 as uuidv4 } from 'uuid';
@@ -183,6 +185,10 @@ const canvasDataToStoreFormat = (canvasData: any) => {
     storeData.supabaseLayoutId = canvasData.supabaseLayoutId;
   }
 
+  if (canvasData.wallScale) {
+    storeData.wallScale = canvasData.wallScale;
+  }
+
   return storeData;
 };
 
@@ -241,12 +247,35 @@ const LayoutMakerPageStore: React.FC = () => {
   const [placementElementWidth, setPlacementElementWidth] = useState(0.45);
   const [placementElementHeight, setPlacementElementHeight] = useState(0.45);
 
+  const [viewMode, setViewMode] = useState<boolean>(() => {
+    const param = searchParams.get('viewMode');
+    return param === 'true';
+  });
+
   const { templates: customTemplates, fetchTemplates, saveTemplate, updateTemplate, deleteTemplate } = useCustomElements();
   const plannerId = 'current-user';
 
   useEffect(() => {
     fetchTemplates(plannerId);
   }, [fetchTemplates, plannerId]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'v' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          setViewMode(prev => !prev);
+        }
+      }
+      if (e.key === 'Escape' && viewMode) {
+        setViewMode(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewMode]);
 
   const handleOpenElementMaker = useCallback(() => {
     setEditingCustomTemplate(null);
@@ -285,9 +314,29 @@ const LayoutMakerPageStore: React.FC = () => {
   const a4Bounds = useCanvasStore((s) => s.a4Bounds);
   const wallScale = useCanvasStore((s) => s.wallScale);
 
+  // Get the effective pixels-per-meter from the current space, falling back to wallScale then 100
+  const getEffectivePPM = useCallback((): number => {
+    const state = useCanvasStore.getState();
+    const allElements = state.elementOrder
+      .map((id) => state.elements[id])
+      .filter(Boolean);
+    for (let i = allElements.length - 1; i >= 0; i--) {
+      const el = allElements[i];
+      if (
+        el &&
+        el.type === 'rectangle' &&
+        typeof el.spaceMetersWidth === 'number' && el.spaceMetersWidth > 0 &&
+        typeof el.pixelsPerMeter === 'number' && el.pixelsPerMeter > 0
+      ) {
+        return el.pixelsPerMeter;
+      }
+    }
+    return state.wallScale?.pxPerMeter || 100;
+  }, []);
+
   // Add custom shape directly to canvas without saving to library
   const handleAddCustomToCanvas = useCallback((templateData: Omit<CustomElementTemplate, 'id' | 'plannerId' | 'createdAt' | 'updatedAt'>) => {
-    const PIXELS_PER_METER = 100;
+    const PIXELS_PER_METER = getEffectivePPM();
 
     // Generate a unique ID for this unsaved custom shape
     const tempTemplateId = uuidv4();
@@ -397,8 +446,24 @@ const LayoutMakerPageStore: React.FC = () => {
     return {};
   });
 
+  const [workflowConnections, setWorkflowConnections] = useState<Connection[]>(() => {
+    try {
+      const stored = localStorage.getItem('workflow-connections');
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return [];
+  });
+
+  const [workflowNotes, setWorkflowNotes] = useState<WorkflowNote[]>(() => {
+    try {
+      const stored = localStorage.getItem('workflow-notes-cards');
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return [];
+  });
+
   const handleSelectCustomTemplate = useCallback((template: CustomElementTemplate) => {
-    const PIXELS_PER_METER = 100;
+    const PIXELS_PER_METER = getEffectivePPM();
     const id = uuidv4();
 
     // Convert dimensions from meters to pixels
@@ -442,7 +507,20 @@ const LayoutMakerPageStore: React.FC = () => {
     zoomOut: () => void;
     resetZoom: () => void;
     fitToCanvas: () => void;
+    getSvgElement: () => SVGSVGElement | null;
   } | null>(null);
+
+  const exportSvgRef = useRef<SVGSVGElement | null>(null);
+
+  // Keep SVG ref in sync for export
+  useEffect(() => {
+    const updateSvgRef = () => {
+      exportSvgRef.current = gridCanvasRef.current?.getSvgElement() ?? null;
+    };
+    updateSvgRef();
+    const id = setInterval(updateSvgRef, 500);
+    return () => clearInterval(id);
+  }, [activeProjectId]);
 
   const [zoomLevel, setZoomLevel] = useState<number>(100);
 
@@ -569,6 +647,16 @@ const LayoutMakerPageStore: React.FC = () => {
   const handleWorkflowPositionsChange = useCallback((positions: Record<string, { x: number; y: number }>) => {
     setWorkflowPositions(positions);
     localStorage.setItem('workflow-positions', JSON.stringify(positions));
+  }, []);
+
+  const handleWorkflowConnectionsChange = useCallback((connections: Connection[]) => {
+    setWorkflowConnections(connections);
+    localStorage.setItem('workflow-connections', JSON.stringify(connections));
+  }, []);
+
+  const handleWorkflowNotesChange = useCallback((notes: WorkflowNote[]) => {
+    setWorkflowNotes(notes);
+    localStorage.setItem('workflow-notes-cards', JSON.stringify(notes));
   }, []);
 
   const handleReorderProjects = useCallback((fromIndex: number, toIndex: number) => {
@@ -792,9 +880,8 @@ const LayoutMakerPageStore: React.FC = () => {
     const { diameter, unit, seats, quantity } = data;
 
     const diameterInMeters = unit === 'cm' ? diameter / 100 : diameter;
-    // Use wall scale if available, otherwise default to 100
-    const PIXELS_PER_METER = wallScale?.pxPerMeter || 100;
-    const tableSizePx = diameterInMeters * PIXELS_PER_METER;
+    const ppmValue = getEffectivePPM();
+    const tableSizePx = diameterInMeters * ppmValue;
     const spacingPx = 60;
 
     const itemsPerRow = Math.min(quantity, 4);
@@ -832,9 +919,8 @@ const LayoutMakerPageStore: React.FC = () => {
       });
 
       const chairIds: string[] = [];
-      const ppm = wallScale?.pxPerMeter || 100;
-      const chairSizePx = 0.45 * ppm;
-      const chairRadius = (tableSizePx / 2) + (0.1 * ppm);
+      const chairSizePx = 0.45 * ppmValue;
+      const chairRadius = (tableSizePx / 2) + (0.1 * ppmValue);
 
       for (let j = 0; j < seats; j++) {
         const angle = (j / seats) * Math.PI * 2 - Math.PI / 2;
@@ -883,10 +969,9 @@ const LayoutMakerPageStore: React.FC = () => {
 
     const widthInMeters = unit === 'cm' ? width / 100 : width;
     const heightInMeters = unit === 'cm' ? height / 100 : height;
-    // Use wall scale if available, otherwise default to 100
-    const PIXELS_PER_METER = wallScale?.pxPerMeter || 100;
-    const tableWidthPx = widthInMeters * PIXELS_PER_METER;
-    const tableHeightPx = heightInMeters * PIXELS_PER_METER;
+    const ppmValue = getEffectivePPM();
+    const tableWidthPx = widthInMeters * ppmValue;
+    const tableHeightPx = heightInMeters * ppmValue;
     const spacingPx = 60;
 
     const itemsPerRow = Math.min(quantity, 4);
@@ -925,9 +1010,8 @@ const LayoutMakerPageStore: React.FC = () => {
       });
 
       const chairIds: string[] = [];
-      const ppm = wallScale?.pxPerMeter || 100;
-      const chairSizePx = 0.45 * ppm;
-      const chairOffset = 0.12 * ppm;
+      const chairSizePx = 0.45 * ppmValue;
+      const chairOffset = 0.12 * ppmValue;
 
       const seatsPerSide = Math.floor(seats / 2);
       const extraOnTop = seats % 2;
@@ -990,9 +1074,8 @@ const LayoutMakerPageStore: React.FC = () => {
     const { size, unit, seats, quantity } = data;
 
     const sizeInMeters = unit === 'cm' ? size / 100 : size;
-    // Use wall scale if available, otherwise default to 100
-    const PIXELS_PER_METER = wallScale?.pxPerMeter || 100;
-    const tableSizePx = sizeInMeters * PIXELS_PER_METER;
+    const ppmValue = getEffectivePPM();
+    const tableSizePx = sizeInMeters * ppmValue;
     const spacingPx = 60;
 
     const itemsPerRow = Math.min(quantity, 4);
@@ -1030,9 +1113,8 @@ const LayoutMakerPageStore: React.FC = () => {
       });
 
       const chairIds: string[] = [];
-      const ppm = wallScale?.pxPerMeter || 100;
-      const chairSizePx = 0.45 * ppm;
-      const chairOffset = 0.12 * ppm;
+      const chairSizePx = 0.45 * ppmValue;
+      const chairOffset = 0.12 * ppmValue;
 
       // Distribute seats across 4 sides (top, bottom, right, left)
       const baseSeatsPerSide = Math.floor(seats / 4);
@@ -1118,9 +1200,9 @@ const LayoutMakerPageStore: React.FC = () => {
 
     const widthInMeters = unit === 'cm' ? width / 100 : width;
     const heightInMeters = unit === 'cm' ? height / 100 : height;
-    const PIXELS_PER_METER = 100;
-    const tableWidthPx = widthInMeters * PIXELS_PER_METER;
-    const tableHeightPx = heightInMeters * PIXELS_PER_METER;
+    const ppmValue = getEffectivePPM();
+    const tableWidthPx = widthInMeters * ppmValue;
+    const tableHeightPx = heightInMeters * ppmValue;
     const spacingPx = 60;
 
     const itemsPerRow = Math.min(quantity, 4);
@@ -1158,8 +1240,8 @@ const LayoutMakerPageStore: React.FC = () => {
       });
 
       const chairIds: string[] = [];
-      const chairSizePx = 0.45 * PIXELS_PER_METER;
-      const chairOffset = 12;
+      const chairSizePx = 0.45 * ppmValue;
+      const chairOffset = 0.12 * ppmValue;
 
       for (let j = 0; j < seats; j++) {
         const angle = (j / seats) * Math.PI * 2 - Math.PI / 2;
@@ -1410,12 +1492,13 @@ const LayoutMakerPageStore: React.FC = () => {
         <ErrorBoundary>
           <GridCanvasStore
             ref={gridCanvasRef}
-            activeTool={activeTool}
+            activeTool={viewMode ? 'hand' : activeTool}
             onToolChange={setActiveTool}
             projectId={activeProjectId}
             a4Dimensions={activeProject.a4Dimensions || getInitialA4Dimensions()}
             brushSize={brushSize}
             brushColor={brushColor}
+            isViewMode={viewMode}
             {...(activeProject.eventId ? { eventId: activeProject.eventId } : eventIdFromUrl ? { eventId: eventIdFromUrl } : {})}
           />
         </ErrorBoundary>
@@ -1431,15 +1514,17 @@ const LayoutMakerPageStore: React.FC = () => {
         zIndex: 10000,
         isolation: 'isolate',
       }}>
-        <HeaderBar
-          onSaveCurrentLayout={forceSave}
-          onSaveAllLayouts={forceSave}
-          isSaving={syncStatus === 'syncing'}
-          projectCount={projects.length}
-          {...(eventInfo !== null ? { eventInfo } : {})}
-        />
+        {!viewMode && (
+          <HeaderBar
+            onSaveCurrentLayout={forceSave}
+            onSaveAllLayouts={forceSave}
+            isSaving={syncStatus === 'syncing'}
+            projectCount={projects.length}
+            {...(eventInfo !== null ? { eventInfo } : {})}
+          />
+        )}
 
-        {!isWorkflowOpen && (
+        {!viewMode && !isWorkflowOpen && (
           <>
             <Toolbar
               activeTool={activeTool}
@@ -1643,6 +1728,76 @@ const LayoutMakerPageStore: React.FC = () => {
         />
       </div>
 
+      {/* Export Button */}
+      {!viewMode && !isWorkflowOpen && (
+        <div style={{ position: 'fixed', top: 20, right: 178, zIndex: 20051 }}>
+          <ExportButton
+            svgRef={exportSvgRef}
+            a4Bounds={a4Bounds ? { x: a4Bounds.x, y: a4Bounds.y, width: a4Bounds.width, height: a4Bounds.height } : null}
+            layoutName={activeProject.name}
+          />
+        </div>
+      )}
+
+      {/* View Mode Toggle Button - Outside the pointerEvents:none container */}
+      {!viewMode && (
+        <button
+          type="button"
+          onClick={() => setViewMode(true)}
+          style={{
+            position: 'fixed',
+            top: 20,
+            right: 128,
+            zIndex: 20051,
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            border: '1px solid #e0e0e0',
+            background: 'white',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          }}
+          title="View Mode (Press V)"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
+      )}
+
+      {viewMode && (
+        <button
+          type="button"
+          onClick={() => setViewMode(false)}
+          style={{
+            position: 'fixed',
+            top: 20,
+            right: 20,
+            zIndex: 20051,
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            background: 'white',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            border: '1px solid #e0e0e0',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          title="Exit View Mode (Press Esc)"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      )}
+
       <AssistantChat />
 
       {/* Zoom Controls - only show when not in workflow mode */}
@@ -1753,6 +1908,11 @@ const LayoutMakerPageStore: React.FC = () => {
           activeProjectId={activeProjectId}
           positions={workflowPositions}
           onPositionsChange={handleWorkflowPositionsChange}
+          connections={workflowConnections}
+          onConnectionsChange={handleWorkflowConnectionsChange}
+          notes={workflowNotes}
+          onNotesChange={handleWorkflowNotesChange}
+          eventId={eventIdFromUrl || ''}
         />
       )}
     </div>

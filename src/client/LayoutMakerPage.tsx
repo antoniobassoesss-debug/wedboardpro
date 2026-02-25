@@ -757,6 +757,7 @@ const LayoutMakerPage: React.FC = () => {
           activeProjectId={activeProjectId}
           positions={workflowPositions}
           onPositionsChange={handleWorkflowPositionsChange}
+          eventId={eventIdFromUrl || ''}
         />
       )}
     </div>

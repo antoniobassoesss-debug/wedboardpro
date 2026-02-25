@@ -113,12 +113,29 @@ export const useLayoutStore = create<LayoutState>()(
             state.layout = null;
             return;
           }
+          // Migration: ensure space dimensions and pixelsPerMeter exist
+          if (layout.space) {
+            if (!layout.space.dimensions || !layout.space.dimensions.width || !layout.space.dimensions.height) {
+              layout.space.dimensions = { width: 20, height: 20 };
+            }
+            if (!layout.space.pixelsPerMeter) {
+              layout.space.pixelsPerMeter = 100;
+            }
+          } else {
+            layout.space = {
+              walls: [],
+              dimensions: { width: 20, height: 20 },
+              pixelsPerMeter: 100,
+            };
+          }
           state.layout = layout;
           state.error = null;
         }),
 
       createLayout: (projectId, eventId, createdBy, space) => {
         const now = new Date().toISOString();
+        const width = Math.max(5, Math.min(200, space?.dimensions?.width ?? 20));
+        const height = Math.max(5, Math.min(200, space?.dimensions?.height ?? 20));
         const layout: Layout = {
           id: uuidv4(),
           projectId,
@@ -127,10 +144,9 @@ export const useLayoutStore = create<LayoutState>()(
           description: '',
           status: 'draft',
           space: {
-            walls: [],
-            dimensions: { width: 20, height: 20 },
+            walls: space?.walls ?? [],
+            dimensions: { width, height },
             pixelsPerMeter: 100,
-            ...space,
           },
           floorPlan: null,
           elements: {},

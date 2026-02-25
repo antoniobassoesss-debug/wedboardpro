@@ -28,7 +28,7 @@ export function snapToGrid(
   );
   
   // Only snap if within 10 pixels of grid point
-  const snapThreshold = 10;
+  const snapThreshold = gridSize * 0.45;
   
   const snapped = distance < snapThreshold;
   return {
@@ -55,7 +55,7 @@ export function calculateAngle(x1: number, y1: number, x2: number, y2: number): 
 export function snapAngle(
   angle: number,
   snapAngles: number[],
-  threshold: number = 5 // degrees
+  threshold: number = 10 // degrees
 ): { angle: number; snapped: boolean; snapAngle?: number } {
   if (snapAngles.length === 0) {
     return { angle, snapped: false };
@@ -92,7 +92,7 @@ export function snapLineToAngle(
   endX: number,
   endY: number,
   snapAngles: number[],
-  threshold: number = 5
+  threshold: number = 10
 ): { x: number; y: number; snapped: boolean; angle?: number } {
   const currentAngle = calculateAngle(startX, startY, endX, endY);
   const snapResult = snapAngle(currentAngle, snapAngles, threshold);

@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CanvasArea } from './Canvas/CanvasArea';
 import { ElementLibrary } from './Sidebar/ElementLibrary';
 import { PropertiesPanel } from './Sidebar/PropertiesPanel';
@@ -51,7 +52,34 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
   const selectionStore = useSelectionStore();
   const uiStore = useUIStore();
 
+  const [searchParams] = useSearchParams();
+
   const { isDesktop, isTablet, isMobile } = useResponsive();
+
+  useEffect(() => {
+    const viewModeParam = searchParams.get('viewMode');
+    if (viewModeParam === 'true') {
+      uiStore.setViewMode(true);
+    }
+  }, [searchParams, uiStore]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'v' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          uiStore.toggleViewMode();
+        }
+      }
+      if (e.key === 'Escape' && uiStore.isViewMode) {
+        uiStore.setViewMode(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [uiStore]);
 
   const [elementsSheetOpen, setElementsSheetOpen] = useState(false);
   const [propertiesSheetOpen, setPropertiesSheetOpen] = useState(false);
@@ -365,26 +393,57 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-gray-100">
-      <header className="flex-shrink-0 bg-white border-b px-4 py-2 flex items-center justify-between z-10">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-gray-900">Layout Maker</h1>
-          <span className="px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">
-            {isDesktop ? 'Desktop' : isTablet ? 'Tablet' : 'Mobile'}
-          </span>
-        </div>
+      {!uiStore.isViewMode && (
+        <header className="flex-shrink-0 bg-white border-b px-4 py-2 flex items-center justify-between z-10">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-semibold text-gray-900">Layout Maker</h1>
+            <span className="px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">
+              {isDesktop ? 'Desktop' : isTablet ? 'Tablet' : 'Mobile'}
+            </span>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setElementsSheetOpen(true)}
-            className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
-          >
-            Add Element
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => uiStore.toggleViewMode()}
+              className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+              title="Press V to toggle"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              View Mode
+            </button>
+            <button
+              onClick={() => setElementsSheetOpen(true)}
+              className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Add Element
+            </button>
+          </div>
+        </header>
+      )}
+
+      {uiStore.isViewMode && (
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+          <div className="px-4 py-2 bg-white rounded-lg shadow-lg border border-gray-200 flex items-center gap-3">
+            <span className="text-sm font-medium text-gray-700">View Mode</span>
+            <button
+              onClick={() => uiStore.setViewMode(false)}
+              className="p-1 hover:bg-gray-100 rounded transition-colors"
+              title="Press Esc to exit"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
         </div>
-      </header>
+      )}
 
       <div className="flex-1 flex overflow-hidden">
-        {isDesktop && (
+        {isDesktop && !uiStore.isViewMode && (
           <aside className="w-64 bg-white border-r flex flex-col overflow-hidden">
             <div className="p-3 border-b bg-gray-50">
               <h2 className="font-semibold text-sm">Elements</h2>
@@ -402,13 +461,13 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
           </aside>
         )}
 
-        <main className="flex-1 relative overflow-hidden">
+        <main className={`flex-1 relative overflow-hidden ${uiStore.isViewMode ? 'bg-white' : ''}`}>
           <CanvasArea
             onCanvasClick={handleCanvasClick}
             onElementClick={handleElementClick}
           />
 
-          {!isDesktop && (
+          {!isDesktop && !uiStore.isViewMode && (
             <FloatingActionButton
               onClick={() => setElementsSheetOpen(true)}
               onAddElement={handleAddElement}
@@ -416,7 +475,7 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
           )}
         </main>
 
-        {isDesktop ? (
+        {isDesktop && !uiStore.isViewMode ? (
           <aside className="w-72 bg-white border-l flex flex-col overflow-hidden">
             <div className="p-3 border-b bg-gray-50">
               <h2 className="font-semibold text-sm">Properties</h2>
@@ -430,7 +489,7 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
               onClose={() => selectionStore.clearSelection()}
             />
           </aside>
-        ) : selectedElement && (
+        ) : !uiStore.isViewMode && selectedElement && (
           <BottomSheet
             isOpen={propertiesSheetOpen}
             onClose={() => setPropertiesSheetOpen(false)}
@@ -457,7 +516,7 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
         />
       )}
 
-      {isMobile && selectedElement && (
+      {isMobile && selectedElement && !uiStore.isViewMode && (
         <button
           onClick={() => setPropertiesSheetOpen(true)}
           className="fixed bottom-6 left-6 px-4 py-2 bg-white rounded-full shadow-lg text-sm font-medium text-gray-700 z-30"

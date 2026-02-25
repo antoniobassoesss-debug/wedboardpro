@@ -31,6 +31,8 @@ interface UIStore {
   showBackground: boolean;
   snapEnabled: boolean;
 
+  isViewMode: boolean;
+
   dragState: DragState;
 
   setSidebarOpen: (open: boolean) => void;
@@ -51,6 +53,9 @@ interface UIStore {
   setShowBackground: (show: boolean) => void;
   setSnapEnabled: (enabled: boolean) => void;
 
+  setViewMode: (enabled: boolean) => void;
+  toggleViewMode: () => void;
+
   startDrag: (elementType: ElementType) => void;
   updateDragPosition: (position: { x: number; y: number }) => void;
   endDrag: () => void;
@@ -69,6 +74,8 @@ export const useUIStore = create<UIStore>()(
       showRulers: true,
       showBackground: true,
       snapEnabled: true,
+
+      isViewMode: false,
 
       dragState: {
         isDragging: false,
@@ -144,6 +151,16 @@ export const useUIStore = create<UIStore>()(
       setSnapEnabled: (enabled) =>
         set((state) => {
           state.snapEnabled = enabled;
+        }),
+
+      setViewMode: (enabled) =>
+        set((state) => {
+          state.isViewMode = enabled;
+        }),
+
+      toggleViewMode: () =>
+        set((state) => {
+          state.isViewMode = !state.isViewMode;
         }),
 
       startDrag: (elementType) =>

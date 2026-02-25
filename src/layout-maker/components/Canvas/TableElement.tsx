@@ -17,6 +17,7 @@ interface TableElementProps {
   isSelected?: boolean;
   isHovered?: boolean;
   isColliding?: boolean;
+  isViewMode?: boolean;
   onClick?: (event: React.MouseEvent) => void;
   onDoubleClick?: (event: React.MouseEvent) => void;
   onMouseEnter?: () => void;
@@ -30,6 +31,7 @@ export const TableElement: React.FC<TableElementProps> = ({
   isSelected = false,
   isHovered = false,
   isColliding = false,
+  isViewMode = false,
   onClick,
   onDoubleClick,
   onMouseEnter,
@@ -140,6 +142,22 @@ export const TableElement: React.FC<TableElementProps> = ({
 
   const renderCapacityLabel = () => {
     if (element.seats.length > 0 || element.capacity === 0) return null;
+
+    if (isViewMode && element.seats.length > 0) {
+      return (
+        <text
+          x={centerX * pixelsPerMeter}
+          y={(centerY + element.dimensions.height / 2 + 0.15) * pixelsPerMeter}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill="#666666"
+          fontSize={10}
+          style={{ pointerEvents: 'none', userSelect: 'none' }}
+        >
+          {element.seats.length}/{element.capacity} guests
+        </text>
+      );
+    }
 
     return (
       <text

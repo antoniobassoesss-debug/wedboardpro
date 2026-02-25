@@ -6,6 +6,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import type { Wall, Door } from './types/wall';
 import type { PowerPoint } from './types/powerPoint';
 import { createPowerPoint } from './types/powerPoint';
@@ -22,6 +23,8 @@ import { clampPositionToA4 } from '../layout-maker/store/boundaries';
 import { useShallow } from 'zustand/shallow';
 import GuestSearchDropdown from '../layout-maker/components/GuestAssignment/GuestSearchDropdown';
 import { useGuestAssignment } from '../layout-maker/hooks/useGuestAssignment';
+import { browserSupabaseClient } from './browserSupabaseClient';
+import type { ElectricalStandard } from './types/electrical';
 
 const WALLMAKER_PIXELS_PER_METER = 100;
 
@@ -30,6 +33,101 @@ const MIN_ZOOM = 10; // 10%
 const MAX_ZOOM = 400; // 400%
 const ZOOM_STEP = 1.2; // 20% per step
 const DEFAULT_ZOOM = 100; // 100%
+
+// Helper to create a circuit in Supabase for a power point
+const createCircuitForPowerPoint = async (powerPointId: string, eventId?: string) => {
+  console.log('[PowerPoint] createCircuitForPowerPoint called', { powerPointId, eventId });
+  
+  if (!browserSupabaseClient) {
+    console.log('[PowerPoint] No Supabase client, running in demo mode');
+    return null;
+  }
+
+  try {
+    // Ensure session is set before making requests
+    const storedSession = localStorage.getItem('wedboarpro_session');
+    if (storedSession) {
+      const session = JSON.parse(storedSession);
+      if (session?.access_token && session?.refresh_token) {
+        await browserSupabaseClient.auth.setSession({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        });
+        console.log('[PowerPoint] Session set successfully');
+      }
+    }
+
+    // First, try to get or create an electrical project for this event
+    let projectId: string | null = null;
+
+    if (eventId) {
+      console.log('[PowerPoint] Checking for existing electrical project for event:', eventId);
+      // Check if electrical project exists for this event
+      const { data: existingProject } = await browserSupabaseClient
+        .from('electrical_projects')
+        .select('id')
+        .eq('event_id', eventId)
+        .maybeSingle();
+
+      if (existingProject) {
+        projectId = existingProject.id;
+        console.log('[PowerPoint] Found existing project:', projectId);
+      } else {
+        console.log('[PowerPoint] Creating new electrical project for event');
+        // Create a new electrical project for this event
+        const { data: newProject, error: projectError } = await browserSupabaseClient
+          .from('electrical_projects')
+          .insert({
+            name: `Event ${eventId.slice(0, 8)} Electrical`,
+            event_id: eventId,
+            standard: 'EU_PT',
+          })
+          .select('id')
+          .single();
+
+        if (projectError) {
+          console.error('[PowerPoint] Failed to create electrical project:', projectError);
+        } else {
+          projectId = newProject?.id || null;
+          console.log('[PowerPoint] Created new project:', projectId);
+        }
+      }
+    } else {
+      console.log('[PowerPoint] No eventId provided');
+    }
+
+    if (!projectId) {
+      console.log('[PowerPoint] No projectId, cannot create circuit');
+      return null;
+    }
+
+    console.log('[PowerPoint] Creating circuit for project:', projectId);
+    // Create a circuit for this power point
+    const { data: circuit, error: circuitError } = await browserSupabaseClient
+      .from('electrical_circuits')
+      .insert({
+        project_id: projectId,
+        name: `Power Point ${powerPointId.slice(0, 8)}`,
+        standard: 'EU_PT',
+        breaker_amps: 16,
+        voltage: 230,
+        status: 'ok',
+      })
+      .select('id')
+      .single();
+
+    if (circuitError) {
+      console.error('[PowerPoint] Failed to create circuit:', circuitError);
+      return null;
+    }
+
+    console.log('[PowerPoint] Created circuit:', circuit?.id);
+    return circuit?.id || null;
+  } catch (error) {
+    console.error('[PowerPoint] Error creating circuit:', error);
+    return null;
+  }
+};
 
 interface A4Dimensions {
   a4X: number;
@@ -97,6 +195,7 @@ interface GridCanvasProps {
   brushSize?: number;
   brushColor?: string;
   eventId?: string;
+  isViewMode?: boolean;
 }
 
 const GridCanvasStore = forwardRef<{
@@ -110,6 +209,7 @@ const GridCanvasStore = forwardRef<{
   zoomOut: () => void;
   resetZoom: () => void;
   fitToCanvas: () => void;
+  getSvgElement: () => SVGSVGElement | null;
 }, GridCanvasProps>(({
   activeTool,
   onToolChange,
@@ -118,6 +218,7 @@ const GridCanvasStore = forwardRef<{
   brushSize = 2,
   brushColor = '#000000',
   eventId,
+  isViewMode = false,
 }, ref) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -205,6 +306,11 @@ const GridCanvasStore = forwardRef<{
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0 });
   const currentSpaceRef = useRef<SpaceShape | null>(null);
+  
+  // Refs for power point dragging
+  const isDraggingPowerPointRef = useRef(false);
+  const draggedPowerPointIdRef = useRef<string | null>(null);
+  const powerPointDragOffsetRef = useRef<{ x: number; y: number } | null>(null);
   const wallScaleRef = useRef<{ pxPerMeter: number; bounds: WallBounds | null } | null>(null);
   const moveOffsetRef = useRef<{ x: number; y: number } | null>(null);
   const movingPositionRef = useRef<{ x: number; y: number } | null>(null);
@@ -399,54 +505,73 @@ const GridCanvasStore = forwardRef<{
     });
   }, [propA4Dimensions]);
 
-  // Mouse handlers
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    // Detect pinch-to-zoom (trackpad) or Ctrl+scroll
-    const isPinchZoom = e.ctrlKey || e.metaKey || Math.abs(e.deltaY) < 50;
+  // Mouse handlers — trackpad pinch-to-zoom + two-finger pan
+  // Uses native non-passive listener so preventDefault() works (prevents browser back/forward)
+  const viewBoxRef = useRef(viewBoxState);
+  viewBoxRef.current = viewBoxState;
 
-    if (isPinchZoom && e.deltaY !== 0) {
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
+
       const svg = svgRef.current;
       if (!svg) return;
-      const rect = svg.getBoundingClientRect();
 
-      // Get mouse position relative to SVG viewBox
-      const mouseX = (e.clientX - rect.left) * (viewBoxState.width / rect.width) + viewBoxState.x;
-      const mouseY = (e.clientY - rect.top) * (viewBoxState.height / rect.height) + viewBoxState.y;
+      // Only ctrlKey/metaKey = pinch-to-zoom (browser sets ctrlKey for trackpad pinch)
+      if ((e.ctrlKey || e.metaKey) && e.deltaY !== 0) {
+        const rect = svg.getBoundingClientRect();
+        const vb = viewBoxRef.current;
 
-      // Smooth zoom factor based on delta
-      const zoomIntensity = e.ctrlKey || e.metaKey ? 0.002 : 0.01;
-      const scaleFactor = 1 - e.deltaY * zoomIntensity;
+        const mouseX = (e.clientX - rect.left) * (vb.width / rect.width) + vb.x;
+        const mouseY = (e.clientY - rect.top) * (vb.height / rect.height) + vb.y;
 
-      setViewBoxState(prev => {
-        const newWidth = prev.width / scaleFactor;
-        const newHeight = prev.height / scaleFactor;
+        // Pinch open (fingers apart) → deltaY negative → zoom in (shrink viewBox)
+        // Pinch close (fingers together) → deltaY positive → zoom out (grow viewBox)
+        const zoomIntensity = 0.005;
+        const scaleFactor = 1 + e.deltaY * zoomIntensity;
 
-        // Check zoom limits
-        const currentZoom = initialViewBoxWidthRef.current / prev.width * 100;
-        const newZoom = currentZoom * scaleFactor;
-        if (newZoom < MIN_ZOOM || newZoom > MAX_ZOOM) {
-          return prev;
-        }
+        setViewBoxState(prev => {
+          const newWidth = prev.width * scaleFactor;
+          const newHeight = prev.height * scaleFactor;
 
-        // Zoom centered on mouse position
-        const newX = mouseX - (mouseX - prev.x) / scaleFactor;
-        const newY = mouseY - (mouseY - prev.y) / scaleFactor;
+          const currentZoom = initialViewBoxWidthRef.current / prev.width * 100;
+          const newZoom = initialViewBoxWidthRef.current / newWidth * 100;
+          if (newZoom < MIN_ZOOM || newZoom > MAX_ZOOM) {
+            return prev;
+          }
 
-        return { x: newX, y: newY, width: newWidth, height: newHeight };
-      });
-    } else {
-      // Pan with scroll
-      const panSpeed = 1;
-      setViewBoxState(prev => ({
-        ...prev,
-        x: prev.x + e.deltaX * panSpeed,
-        y: prev.y + e.deltaY * panSpeed,
-      }));
-    }
-  }, [viewBoxState]);
+          // Zoom centered on cursor position
+          const newX = mouseX - (mouseX - prev.x) * scaleFactor;
+          const newY = mouseY - (mouseY - prev.y) * scaleFactor;
+
+          return { x: newX, y: newY, width: newWidth, height: newHeight };
+        });
+      } else {
+        // Two-finger drag → pan (deltaX/deltaY map directly to viewBox movement)
+        setViewBoxState(prev => ({
+          ...prev,
+          x: prev.x + e.deltaX,
+          y: prev.y + e.deltaY,
+        }));
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (isViewMode) {
+      if (activeTool === 'hand' || e.button === 1) {
+        isPanningRef.current = true;
+        panStartRef.current = { x: e.clientX, y: e.clientY };
+      }
+      return;
+    }
+
     const svg = svgRef.current;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
@@ -494,9 +619,20 @@ const GridCanvasStore = forwardRef<{
     if (activeTool === 'power-point') {
       if (!isPointOnCanvas(x, y)) return;
       const newPoint = createPowerPoint(x, y, 'EU_PT');
-      addPowerPoint(newPoint);
-      setSelectedPowerPointId(newPoint.id);
-      setIsElectricalDrawerOpen(true);
+      const storedId = addPowerPoint(newPoint);
+      setSelectedPowerPointId(storedId);
+      
+      // Create a circuit in Supabase for this power point and link it
+      createCircuitForPowerPoint(storedId, eventId).then((circuitId) => {
+        if (circuitId) {
+          updatePowerPoint(storedId, { circuitId } as any);
+        }
+      });
+      
+      // Delay drawer opening to prevent canvas from disappearing
+      setTimeout(() => {
+        setIsElectricalDrawerOpen(true);
+      }, 100);
       return;
     }
 
@@ -508,6 +644,27 @@ const GridCanvasStore = forwardRef<{
       return;
     }
 
+    if (isViewMode) {
+      return;
+    }
+
+    // Check if clicking on a power point first (for any tool)
+    const clickedPowerPoint = powerPoints.find(pp => {
+      const ppX = pp.x * (viewBoxState.width / 800);
+      const ppY = pp.y * (viewBoxState.height / 1132);
+      const distance = Math.sqrt(Math.pow(x - ppX, 2) + Math.pow(y - ppY, 2));
+      return distance < 15; // 15px hit area
+    });
+
+    if (clickedPowerPoint && activeTool === 'select') {
+      setSelectedPowerPointId(clickedPowerPoint.id);
+      // Start dragging power point
+      isDraggingPowerPointRef.current = true;
+      draggedPowerPointIdRef.current = clickedPowerPoint.id;
+      powerPointDragOffsetRef.current = { x: x - clickedPowerPoint.x, y: y - clickedPowerPoint.y };
+      return;
+    }
+
     if (activeTool === 'select') {
       const clickedShape = [...elements].reverse().find(shape => {
         return x >= shape.x && x <= shape.x + shape.width && y >= shape.y && y <= shape.y + shape.height;
@@ -516,9 +673,13 @@ const GridCanvasStore = forwardRef<{
         setSelectedShapeId(clickedShape.id);
       } else {
         setSelectedShapeId(null);
+        // If clicking on empty canvas, deselect power point too
+        if (!clickedPowerPoint) {
+          setSelectedPowerPointId(null);
+        }
       }
     }
-  }, [activeTool, brushColor, brushSize, viewBoxState, elements, drawings, isPointOnCanvas, addDrawing, setDrawings, addPowerPoint, addText]);
+  }, [activeTool, brushColor, brushSize, viewBoxState, elements, drawings, isPointOnCanvas, addDrawing, setDrawings, addPowerPoint, addText, isViewMode, powerPoints]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanningRef.current) {
@@ -536,6 +697,22 @@ const GridCanvasStore = forwardRef<{
         };
       });
       panStartRef.current = { x: e.clientX, y: e.clientY };
+      return;
+    }
+
+    // Handle power point dragging
+    if (isDraggingPowerPointRef.current && draggedPowerPointIdRef.current && powerPointDragOffsetRef.current) {
+      const svg = svgRef.current;
+      if (!svg) return;
+      
+      const rect = svg.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left) * (viewBoxState.width / rect.width) + viewBoxState.x;
+      const mouseY = (e.clientY - rect.top) * (viewBoxState.height / rect.height) + viewBoxState.y;
+      
+      const newX = mouseX - powerPointDragOffsetRef.current.x;
+      const newY = mouseY - powerPointDragOffsetRef.current.y;
+      
+      updatePowerPoint(draggedPowerPointIdRef.current, { x: newX, y: newY });
       return;
     }
 
@@ -587,6 +764,14 @@ const GridCanvasStore = forwardRef<{
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     if (isPanningRef.current) {
       isPanningRef.current = false;
+      return;
+    }
+
+    // End power point dragging
+    if (isDraggingPowerPointRef.current) {
+      isDraggingPowerPointRef.current = false;
+      draggedPowerPointIdRef.current = null;
+      powerPointDragOffsetRef.current = null;
       return;
     }
 
@@ -942,20 +1127,32 @@ const GridCanvasStore = forwardRef<{
       const translatedStartY = wall.startY - layoutCenterY;
       const translatedEndX = wall.endX - layoutCenterX;
       const translatedEndY = wall.endY - layoutCenterY;
-      // Calculate original length if not set
       const origLength = wall.length || Math.sqrt(
         Math.pow(wall.endX - wall.startX, 2) + Math.pow(wall.endY - wall.startY, 2)
       );
-      return {
+      const scaled: Wall = {
         ...wall,
         startX: translatedStartX * uniformScale + canvasCenterX,
         startY: translatedStartY * uniformScale + canvasCenterY,
         endX: translatedEndX * uniformScale + canvasCenterX,
         endY: translatedEndY * uniformScale + canvasCenterY,
         thickness: wall.thickness * uniformScale,
-        originalLengthPx: origLength, // Store original length for derivation
-        pxPerMeter: computedPpm, // Store computed scale on each wall
+        originalLengthPx: origLength,
+        pxPerMeter: computedPpm,
       };
+      // Transform bezier control point to match the new coordinate space
+      if (wall.curve && wall.curve.type === 'bezier') {
+        const translatedCpX = wall.curve.point.x - layoutCenterX;
+        const translatedCpY = wall.curve.point.y - layoutCenterY;
+        scaled.curve = {
+          type: 'bezier',
+          point: {
+            x: translatedCpX * uniformScale + canvasCenterX,
+            y: translatedCpY * uniformScale + canvasCenterY,
+          },
+        };
+      }
+      return scaled;
     });
 
     const scaledBounds = getWallsBoundingBox(scaledWalls);
@@ -994,20 +1191,10 @@ const GridCanvasStore = forwardRef<{
     zoomOut,
     resetZoom,
     fitToCanvas,
+    getSvgElement: () => svgRef.current,
   }), [addSpace, addTable, addWalls, zoomToPoints, getPowerPoints, getZoomLevel, zoomIn, zoomOut, resetZoom, fitToCanvas]);
 
-  // Prevent default wheel zoom
-  useEffect(() => {
-    const handleGlobalWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-      }
-    };
-    window.addEventListener('wheel', handleGlobalWheel, { passive: false, capture: true });
-    return () => window.removeEventListener('wheel', handleGlobalWheel, { capture: true });
-  }, []);
+  // Note: global ctrl+wheel prevention is handled by the container's native wheel listener above
 
   // Guest assignment handlers
   const handleCloseGuestDropdown = useCallback(() => {
@@ -1077,7 +1264,7 @@ const GridCanvasStore = forwardRef<{
   }, [guestDropdownChairId, elements, updateElement, handleCloseGuestDropdown]);
 
   return (
-    <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', overflow: 'hidden', background: 'transparent', zIndex: 5 }}>
+    <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', overflow: 'hidden', background: 'transparent', zIndex: 5, overscrollBehavior: 'none' }}>
       <svg
         ref={svgRef}
         viewBox={getViewBoxString()}
@@ -1085,7 +1272,6 @@ const GridCanvasStore = forwardRef<{
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
-        onWheel={handleWheel}
         style={{ width: '100%', height: '100%', touchAction: 'none', cursor: activeTool === 'hand' ? 'grab' : (activeTool === 'select' ? 'default' : (activeTool === 'brush' || activeTool === 'pen' ? 'crosshair' : 'crosshair')) }}
       >
         <defs>
@@ -1115,6 +1301,23 @@ const GridCanvasStore = forwardRef<{
 
         <g clipPath="url(#a4-clip)">
           {walls.map((wall) => {
+            if (wall.curve) {
+              let pathD: string;
+              if (wall.curve.type === 'bezier') {
+                pathD = `M ${wall.startX} ${wall.startY} Q ${wall.curve.point.x} ${wall.curve.point.y} ${wall.endX} ${wall.endY}`;
+              } else {
+                const dx = wall.endX - wall.startX;
+                const dy = wall.endY - wall.startY;
+                const radius = Math.sqrt(dx * dx + dy * dy) / 2;
+                const sweepFlag = wall.curve.direction === 1 ? 0 : 1;
+                pathD = `M ${wall.startX} ${wall.startY} A ${radius} ${radius} 0 0 ${sweepFlag} ${wall.endX} ${wall.endY}`;
+              }
+              return (
+                <g key={wall.id}>
+                  <path d={pathD} fill="none" stroke="#2c3e50" strokeWidth={wall.thickness} strokeLinecap="round" />
+                </g>
+              );
+            }
             const dx = wall.endX - wall.startX;
             const dy = wall.endY - wall.startY;
             const length = Math.sqrt(dx * dx + dy * dy);
@@ -1274,22 +1477,25 @@ const GridCanvasStore = forwardRef<{
           ))}
         </g>
       </svg>
-      <ElectricalDrawer
-        isOpen={isElectricalDrawerOpen}
-        onClose={() => {
-          setIsElectricalDrawerOpen(false);
-          setTimeout(() => setSelectedPowerPointId(null), 300);
-        }}
-        powerPoint={selectedPowerPoint}
-        onUpdate={(updated: PowerPoint) => {
-          updatePowerPoint(updated.id, updated);
-        }}
-        onDelete={(id: string) => {
-          deletePowerPoint(id);
-          setIsElectricalDrawerOpen(false);
-          setTimeout(() => setSelectedPowerPointId(null), 300);
-        }}
-      />
+      {createPortal(
+        <ElectricalDrawer
+          isOpen={isElectricalDrawerOpen}
+          onClose={() => {
+            setIsElectricalDrawerOpen(false);
+            setTimeout(() => setSelectedPowerPointId(null), 300);
+          }}
+          powerPoint={selectedPowerPoint}
+          onUpdate={(updated: PowerPoint) => {
+            updatePowerPoint(updated.id, updated);
+          }}
+          onDelete={(id: string) => {
+            deletePowerPoint(id);
+            setIsElectricalDrawerOpen(false);
+            setTimeout(() => setSelectedPowerPointId(null), 300);
+          }}
+        />,
+        document.body
+      )}
 
       {/* Guest Assignment Dropdown for chairs */}
       {guestDropdownChairId && guestDropdownPosition && (

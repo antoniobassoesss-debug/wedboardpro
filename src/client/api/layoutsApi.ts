@@ -37,10 +37,25 @@ export interface LayoutTab {
 }
 
 // The full layout file data (contains multiple tabs)
+export interface WorkflowConnection {
+  fromCardId: string;
+  fromSide: 'left' | 'right';
+  toCardId: string;
+  toSide: 'left' | 'right';
+}
+
 export interface LayoutFileData {
   tabs: LayoutTab[];
   activeTabId: string;
   workflowPositions?: Record<string, { x: number; y: number }>;
+  workflowConnections?: WorkflowConnection[];
+  workflowNotes?: Array<{
+    id: string;
+    content: string;
+    color: string;
+    width: number;
+    height: number;
+  }>;
 }
 
 // Legacy single canvas data (for backwards compatibility)

@@ -1,10 +1,73 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import type { Wall, WallMakerConfig, Door } from '../types/wall.js';
+import type { Wall, WallMakerConfig, Door, WallCurveControl } from '../types/wall.js';
 import { snapToGrid, snapLineToAngle, calculateDistance, calculateAngle, type Point } from '../utils/gridSnap.js';
 
 // Helper function to calculate distance between two points
 const calculateDistanceBetweenPoints = (p1: Point, p2: Point): number => {
   return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+};
+
+// Generate SVG path for a wall based on its curve
+const generateWallPath = (wall: Wall): string => {
+  const { startX, startY, endX, endY, curve } = wall;
+  if (!curve) {
+    return `M ${startX} ${startY} L ${endX} ${endY}`;
+  }
+  if (curve.type === 'bezier') {
+    return `M ${startX} ${startY} Q ${curve.point.x} ${curve.point.y} ${endX} ${endY}`;
+  }
+  if (curve.type === 'arc') {
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const radius = Math.sqrt(dx * dx + dy * dy) / 2;
+    const sweepFlag = curve.direction === 1 ? 0 : 1;
+    return `M ${startX} ${startY} A ${radius} ${radius} 0 0 ${sweepFlag} ${endX} ${endY}`;
+  }
+  return `M ${startX} ${startY} L ${endX} ${endY}`;
+};
+
+// Calculate midpoint of a wall (apex for curves)
+const getWallMidpoint = (wall: Wall): Point => {
+  const { startX, startY, endX, endY, curve } = wall;
+  const midX = (startX + endX) / 2;
+  const midY = (startY + endY) / 2;
+
+  if (!curve) return { x: midX, y: midY };
+
+  if (curve.type === 'bezier') {
+    return {
+      x: 0.25 * startX + 0.5 * curve.point.x + 0.25 * endX,
+      y: 0.25 * startY + 0.5 * curve.point.y + 0.25 * endY,
+    };
+  }
+
+  if (curve.type === 'arc') {
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    const radius = length / 2;
+    const perpX = (-dy / length) * curve.direction;
+    const perpY = (dx / length) * curve.direction;
+    return { x: midX + radius * perpX, y: midY + radius * perpY };
+  }
+
+  return { x: midX, y: midY };
+};
+
+// Inverse bezier: get control point from desired midpoint position
+const getControlPointFromMidpoint = (start: Point, end: Point, midpoint: Point): Point => {
+  return {
+    x: (midpoint.x - 0.25 * start.x - 0.25 * end.x) / 0.5,
+    y: (midpoint.y - 0.25 * start.y - 0.25 * end.y) / 0.5,
+  };
+};
+
+// Cycle wall curve: straight → left arc → right arc → straight
+const cycleWallCurve = (wall: Wall): WallCurveControl => {
+  const curve = wall.curve;
+  if (!curve) return { type: 'arc', direction: 1 };
+  if (curve.type === 'arc' && curve.direction === 1) return { type: 'arc', direction: -1 };
+  return null;
 };
 
 interface WallMakerProps {
@@ -80,6 +143,10 @@ const WallMaker: React.FC<WallMakerProps> = ({
     hingeSide: 'start' | 'end';
   } | null>(null);
   const [hoveredDirection, setHoveredDirection] = useState<'left' | 'right' | null>(null);
+
+  // Curve editing state
+  const [hoveredWallMidpoint, setHoveredWallMidpoint] = useState<string | null>(null);
+  const [draggingWallCurve, setDraggingWallCurve] = useState<string | null>(null);
   
   // Default door width (in pixels, equivalent to ~0.9 meters)
   const DOOR_WIDTH = 90;
@@ -446,9 +513,23 @@ const WallMaker: React.FC<WallMakerProps> = ({
     
     // Handle wall tool
     if (activeTool !== 'wall') return;
-    
+
     const point = screenToSvg(e.clientX, e.clientY);
     if (!point) return;
+
+    // Check if clicking on a wall midpoint handle (for curve dragging)
+    if (drawingMode === 'idle') {
+      for (const wall of walls) {
+        const mid = getWallMidpoint(wall);
+        const dist = Math.sqrt(Math.pow(point.x - mid.x, 2) + Math.pow(point.y - mid.y, 2));
+        if (dist < 30) {
+          setDraggingWallCurve(wall.id);
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+    }
 
     if (drawingMode === 'idle') {
       // First click: set start point
@@ -538,11 +619,48 @@ const WallMaker: React.FC<WallMakerProps> = ({
       return;
     }
     
+    // Handle wall curve dragging
+    if (draggingWallCurve) {
+      const point = screenToSvg(e.clientX, e.clientY);
+      if (!point) return;
+
+      const wall = walls.find(w => w.id === draggingWallCurve);
+      if (wall) {
+        const start = { x: wall.startX, y: wall.startY };
+        const end = { x: wall.endX, y: wall.endY };
+        const controlPoint = getControlPointFromMidpoint(start, end, point);
+        const newWalls = walls.map(w =>
+          w.id === draggingWallCurve
+            ? { ...w, curve: { type: 'bezier' as const, point: controlPoint } }
+            : w
+        );
+        onWallsChange(newWalls);
+      }
+      return;
+    }
+
+    // Handle wall midpoint hover detection
+    if (activeTool === 'wall' && drawingMode === 'idle') {
+      const point = screenToSvg(e.clientX, e.clientY);
+      if (point) {
+        let foundHover: string | null = null;
+        for (const wall of walls) {
+          const mid = getWallMidpoint(wall);
+          const dist = Math.sqrt(Math.pow(point.x - mid.x, 2) + Math.pow(point.y - mid.y, 2));
+          if (dist < 30) {
+            foundHover = wall.id;
+            break;
+          }
+        }
+        setHoveredWallMidpoint(foundHover);
+      }
+    }
+
     // Handle door tool
     if (activeTool === 'door') {
       const point = screenToSvg(e.clientX, e.clientY);
       if (!point) return;
-      
+
       // Door drawing preview (update end point as mouse moves - only before second click)
       if (doorDrawingMode === 'hinge-set' || doorDrawingMode === 'preview') {
         // Only show preview if doorSelection is not set (i.e., before second click finalizes)
@@ -680,8 +798,14 @@ const WallMaker: React.FC<WallMakerProps> = ({
       setPanStart(null);
       return;
     }
+    // Finish curve dragging
+    if (draggingWallCurve) {
+      saveToHistory(walls);
+      setDraggingWallCurve(null);
+      return;
+    }
     // Mouse up is handled in mouseDown for click-click mode (wall tool and door tool)
-  }, [activeTool, isPanning]);
+  }, [activeTool, isPanning, draggingWallCurve, walls, saveToHistory]);
   
 
   const handleMouseLeave = useCallback(() => {
@@ -871,21 +995,35 @@ const WallMaker: React.FC<WallMakerProps> = ({
         );
       }
 
-      // Wall without doors - render normally
+      // Wall without doors - render normally (straight or curved)
+      const hasCurve = wall.curve != null;
       return (
         <g key={wall.id}>
-          <line
-            x1={wall.startX}
-            y1={wall.startY}
-            x2={wall.endX}
-            y2={wall.endY}
-            stroke={isSelected ? '#3498db' : '#2c3e50'}
-            strokeWidth={wall.thickness}
-            strokeLinecap="round"
-            cursor="pointer"
-            onContextMenu={(e) => handleWallRightClick(e, wall)}
-            style={{ filter: isSelected ? 'drop-shadow(0 0 4px rgba(52, 152, 219, 0.5))' : 'none' }}
-          />
+          {hasCurve ? (
+            <path
+              d={generateWallPath(wall)}
+              fill="none"
+              stroke={isSelected ? '#3498db' : '#2c3e50'}
+              strokeWidth={wall.thickness}
+              strokeLinecap="round"
+              cursor="pointer"
+              onContextMenu={(e) => handleWallRightClick(e, wall)}
+              style={{ filter: isSelected ? 'drop-shadow(0 0 4px rgba(52, 152, 219, 0.5))' : 'none' }}
+            />
+          ) : (
+            <line
+              x1={wall.startX}
+              y1={wall.startY}
+              x2={wall.endX}
+              y2={wall.endY}
+              stroke={isSelected ? '#3498db' : '#2c3e50'}
+              strokeWidth={wall.thickness}
+              strokeLinecap="round"
+              cursor="pointer"
+              onContextMenu={(e) => handleWallRightClick(e, wall)}
+              style={{ filter: isSelected ? 'drop-shadow(0 0 4px rgba(52, 152, 219, 0.5))' : 'none' }}
+            />
+          )}
           {config.showMeasurements && (
             <text
               x={(wall.startX + wall.endX) / 2}
@@ -908,6 +1046,122 @@ const WallMaker: React.FC<WallMakerProps> = ({
             >
               {wall.angle.toFixed(0)}°
             </text>
+          )}
+        </g>
+      );
+    });
+  };
+
+  // Render midpoint handles for wall curve editing
+  const renderWallCurveHandles = () => {
+    if (activeTool !== 'wall') return null;
+
+    return walls.map(wall => {
+      const mid = getWallMidpoint(wall);
+      const isHovered = hoveredWallMidpoint === wall.id;
+      const isDragging = draggingWallCurve === wall.id;
+      const curve = wall.curve;
+      const isArc = curve != null && curve.type === 'arc';
+      const isBezier = curve != null && curve.type === 'bezier';
+      const isCurved = curve != null;
+
+      const handleColor = isCurved
+        ? (isArc ? '#22c55e' : '#f97316')
+        : '#3b82f6';
+      const fillColor = isDragging
+        ? handleColor
+        : isHovered
+        ? handleColor
+        : isCurved
+        ? (isArc ? '#bbf7d0' : '#fdba74')
+        : '#ffffff';
+      const strokeColor = handleColor;
+
+      return (
+        <g
+          key={`curve-handle-${wall.id}`}
+          style={{ cursor: isDragging ? 'grabbing' : 'pointer' }}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const newCurve = cycleWallCurve(wall);
+            const newWalls = walls.map(w => {
+              if (w.id !== wall.id) return w;
+              if (newCurve === null) {
+                const { curve: _, ...rest } = w;
+                return rest;
+              }
+              return { ...w, curve: newCurve };
+            });
+            saveToHistory(newWalls);
+            onWallsChange(newWalls);
+          }}
+        >
+          <circle
+            cx={mid.x}
+            cy={mid.y}
+            r={20}
+            fill={fillColor}
+            stroke={strokeColor}
+            strokeWidth={7.5}
+            opacity={isHovered || isDragging ? 1 : 0.8}
+          />
+          {/* Icon: straight shows arc hint, left arc shows flip, right arc shows straighten */}
+          {!isCurved && (
+            <path
+              d={`M ${mid.x - 10} ${mid.y + 4} A 10 10 0 0 1 ${mid.x + 10} ${mid.y + 4}`}
+              fill="none"
+              stroke={isHovered ? '#ffffff' : '#9ca3af'}
+              strokeWidth="4"
+              strokeLinecap="round"
+              pointerEvents="none"
+            />
+          )}
+          {isArc && curve.type === 'arc' && curve.direction === 1 && (
+            <g pointerEvents="none">
+              <path
+                d={`M ${mid.x - 10} ${mid.y - 4} A 10 10 0 0 0 ${mid.x + 10} ${mid.y - 4}`}
+                fill="none"
+                stroke={isHovered ? '#ffffff' : '#22c55e'}
+                strokeWidth="4"
+                strokeLinecap="round"
+              />
+            </g>
+          )}
+          {isArc && curve.type === 'arc' && curve.direction === -1 && (
+            <line
+              x1={mid.x - 10}
+              y1={mid.y}
+              x2={mid.x + 10}
+              y2={mid.y}
+              stroke={isHovered ? '#ffffff' : '#ef4444'}
+              strokeWidth="5"
+              strokeLinecap="round"
+              pointerEvents="none"
+            />
+          )}
+          {/* Tooltip */}
+          {isHovered && !isDragging && (
+            <g pointerEvents="none">
+              <rect
+                x={mid.x - 120}
+                y={mid.y - 65}
+                width="240"
+                height="40"
+                rx="10"
+                fill="rgba(0,0,0,0.85)"
+              />
+              <text
+                x={mid.x}
+                y={mid.y - 39}
+                fontSize="26"
+                fill="#ffffff"
+                textAnchor="middle"
+                fontWeight="500"
+              >
+                {!isCurved ? 'Dbl-click: arc left' : isArc && curve.type === 'arc' && curve.direction === 1 ? 'Dbl-click: arc right' : isArc ? 'Dbl-click: straighten' : 'Dbl-click: straighten'}
+              </text>
+            </g>
           )}
         </g>
       );
@@ -1536,6 +1790,7 @@ const WallMaker: React.FC<WallMakerProps> = ({
             {renderDoorPreview()}
             {renderDoorDirectionOptions()}
             {renderSnapHighlight()}
+            {renderWallCurveHandles()}
           </g>
         </svg>
       </div>

@@ -6,6 +6,7 @@
  */
 
 import type { Point } from '../../types/layout-scale';
+import type { WallCurveControl } from '../../client/types/wall';
 
 /**
  * Default pixels per meter used by Wall Maker
@@ -25,6 +26,7 @@ export interface PixelWall {
   length?: number;
   angle?: number;
   color?: string;
+  curve?: WallCurveControl;
 }
 
 /**
@@ -38,6 +40,7 @@ export interface MeterWall {
   length?: number;
   angle?: number;
   color?: string;
+  curve?: WallCurveControl;
 }
 
 /**
@@ -47,11 +50,35 @@ export interface MeterWall {
  * @param pixelsPerMeter - Scale factor (default: 100)
  * @returns Wall in meter coordinates
  */
+function convertCurveToMeters(curve: WallCurveControl | undefined, pixelsPerMeter: number): WallCurveControl | undefined {
+  if (!curve) return curve;
+  if (curve.type === 'arc') return curve;
+  return {
+    type: 'bezier',
+    point: {
+      x: curve.point.x / pixelsPerMeter,
+      y: curve.point.y / pixelsPerMeter,
+    },
+  };
+}
+
+function convertCurveToPixels(curve: WallCurveControl | undefined, pixelsPerMeter: number): WallCurveControl | undefined {
+  if (!curve) return curve;
+  if (curve.type === 'arc') return curve;
+  return {
+    type: 'bezier',
+    point: {
+      x: curve.point.x * pixelsPerMeter,
+      y: curve.point.y * pixelsPerMeter,
+    },
+  };
+}
+
 export function convertWallToMeters(
   wall: PixelWall,
   pixelsPerMeter: number = WALLMAKER_PIXELS_PER_METER
 ): MeterWall {
-  return {
+  const result: MeterWall = {
     id: wall.id,
     start: {
       x: wall.startX / pixelsPerMeter,
@@ -62,10 +89,13 @@ export function convertWallToMeters(
       y: wall.endY / pixelsPerMeter,
     },
     thickness: wall.thickness / pixelsPerMeter,
-    length: wall.length !== undefined ? wall.length / pixelsPerMeter : undefined,
-    angle: wall.angle,
-    color: wall.color,
   };
+  if (wall.length !== undefined) result.length = wall.length / pixelsPerMeter;
+  if (wall.angle !== undefined) result.angle = wall.angle;
+  if (wall.color !== undefined) result.color = wall.color;
+  const convertedCurve = convertCurveToMeters(wall.curve, pixelsPerMeter);
+  if (convertedCurve) result.curve = convertedCurve;
+  return result;
 }
 
 /**
@@ -93,17 +123,20 @@ export function convertWallToPixels(
   wall: MeterWall,
   pixelsPerMeter: number = WALLMAKER_PIXELS_PER_METER
 ): PixelWall {
-  return {
+  const result: PixelWall = {
     id: wall.id,
     startX: wall.start.x * pixelsPerMeter,
     startY: wall.start.y * pixelsPerMeter,
     endX: wall.end.x * pixelsPerMeter,
     endY: wall.end.y * pixelsPerMeter,
     thickness: wall.thickness * pixelsPerMeter,
-    length: wall.length !== undefined ? wall.length * pixelsPerMeter : undefined,
-    angle: wall.angle,
-    color: wall.color,
   };
+  if (wall.length !== undefined) result.length = wall.length * pixelsPerMeter;
+  if (wall.angle !== undefined) result.angle = wall.angle;
+  if (wall.color !== undefined) result.color = wall.color;
+  const convertedCurve = convertCurveToPixels(wall.curve, pixelsPerMeter);
+  if (convertedCurve) result.curve = convertedCurve;
+  return result;
 }
 
 /**

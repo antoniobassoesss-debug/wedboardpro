@@ -14,7 +14,7 @@ import { DecorationElementComponent } from './DecorationElement';
 import type { TableElement as TableElementType, ChairElement as ChairElementType } from '../../../types/layout-elements';
 import { isTableElement, isChairElement, isZoneElement, isServiceElement, isDecorationElement } from '../../types/elements';
 import { RotateButton } from '../Elements/RotateButton';
-import { useSelectionStore } from '../../stores';
+import { useSelectionStore, useUIStore } from '../../stores';
 
 interface ElementsLayerProps {
   layout: Layout;
@@ -36,6 +36,7 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
   onElementRotate,
 }) => {
   const selectionStore = useSelectionStore();
+  const uiStore = useUIStore();
   const selectedIds = selectionStore.selectedIds;
   console.log('[ElementsLayer] Selected IDs:', selectedIds, 'pixelsPerMeter:', pixelsPerMeter);
 
@@ -109,6 +110,7 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
             element={tableElement}
             pixelsPerMeter={pixelsPerMeter}
             isSelected={isSelected}
+            isViewMode={uiStore.isViewMode}
             onClick={handleElementClick}
             onDoubleClick={handleDoubleClick}
             onMouseEnter={handleMouseEnter}
@@ -155,6 +157,7 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
           key={element.id}
           element={chairElement}
           pixelsPerMeter={pixelsPerMeter}
+          isViewMode={uiStore.isViewMode}
           onClick={handleElementClick}
           onDoubleClick={handleDoubleClick}
           onMouseEnter={handleMouseEnter}

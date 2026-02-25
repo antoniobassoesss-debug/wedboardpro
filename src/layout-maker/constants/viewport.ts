@@ -20,14 +20,19 @@ export const ZOOM_PRESETS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3] as const;
 
 /**
  * Scale Settings
+ *
+ * SINGLE SOURCE OF TRUTH for the entire layout system.
+ * 1 meter in real world = 100 pixels on canvas at zoom 1.
+ * All element rendering MUST use this constant.
+ * wallScale.pxPerMeter from the legacy canvas store must NOT be used for element sizing.
  */
-export const DEFAULT_PIXELS_PER_METER = 100; // 1 meter = 100 pixels at zoom 1
+export const DEFAULT_PIXELS_PER_METER = 100;
 
 /**
  * Grid Settings
  */
 export const DEFAULT_GRID_SIZE = 0.5; // meters (50cm)
-export const MAJOR_GRID_INTERVAL = 5; // Every 5 lines = 2.5m at default
+export const MAJOR_GRID_INTERVAL = 10; // Every 10 lines = 5m at default 0.5m grid
 export const MIN_GRID_SIZE = 0.1; // 10cm
 export const MAX_GRID_SIZE = 2.0; // 2m
 

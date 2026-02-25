@@ -15,7 +15,13 @@ import type { Layout } from '../../types/layout';
 interface CreateLayoutModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (data: { name: string; type: 'blank' | 'duplicate' | 'template'; sourceLayoutId?: string }) => void;
+  onCreate: (data: {
+    name: string;
+    type: 'blank' | 'duplicate' | 'template';
+    sourceLayoutId?: string;
+    spaceWidth?: number;
+    spaceHeight?: number;
+  }) => void;
   existingLayouts?: Layout[];
 }
 
@@ -31,6 +37,8 @@ export const CreateLayoutModal: React.FC<CreateLayoutModalProps> = ({
   const [creationType, setCreationType] = useState<CreationType>('blank');
   const [selectedLayoutId, setSelectedLayoutId] = useState<string>('');
   const [selectedTemplate, setSelectedTemplate] = useState<string>('wedding-round');
+  const [spaceWidth, setSpaceWidth] = useState(20);
+  const [spaceHeight, setSpaceHeight] = useState(20);
 
   const templates = [
     { id: 'wedding-round', name: 'Wedding Round Tables', description: 'Classic round table arrangement' },
@@ -42,13 +50,17 @@ export const CreateLayoutModal: React.FC<CreateLayoutModalProps> = ({
 
   const handleSubmit = useCallback(() => {
     const finalName = name.trim() || 'Untitled Layout';
+    const clampedWidth = Math.max(5, Math.min(200, spaceWidth || 20));
+    const clampedHeight = Math.max(5, Math.min(200, spaceHeight || 20));
     onCreate({
       name: finalName,
       type: creationType,
+      spaceWidth: clampedWidth,
+      spaceHeight: clampedHeight,
       ...(creationType === 'duplicate' && selectedLayoutId ? { sourceLayoutId: selectedLayoutId } : {}),
     });
     onClose();
-  }, [name, creationType, selectedLayoutId, onCreate, onClose]);
+  }, [name, creationType, selectedLayoutId, spaceWidth, spaceHeight, onCreate, onClose]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -97,6 +109,42 @@ export const CreateLayoutModal: React.FC<CreateLayoutModalProps> = ({
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               autoFocus
             />
+          </div>
+
+          {/* Space Dimensions */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Space Dimensions
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Width (meters)</label>
+                <input
+                  type="number"
+                  min={5}
+                  max={200}
+                  step={0.5}
+                  value={spaceWidth}
+                  onChange={(e) => setSpaceWidth(parseFloat(e.target.value) || 20)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Height (meters)</label>
+                <input
+                  type="number"
+                  min={5}
+                  max={200}
+                  step={0.5}
+                  value={spaceHeight}
+                  onChange={(e) => setSpaceHeight(parseFloat(e.target.value) || 20)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                />
+              </div>
+            </div>
+            <div className="mt-1.5 text-xs text-gray-400 bg-gray-50 px-3 py-1.5 rounded">
+              {spaceWidth}m × {spaceHeight}m = {(spaceWidth * spaceHeight).toFixed(0)}m² total area
+            </div>
           </div>
 
           {/* Creation type selection */}

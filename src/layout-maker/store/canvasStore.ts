@@ -209,7 +209,7 @@ export interface CanvasActions {
   deleteDoor: (id: string) => void;
 
   // Power point operations
-  addPowerPoint: (point: Omit<PowerPoint, 'id'>) => string;
+  addPowerPoint: (point: Partial<PowerPoint> & { x: number; y: number }) => string;
   updatePowerPoint: (id: string, updates: Partial<PowerPoint>) => void;
   deletePowerPoint: (id: string) => void;
 
@@ -553,8 +553,7 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
           const existing = state.walls[id];
           if (!existing) return;
           const updated: Wall = { ...existing, ...updates };
-          const clamped = clampWallToA4(updated, a4);
-          state.walls[id] = { ...updated, startX: clamped.startX, startY: clamped.startY, endX: clamped.endX, endY: clamped.endY };
+          state.walls[id] = clampWallToA4(updated, a4);
           state.pendingChanges = true;
         });
       },
@@ -611,9 +610,19 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
       // ========== Power Point Operations ==========
 
       addPowerPoint: (pointData) => {
-        const id = generateId('pp');
+        const id = pointData.id || generateId('pp');
         const a4 = get().a4Bounds;
-        const point: PowerPoint = { id, ...pointData };
+        
+        const point: PowerPoint = {
+          id,
+          x: pointData.x,
+          y: pointData.y,
+          electrical: pointData.electrical ?? true,
+          standard: pointData.standard ?? 'EU_PT',
+          breaker_amps: pointData.breaker_amps ?? 16,
+          voltage: pointData.voltage ?? 230,
+          ...(pointData.label && { label: pointData.label }),
+        };
         const clamped = clampPointToA4(point, a4);
 
         set((state) => {

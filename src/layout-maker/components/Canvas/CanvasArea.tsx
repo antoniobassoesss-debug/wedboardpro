@@ -5,9 +5,8 @@
  * Handles viewport rendering, mouse events, and layer organization.
  */
 
-import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useViewportStore, useUIStore, useLayoutStore, useSelectionStore } from '../../stores';
-import { useWallScale } from '../../store/selectors';
 import { useViewport } from '../../hooks/useViewport';
 import { useAddElement } from '../../hooks/useAddElement';
 import { useGuestAssignment } from '../../hooks/useGuestAssignment';
@@ -53,6 +52,8 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
   const [ghostPosition, setGhostPosition] = useState<{ x: number; y: number } | null>(null);
   const [guestDropdownChairId, setGuestDropdownChairId] = useState<string | null>(null);
   const [guestDropdownPosition, setGuestDropdownPosition] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [hoveredElementId, setHoveredElementId] = useState<string | null>(null);
+  const [hoverTooltipPosition, setHoverTooltipPosition] = useState<{ x: number; y: number } | null>(null);
 
   const {
     viewport,
@@ -68,11 +69,8 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
     zoomOut,
   } = useViewport();
 
-  // Use wall scale pxPerMeter if available, otherwise fall back to default
-  const wallScale = useWallScale();
-  const pixelsPerMeter = useMemo(() => {
-    return wallScale?.pxPerMeter || defaultPixelsPerMeter;
-  }, [wallScale, defaultPixelsPerMeter]);
+  // Always use layout.space.pixelsPerMeter (default 100) as single source of truth
+  const pixelsPerMeter = layoutStore.layout?.space?.pixelsPerMeter || defaultPixelsPerMeter;
 
   const [isPanning, setIsPanning] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -108,6 +106,10 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
 
   const handleElementClick = useCallback(
     (elementId: string, event: React.MouseEvent) => {
+      if (uiStore.isViewMode) {
+        return;
+      }
+
       console.log('[CanvasArea] Element clicked:', elementId);
       event.stopPropagation();
 
@@ -141,25 +143,47 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
 
       onElementClick?.(elementId, event);
     },
-    [selectionStore, layoutStore, onElementClick, worldToScreen, pixelsPerMeter, viewport.zoom]
+    [selectionStore, layoutStore, onElementClick, worldToScreen, pixelsPerMeter, viewport.zoom, uiStore.isViewMode]
   );
 
   const handleElementHover = useCallback(
     (elementId: string | null) => {
       selectionStore.setHovered(elementId);
+      setHoveredElementId(elementId);
+      
+      if (elementId && uiStore.isViewMode) {
+        const element = layoutStore.getElementById(elementId);
+        if (element) {
+          const svg = svgRef.current;
+          if (svg) {
+            const rect = svg.getBoundingClientRect();
+            const screenPos = worldToScreen({ x: element.x, y: element.y });
+            setHoverTooltipPosition({
+              x: rect.left + screenPos.x,
+              y: rect.top + screenPos.y - 40,
+            });
+          }
+        }
+      } else {
+        setHoverTooltipPosition(null);
+      }
     },
-    [selectionStore]
+    [selectionStore, layoutStore, uiStore.isViewMode, worldToScreen]
   );
 
   const handleCanvasClick = useCallback(
     (event: React.MouseEvent) => {
+      if (uiStore.isViewMode) {
+        return;
+      }
+
       selectionStore.deselectAll();
       // Close guest dropdown when clicking on canvas
       setGuestDropdownChairId(null);
       setGuestDropdownPosition(null);
       onCanvasClick?.(event);
     },
-    [selectionStore, onCanvasClick]
+    [selectionStore, onCanvasClick, uiStore.isViewMode]
   );
 
   const handleCloseGuestDropdown = useCallback(() => {
@@ -188,6 +212,10 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
 
   const startElementDrag = useCallback(
     (elementId: string, clientX: number, clientY: number) => {
+      if (uiStore.isViewMode) {
+        return;
+      }
+
       const svg = svgRef.current;
       if (!svg) return;
 
@@ -206,7 +234,30 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
       setDragElementIds([elementId]);
       setIsDragging(true);
     },
-    [layoutStore, screenToWorld]
+    [layoutStore, screenToWorld, uiStore.isViewMode]
+  );
+
+  const handleElementMouseDown = useCallback(
+    (elementId: string, event: React.MouseEvent) => {
+      if (uiStore.isViewMode) {
+        return;
+      }
+
+      event.stopPropagation();
+
+      if (event.shiftKey) {
+        selectionStore.toggleSelection(elementId);
+      } else {
+        selectionStore.select(elementId);
+      }
+
+      if (selectionStore.isSelected(elementId)) {
+        startElementDrag(elementId, event.clientX, event.clientY);
+      }
+
+      onElementClick?.(elementId, event);
+    },
+    [selectionStore, startElementDrag, onElementClick, uiStore.isViewMode]
   );
 
   const updateElementDrag = useCallback(
@@ -234,25 +285,6 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
     setDragElementIds([]);
     dragOffsetRef.current = null;
   }, []);
-
-  const handleElementMouseDown = useCallback(
-    (elementId: string, event: React.MouseEvent) => {
-      event.stopPropagation();
-
-      if (event.shiftKey) {
-        selectionStore.toggleSelection(elementId);
-      } else {
-        selectionStore.select(elementId);
-      }
-
-      if (selectionStore.isSelected(elementId)) {
-        startElementDrag(elementId, event.clientX, event.clientY);
-      }
-
-      onElementClick?.(elementId, event);
-    },
-    [selectionStore, startElementDrag, onElementClick]
-  );
 
   const handleMouseDown = useCallback(
     (event: React.MouseEvent<SVGSVGElement>) => {
@@ -422,6 +454,10 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
+      if (uiStore.isViewMode) {
+        return;
+      }
+
       const isZoomKey = event.key === '=' || event.key === '+' || event.key === '-';
       const isZoomIn = (event.key === '=' || event.key === '+') && !event.shiftKey;
       const isZoomOut = event.key === '-';
@@ -454,6 +490,10 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
 
   const handleKeyUp = useCallback(
     (event: React.KeyboardEvent) => {
+      if (uiStore.isViewMode) {
+        return;
+      }
+
       if (event.key === ' ' && uiStore.activeTool === 'hand') {
         event.preventDefault();
         uiStore.setActiveTool('select');
@@ -530,17 +570,17 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
           </pattern>
           <pattern
             id="grid-pattern-major"
-            width={uiStore.showGrid ? 2.5 * pixelsPerMeter * viewport.zoom : 0}
-            height={uiStore.showGrid ? 2.5 * pixelsPerMeter * viewport.zoom : 0}
+            width={uiStore.showGrid ? 5 * pixelsPerMeter * viewport.zoom : 0}
+            height={uiStore.showGrid ? 5 * pixelsPerMeter * viewport.zoom : 0}
             patternUnits="userSpaceOnUse"
           >
             <rect
-              width={2.5 * pixelsPerMeter * viewport.zoom}
-              height={2.5 * pixelsPerMeter * viewport.zoom}
+              width={5 * pixelsPerMeter * viewport.zoom}
+              height={5 * pixelsPerMeter * viewport.zoom}
               fill="url(#grid-pattern)"
             />
             <path
-              d={`M ${2.5 * pixelsPerMeter * viewport.zoom} 0 L 0 0 0 ${2.5 * pixelsPerMeter * viewport.zoom}`}
+              d={`M ${5 * pixelsPerMeter * viewport.zoom} 0 L 0 0 0 ${5 * pixelsPerMeter * viewport.zoom}`}
               fill="none"
               stroke="var(--grid-major-color, #CCCCCC)"
               strokeWidth="1"
@@ -683,6 +723,64 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
           onClose={handleCloseGuestDropdown}
         />
       )}
+
+      {/* View Mode Hover Tooltip */}
+      {uiStore.isViewMode && hoveredElementId && hoverTooltipPosition && (() => {
+        const element = layoutStore.getElementById(hoveredElementId);
+        if (!element) return null;
+        
+        let tooltipContent: React.ReactNode = null;
+        
+        if (isChairElement(element) && element.assignedGuestName) {
+          const dietaryInfo = element.dietaryType && element.dietaryType !== 'regular' 
+            ? ` • ${element.dietaryType}`
+            : '';
+          const allergyInfo = element.allergyFlags?.length 
+            ? ` • ${element.allergyFlags.join(', ')}`
+            : '';
+          
+          tooltipContent = (
+            <div className="flex flex-col">
+              <span className="font-medium text-gray-900">{element.assignedGuestName}</span>
+              {(dietaryInfo || allergyInfo) && (
+                <span className="text-xs text-gray-500">
+                  {element.dietaryType && element.dietaryType !== 'regular' ? element.dietaryType : ''}
+                  {element.allergyFlags?.length ? ` • ${element.allergyFlags.join(', ')}` : ''}
+                </span>
+              )}
+            </div>
+          );
+        } else if (element.type.startsWith('table-')) {
+          const tableNumber = (element as any).tableNumber || element.label || 'Table';
+          const capacity = (element as any).capacity || 0;
+          tooltipContent = (
+            <div className="flex flex-col">
+              <span className="font-medium text-gray-900">{tableNumber}</span>
+              {capacity > 0 && (
+                <span className="text-xs text-gray-500">{capacity} seats</span>
+              )}
+            </div>
+          );
+        } else {
+          tooltipContent = (
+            <span className="font-medium text-gray-900">{element.label || element.type}</span>
+          );
+        }
+        
+        return (
+          <div
+            className="fixed z-50 px-3 py-2 bg-white rounded-lg shadow-xl border border-gray-200 pointer-events-none"
+            style={{
+              left: hoverTooltipPosition.x,
+              top: hoverTooltipPosition.y,
+              transform: 'translate(-50%, -100%)',
+            }}
+          >
+            {tooltipContent}
+            <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 bg-white border-r border-b border-gray-200 rotate-45" />
+          </div>
+        );
+      })()}
     </div>
   );
 };

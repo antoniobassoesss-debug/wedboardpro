@@ -1,5 +1,7 @@
 // Wall data structures and types
 
+export type WallCurveControl = null | { type: 'bezier'; point: { x: number; y: number } } | { type: 'arc'; direction: 1 | -1 };
+
 export interface Wall {
   id: string;
   startX: number;
@@ -14,6 +16,7 @@ export interface Wall {
   snapAngle?: number; // Snapped angle if applicable
   originalLengthPx?: number; // Original length before scaling (for pxPerMeter derivation)
   pxPerMeter?: number; // Computed pixels per meter for this wall on canvas
+  curve?: WallCurveControl;
 }
 
 export interface WallMakerConfig {
