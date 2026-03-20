@@ -1,4 +1,8 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { DraggableTaskCard, TASK_DEFAULT_WIDTH, TASK_DEFAULT_HEIGHT } from './TaskCard';
+import type { WorkflowTask, TeamMember } from './TaskCard';
+import { createTask, updateTask, deleteTask } from '../api/tasksApi';
+import { getValidAccessToken } from '../utils/sessionManager';
 
 export interface Project {
   id: string;
@@ -11,6 +15,18 @@ export interface Project {
     doors?: any[];
     powerPoints?: any[];
     viewBox: { x: number; y: number; width: number; height: number };
+    satelliteBackground?: {
+      center: { lat: number; lng: number };
+      address: string;
+      realWorldWidth: number;
+      realWorldHeight: number;
+      orientation: 'landscape' | 'portrait';
+      rotation: number;
+      pixelsPerMeter: number;
+      aiEnhanced: boolean;
+      imageBase64: string;
+      addedAt: string;
+    } | null;
   };
   a4Dimensions?: {
     a4X: number;
@@ -28,7 +44,7 @@ export interface WorkflowNote {
   height: number;
 }
 
-interface WorkflowPosition {
+export interface WorkflowPosition {
   x: number;
   y: number;
 }
@@ -52,11 +68,108 @@ interface WorkflowCanvasProps {
   onConnectionsChange?: (connections: Connection[]) => void;
   notes?: WorkflowNote[];
   onNotesChange?: (notes: WorkflowNote[]) => void;
+  tasks?: WorkflowTask[];
+  onTasksChange?: (tasks: WorkflowTask[]) => void;
   eventId?: string;
 }
 
 const CARD_WIDTH = 320;
 const CARD_HEIGHT = 280;
+
+const CARD_SNAP_GAP = 20;
+const CARD_SNAP_THRESHOLD = 24;
+const CARD_MIN_GAP = 16;
+const GRID_COLUMNS = 4;
+const DRAG_SNAP_TO_GRID = 8;
+
+interface CardRect {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+function rectsOverlap(a: CardRect, b: CardRect, gap = 0): boolean {
+  return (
+    a.x - gap < b.x + b.width &&
+    a.x + a.width + gap > b.x &&
+    a.y - gap < b.y + b.height &&
+    a.y + a.height + gap > b.y
+  );
+}
+
+function findNonOverlappingPosition(card: CardRect, others: CardRect[]): { x: number; y: number } {
+  const angles = 24;
+  for (let radius = 0; radius < 2000; radius += 20) {
+    for (let ai = 0; ai < angles; ai++) {
+      const rad = (ai / angles) * Math.PI * 2;
+      const testX = Math.round((card.x + Math.cos(rad) * radius) / DRAG_SNAP_TO_GRID) * DRAG_SNAP_TO_GRID;
+      const testY = Math.round((card.y + Math.sin(rad) * radius) / DRAG_SNAP_TO_GRID) * DRAG_SNAP_TO_GRID;
+      const testRect: CardRect = { ...card, x: testX, y: testY };
+      if (!others.some(o => o.id !== card.id && rectsOverlap(testRect, o, CARD_MIN_GAP))) {
+        return { x: testX, y: testY };
+      }
+    }
+  }
+  return { x: card.x, y: card.y };
+}
+
+interface SnapLine { x1: number; y1: number; x2: number; y2: number }
+
+function applyMagneticSnap(card: CardRect, others: CardRect[]): { x: number; y: number; snapLines: SnapLine[] } {
+  let x = card.x;
+  let y = card.y;
+  const snapLines: SnapLine[] = [];
+
+  for (const other of others) {
+    if (other.id === card.id) continue;
+    const gap = CARD_SNAP_GAP;
+    const th = CARD_SNAP_THRESHOLD;
+
+    if (Math.abs((x + card.width + gap) - other.x) < th) {
+      x = other.x - card.width - gap;
+      snapLines.push({ x1: other.x - gap / 2, y1: Math.min(y, other.y) - 20, x2: other.x - gap / 2, y2: Math.max(y + card.height, other.y + other.height) + 20 });
+    }
+    if (Math.abs(x - (other.x + other.width + gap)) < th) {
+      x = other.x + other.width + gap;
+      snapLines.push({ x1: other.x + other.width + gap / 2, y1: Math.min(y, other.y) - 20, x2: other.x + other.width + gap / 2, y2: Math.max(y + card.height, other.y + other.height) + 20 });
+    }
+    if (Math.abs((y + card.height + gap) - other.y) < th) {
+      y = other.y - card.height - gap;
+      snapLines.push({ x1: Math.min(x, other.x) - 20, y1: other.y - gap / 2, x2: Math.max(x + card.width, other.x + other.width) + 20, y2: other.y - gap / 2 });
+    }
+    if (Math.abs(y - (other.y + other.height + gap)) < th) {
+      y = other.y + other.height + gap;
+      snapLines.push({ x1: Math.min(x, other.x) - 20, y1: other.y + other.height + gap / 2, x2: Math.max(x + card.width, other.x + other.width) + 20, y2: other.y + other.height + gap / 2 });
+    }
+  }
+
+  if (snapLines.length === 0) {
+    x = Math.round(x / DRAG_SNAP_TO_GRID) * DRAG_SNAP_TO_GRID;
+    y = Math.round(y / DRAG_SNAP_TO_GRID) * DRAG_SNAP_TO_GRID;
+  }
+
+  return { x, y, snapLines };
+}
+
+function getNextAvailableSlot(existingCards: CardRect[], cardWidth: number, cardHeight: number): { x: number; y: number } {
+  const colWidth = cardWidth + CARD_SNAP_GAP;
+  const rowHeight = cardHeight + CARD_SNAP_GAP;
+  const startX = 40;
+  const startY = 40;
+  for (let row = 0; row < 100; row++) {
+    for (let col = 0; col < GRID_COLUMNS; col++) {
+      const x = startX + col * colWidth;
+      const y = startY + row * rowHeight;
+      const testRect: CardRect = { id: '__test', x, y, width: cardWidth, height: cardHeight };
+      if (!existingCards.some(c => rectsOverlap(testRect, c, CARD_MIN_GAP))) {
+        return { x, y };
+      }
+    }
+  }
+  return { x: startX, y: startY + existingCards.length * rowHeight };
+}
 
 const NOTE_COLORS = {
   yellow: { bg: '#fef3c7', border: '#f59e0b' },
@@ -90,6 +203,18 @@ const MiniPreview: React.FC<{ project: Project }> = ({ project }) => {
         </defs>
         <rect x={a4!.a4X} y={a4!.a4Y} width={a4!.a4WidthPx} height={a4!.a4HeightPx} fill="white" />
         <rect x={a4!.a4X} y={a4!.a4Y} width={a4!.a4WidthPx} height={a4!.a4HeightPx} fill="url(#previewGrid)" />
+
+        {/* Satellite background */}
+        {canvasData.satelliteBackground && (
+          <image
+            href={canvasData.satelliteBackground.imageBase64}
+            x={a4!.a4X}
+            y={a4!.a4Y}
+            width={a4!.a4WidthPx}
+            height={a4!.a4HeightPx}
+            preserveAspectRatio="xMidYMid slice"
+          />
+        )}
 
           {(canvasData.walls || []).map((w: any) => {
             if (w.curve) {
@@ -260,15 +385,25 @@ const DraggableCard: React.FC<{
   isActive: boolean;
   position: WorkflowPosition;
   onPositionChange: (id: string, x: number, y: number) => void;
+  onDragEnd: (id: string, x: number, y: number) => void;
   onSelect: () => void;
   onConnectorClick: (cardId: string, side: 'left' | 'right') => void;
   connectingFrom: { cardId: string; side: 'left' | 'right' } | null;
   pan: { x: number; y: number };
   zoom: number;
-}> = ({ project, index, isActive, position, onPositionChange, onSelect, onConnectorClick, connectingFrom, pan, zoom }) => {
+  isNew?: boolean;
+  isRejected?: boolean;
+}> = ({ project, index, isActive, position, onPositionChange, onDragEnd, onSelect, onConnectorClick, connectingFrom, pan, zoom, isNew, isRejected }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [dragStartPos, setDragStartPos] = useState<WorkflowPosition | null>(null);
+  const [mounted, setMounted] = useState(false);
   const dragRef = useRef({ offsetX: 0, offsetY: 0, hasMoved: false });
+
+  useEffect(() => {
+    const t = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(t);
+  }, []);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -282,6 +417,7 @@ const DraggableCard: React.FC<{
       offsetY: clickInWrapperY - position.y,
       hasMoved: false,
     };
+    setDragStartPos({ x: position.x, y: position.y });
     setIsDragging(true);
   };
 
@@ -301,6 +437,8 @@ const DraggableCard: React.FC<{
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      setDragStartPos(null);
+      onDragEnd(project.id, position.x, position.y);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -309,11 +447,27 @@ const DraggableCard: React.FC<{
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, pan.x, pan.y, zoom, project.id, onPositionChange]);
+  }, [isDragging, pan.x, pan.y, zoom, project.id, onPositionChange, onDragEnd, position.x, position.y]);
 
   const isConnectMode = connectingFrom !== null;
 
   return (
+    <>
+      {/* Ghost at drag origin */}
+      {isDragging && dragStartPos && (
+        <div style={{
+          position: 'absolute',
+          left: dragStartPos.x,
+          top: dragStartPos.y,
+          width: `${CARD_WIDTH}px`,
+          height: `${CARD_HEIGHT}px`,
+          background: 'rgba(255,255,255,0.35)',
+          borderRadius: '16px',
+          border: '1.5px dashed #cbd5e1',
+          pointerEvents: 'none',
+          zIndex: 0,
+        }} />
+      )}
     <div
       ref={cardRef}
       onMouseDown={handleMouseDown}
@@ -325,18 +479,22 @@ const DraggableCard: React.FC<{
         height: `${CARD_HEIGHT}px`,
         background: '#ffffff',
         borderRadius: '16px',
-        border: isActive ? '2.5px solid #000000' : '1px solid #e5e5e5',
+        border: isRejected ? '2px solid #ef4444' : (isActive ? '2.5px solid #000000' : '1px solid #e5e5e5'),
         boxShadow: isDragging
-          ? '0 20px 50px rgba(0, 0, 0, 0.3)'
+          ? '0 28px 64px rgba(0, 0, 0, 0.35), 0 8px 20px rgba(0,0,0,0.15)'
           : '0 4px 20px rgba(0, 0, 0, 0.08)',
         cursor: isDragging ? 'grabbing' : 'grab',
-        opacity: isDragging ? 0.95 : 1,
+        opacity: isDragging ? 0.96 : (isNew && !mounted ? 0 : 1),
         overflow: 'visible',
         userSelect: 'none',
         display: 'flex',
         flexDirection: 'column',
         zIndex: isDragging ? 9999 : (isActive ? 100 : 1),
-        transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
+        transform: isDragging ? 'scale(0.98)' : (isNew && !mounted ? 'scale(0.85)' : 'scale(1)'),
+        animation: isRejected ? 'cardReject 0.38s ease-out' : 'none',
+        transition: isDragging
+          ? 'box-shadow 0.15s ease, border-color 0.15s ease'
+          : 'transform 0.2s cubic-bezier(0.34, 1.56, 0.5, 1), opacity 0.2s ease, box-shadow 0.2s ease, left 0.15s ease-out, top 0.15s ease-out, border-color 0.15s ease',
       }}
     >
       <div
@@ -415,6 +573,7 @@ const DraggableCard: React.FC<{
         isConnectMode={isConnectMode}
       />
     </div>
+    </>
   );
 };
 
@@ -704,6 +863,9 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   onConnectionsChange,
   notes: externalNotes = [],
   onNotesChange,
+  tasks: externalTasks = [],
+  onTasksChange,
+  eventId,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pan, setPan] = useState({ x: -200, y: -200 });
@@ -715,6 +877,12 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   const [hoveredConnection, setHoveredConnection] = useState<number | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [notes, setNotes] = useState<WorkflowNote[]>(externalNotes);
+  const [tasks, setTasks] = useState<WorkflowTask[]>(externalTasks);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [snapLines, setSnapLines] = useState<SnapLine[]>([]);
+  const [rejectedCardId, setRejectedCardId] = useState<string | null>(null);
+  const [newCardIds, setNewCardIds] = useState<Set<string>>(new Set());
+  const [isTidying, setIsTidying] = useState(false);
   const panStart = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -725,14 +893,43 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     setNotes(externalNotes);
   }, [externalNotes]);
 
+  useEffect(() => {
+    setTasks(externalTasks);
+  }, [externalTasks]);
+
+  // Fetch team members using the same pattern as the todo task UI
+  useEffect(() => {
+    getValidAccessToken().then(token => {
+      if (!token) return;
+      fetch('/api/teams/members', { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data?.members) {
+            setTeamMembers(
+              data.members.map((m: any) => ({
+                id: m.user_id,
+                displayName: m.displayName || m.profile?.full_name || m.displayEmail || 'Unknown',
+                avatarUrl: m.avatarUrl || m.profile?.avatar_url || null,
+              }))
+            );
+          }
+        })
+        .catch(() => {});
+    });
+  }, []);
+
   // Helper to get card dimensions by id (note vs project card)
   const getCardDimensions = useCallback((cardId: string): { width: number; height: number } => {
     if (cardId.startsWith('note-')) {
       const note = notes.find(n => n.id === cardId);
       return { width: note?.width ?? NOTE_DEFAULT_WIDTH, height: note?.height ?? NOTE_DEFAULT_HEIGHT };
     }
+    if (cardId.startsWith('task-')) {
+      const task = tasks.find(t => t.id === cardId);
+      return { width: task?.width ?? TASK_DEFAULT_WIDTH, height: task?.height ?? TASK_DEFAULT_HEIGHT };
+    }
     return { width: CARD_WIDTH, height: CARD_HEIGHT };
-  }, [notes]);
+  }, [notes, tasks]);
 
   const handleConnectorClick = (cardId: string, side: 'left' | 'right') => {
     if (connectingFrom === null) {
@@ -815,24 +1012,107 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     setContextMenu(null);
   }, [notes, positions, onNotesChange, onPositionsChange]);
 
+  const handleTaskChange = useCallback((updatedTask: WorkflowTask) => {
+    const newTasks = tasks.map(t => t.id === updatedTask.id ? updatedTask : t);
+    setTasks(newTasks);
+    onTasksChange?.(newTasks);
+    // Sync to DB if we have a real task id
+    if (updatedTask.realTaskId) {
+      updateTask(updatedTask.realTaskId, {
+        title: updatedTask.title || 'New task',
+        assignee_id: updatedTask.assignee_id,
+        due_date: updatedTask.due_date,
+        is_completed: updatedTask.status === 'done',
+      });
+    }
+  }, [tasks, onTasksChange]);
+
+  const handleDeleteTask = useCallback((taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    const newTasks = tasks.filter(t => t.id !== taskId);
+    setTasks(newTasks);
+    onTasksChange?.(newTasks);
+    const newConnections = connections.filter(c => c.fromCardId !== taskId && c.toCardId !== taskId);
+    if (newConnections.length !== connections.length) {
+      setConnections(newConnections);
+      onConnectionsChange?.(newConnections);
+    }
+    if (task?.realTaskId) {
+      deleteTask(task.realTaskId);
+    }
+  }, [tasks, connections, onTasksChange, onConnectionsChange]);
+
+  const handleCreateTask = useCallback(async (wrapperX: number, wrapperY: number) => {
+    // Optimistically add to canvas immediately
+    const canvasId = `task-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const newTask: WorkflowTask = {
+      id: canvasId,
+      title: '',
+      status: 'todo',
+      assignee_id: null,
+      due_date: null,
+      width: TASK_DEFAULT_WIDTH,
+      height: TASK_DEFAULT_HEIGHT,
+    };
+    const newTasks = [...tasks, newTask];
+    setTasks(newTasks);
+    onTasksChange?.(newTasks);
+    onPositionsChange({ ...positions, [canvasId]: { x: wrapperX, y: wrapperY } });
+    setContextMenu(null);
+
+    // Persist to DB so it appears in the task list tab
+    const { data } = await createTask({
+      title: 'New task',
+      event_id: eventId || null,
+    });
+    if (data) {
+      // Store the real DB task id for future updates
+      setTasks(prev => {
+        const updated = prev.map(t => t.id === canvasId ? { ...t, realTaskId: data.id } : t);
+        onTasksChange?.(updated);
+        return updated;
+      });
+    }
+  }, [tasks, positions, onTasksChange, onPositionsChange, eventId]);
+
   useEffect(() => {
     const newPositions: Record<string, WorkflowPosition> = { ...positions };
     let hasChanges = false;
+    const addedIds: string[] = [];
 
-    projects.forEach((project, index) => {
+    projects.forEach((project) => {
       if (!newPositions[project.id]) {
-        newPositions[project.id] = {
-          x: 40 + (index % 3) * 340,
-          y: 40 + Math.floor(index / 3) * 300,
-        };
+        const placed = Object.entries(newPositions).map(([id, pos]) => {
+          const dims = id.startsWith('note-') ? { width: NOTE_DEFAULT_WIDTH, height: NOTE_DEFAULT_HEIGHT }
+            : id.startsWith('task-') ? { width: TASK_DEFAULT_WIDTH, height: TASK_DEFAULT_HEIGHT }
+            : { width: CARD_WIDTH, height: CARD_HEIGHT };
+          return { id, x: pos.x, y: pos.y, ...dims };
+        });
+        const slot = getNextAvailableSlot(placed, CARD_WIDTH, CARD_HEIGHT);
+        newPositions[project.id] = slot;
         hasChanges = true;
+        addedIds.push(project.id);
       }
     });
 
     if (hasChanges) {
       onPositionsChange(newPositions);
+      if (addedIds.length > 0) {
+        setNewCardIds(prev => {
+          const next = new Set(prev);
+          addedIds.forEach(id => next.add(id));
+          return next;
+        });
+        setTimeout(() => {
+          setNewCardIds(prev => {
+            const next = new Set(prev);
+            addedIds.forEach(id => next.delete(id));
+            return next;
+          });
+        }, 600);
+      }
     }
-  }, [projects, onPositionsChange]);
+  }, [projects]);
 
   const handlePanStart = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -916,6 +1196,90 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   const handleZoomOut = () => setZoom(Math.max(zoom - 0.1, 0.3));
   const handleReset = () => { setPan({ x: 0, y: 0 }); setZoom(1); };
 
+  // Build list of all card rects from current positions
+  const getAllCardRects = useCallback((): CardRect[] => {
+    const rects: CardRect[] = [];
+    projects.forEach(p => {
+      const pos = positions[p.id];
+      if (pos) rects.push({ id: p.id, x: pos.x, y: pos.y, width: CARD_WIDTH, height: CARD_HEIGHT });
+    });
+    notes.forEach(n => {
+      const pos = positions[n.id];
+      if (pos) rects.push({ id: n.id, x: pos.x, y: pos.y, width: n.width, height: n.height });
+    });
+    tasks.forEach(t => {
+      const pos = positions[t.id];
+      if (pos) rects.push({ id: t.id, x: pos.x, y: pos.y, width: t.width ?? TASK_DEFAULT_WIDTH, height: t.height ?? TASK_DEFAULT_HEIGHT });
+    });
+    return rects;
+  }, [projects, notes, tasks, positions]);
+
+  // Position change with magnetic snap applied during drag
+  const handlePositionChangeWithSnap = useCallback((id: string, rawX: number, rawY: number) => {
+    const dims = id.startsWith('note-')
+      ? { width: (notes.find(n => n.id === id)?.width ?? NOTE_DEFAULT_WIDTH), height: (notes.find(n => n.id === id)?.height ?? NOTE_DEFAULT_HEIGHT) }
+      : id.startsWith('task-')
+      ? { width: TASK_DEFAULT_WIDTH, height: TASK_DEFAULT_HEIGHT }
+      : { width: CARD_WIDTH, height: CARD_HEIGHT };
+
+    const others = getAllCardRects().filter(r => r.id !== id);
+    const card: CardRect = { id, x: rawX, y: rawY, ...dims };
+    const { x, y, snapLines: lines } = applyMagneticSnap(card, others);
+    setSnapLines(lines);
+    onPositionsChange({ ...positions, [id]: { x, y } });
+  }, [getAllCardRects, notes, positions, onPositionsChange]);
+
+  // On drag end: collision detection + correction
+  const handleDragEnd = useCallback((id: string, finalX: number, finalY: number) => {
+    setSnapLines([]);
+    const dims = id.startsWith('note-')
+      ? { width: (notes.find(n => n.id === id)?.width ?? NOTE_DEFAULT_WIDTH), height: (notes.find(n => n.id === id)?.height ?? NOTE_DEFAULT_HEIGHT) }
+      : id.startsWith('task-')
+      ? { width: TASK_DEFAULT_WIDTH, height: TASK_DEFAULT_HEIGHT }
+      : { width: CARD_WIDTH, height: CARD_HEIGHT };
+
+    const droppedRect: CardRect = { id, x: finalX, y: finalY, ...dims };
+    const others = getAllCardRects().filter(r => r.id !== id);
+    const hasOverlap = others.some(o => rectsOverlap(droppedRect, o, CARD_MIN_GAP));
+
+    if (hasOverlap) {
+      const corrected = findNonOverlappingPosition(droppedRect, others);
+      onPositionsChange({ ...positions, [id]: corrected });
+      // Flash rejection
+      setRejectedCardId(id);
+      setTimeout(() => setRejectedCardId(null), 400);
+    }
+  }, [getAllCardRects, notes, positions, onPositionsChange]);
+
+  // Tidy Up: arrange all cards into ordered grid
+  const handleTidyUp = useCallback(() => {
+    setIsTidying(true);
+    const allIds = [
+      ...projects.map(p => p.id),
+      ...notes.map(n => n.id),
+      ...tasks.map(t => t.id),
+    ];
+    const newPositions: Record<string, WorkflowPosition> = {};
+    const placed: CardRect[] = [];
+    const startX = 40;
+    const startY = 40;
+
+    allIds.forEach((id) => {
+      const dims = id.startsWith('note-')
+        ? { width: NOTE_DEFAULT_WIDTH, height: NOTE_DEFAULT_HEIGHT }
+        : id.startsWith('task-')
+        ? { width: TASK_DEFAULT_WIDTH, height: TASK_DEFAULT_HEIGHT }
+        : { width: CARD_WIDTH, height: CARD_HEIGHT };
+      const slot = getNextAvailableSlot(placed, dims.width, dims.height);
+      newPositions[id] = slot;
+      placed.push({ id, x: slot.x, y: slot.y, ...dims });
+    });
+
+    // Stagger animation via position update
+    onPositionsChange(newPositions);
+    setTimeout(() => setIsTidying(false), 500);
+  }, [projects, notes, tasks, onPositionsChange]);
+
   // Trackpad: pinch-to-zoom + two-finger pan (native non-passive listener to allow preventDefault)
   const zoomRef = useRef(zoom);
   const panRef = useRef(pan);
@@ -935,7 +1299,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         const delta = -e.deltaY * zoomIntensity;
         const curZoom = zoomRef.current;
         const curPan = panRef.current;
-        const newZoom = Math.min(2, Math.max(0.3, curZoom * (1 + delta)));
+        const newZoom = Math.min(2, Math.max(0.15, curZoom * (1 + delta)));
 
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
@@ -970,7 +1334,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         left: 0,
         width: '100vw',
         height: '100vh',
-        background: '#1a1a1a',
+        background: '#e5e5e5',
         overflow: 'hidden',
         zIndex: 1000,
         cursor: isPanning ? 'grabbing' : (connectingFrom ? 'crosshair' : 'grab'),
@@ -998,7 +1362,43 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
           0% { stroke-dashoffset: 16; }
           100% { stroke-dashoffset: 0; }
         }
+        @keyframes cardReject {
+          0%   { transform: scale(1) translateX(0); background: rgba(239,68,68,0.08); }
+          25%  { transform: scale(1.02) translateX(-4px); }
+          50%  { transform: scale(1.01) translateX(4px); }
+          75%  { transform: scale(1.01) translateX(-2px); }
+          100% { transform: scale(1) translateX(0); background: transparent; }
+        }
       `}</style>
+
+      {/* Infinite grid — sits outside the transform group, covers full viewport */}
+      {(() => {
+        const BASE_GRID = 40;
+        const scaledGrid = BASE_GRID * zoom;
+        const offsetX = ((pan.x % scaledGrid) + scaledGrid) % scaledGrid;
+        const offsetY = ((pan.y % scaledGrid) + scaledGrid) % scaledGrid;
+        const subGrid = scaledGrid / 5; // minor grid at 1/5 spacing
+        const subOffsetX = ((pan.x % subGrid) + subGrid) % subGrid;
+        const subOffsetY = ((pan.y % subGrid) + subGrid) % subGrid;
+        return (
+          <svg
+            data-workflow-grid
+            data-grid-bg
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }}
+          >
+            <defs>
+              <pattern id="workflow-dot-sm" x={subOffsetX} y={subOffsetY} width={subGrid} height={subGrid} patternUnits="userSpaceOnUse">
+                <circle cx="0" cy="0" r={zoom < 0.5 ? 0 : 0.75} fill="#b8b8b8" />
+              </pattern>
+              <pattern id="workflow-dot-lg" x={offsetX} y={offsetY} width={scaledGrid} height={scaledGrid} patternUnits="userSpaceOnUse">
+                <rect width={scaledGrid} height={scaledGrid} fill="url(#workflow-dot-sm)" />
+                <circle cx="0" cy="0" r={zoom < 0.4 ? 0 : 1.4} fill="#888888" />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#workflow-dot-lg)" />
+          </svg>
+        );
+      })()}
 
       <div
         style={{
@@ -1010,31 +1410,6 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
           transition: isPanning ? 'none' : 'transform 0.1s ease-out',
         }}
       >
-      <div
-        data-grid-bg
-        style={{
-          position: 'absolute',
-          top: -1000,
-          left: -1000,
-          width: '5000px',
-          height: '5000px',
-          background: '#e5e5e5',
-          zIndex: 0,
-        }}
-      >
-        <svg data-workflow-grid width="100%" height="100%" style={{ position: 'absolute', top: 0, left: 0 }}>
-          <defs>
-            <pattern id="workflow-grid" width="20" height="20" patternUnits="userSpaceOnUse">
-              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#d0d0d0" strokeWidth={0.5} />
-            </pattern>
-            <pattern id="workflow-grid-major" width="100" height="100" patternUnits="userSpaceOnUse">
-              <rect width="100" height="100" fill="url(#workflow-grid)" />
-              <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#b0b0b0" strokeWidth={1} />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#workflow-grid-major)" />
-        </svg>
-      </div>
 
         {projects.map((project, index) => {
         return (
@@ -1044,17 +1419,15 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
             index={index}
             isActive={activeProjectId === project.id}
             position={positions[project.id] || { x: 60 + (index % 4) * 340, y: 120 + Math.floor(index / 4) * 300 }}
-            onPositionChange={(id, x, y) => {
-              onPositionsChange({
-                ...positions,
-                [id]: { x, y },
-              });
-            }}
+            onPositionChange={handlePositionChangeWithSnap}
+            onDragEnd={handleDragEnd}
             onSelect={() => onProjectSelect(project.id)}
             onConnectorClick={handleConnectorClick}
             connectingFrom={connectingFrom}
             pan={pan}
             zoom={zoom}
+            isNew={newCardIds.has(project.id)}
+            isRejected={rejectedCardId === project.id}
           />
         );
       })}
@@ -1065,18 +1438,30 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
           key={note.id}
           note={note}
           position={positions[note.id] || { x: 100, y: 100 }}
-          onPositionChange={(id, x, y) => {
-            onPositionsChange({
-              ...positions,
-              [id]: { x, y },
-            });
-          }}
+          onPositionChange={handlePositionChangeWithSnap}
           onNoteChange={handleNoteChange}
           onDelete={handleDeleteNote}
           onConnectorClick={handleConnectorClick}
           connectingFrom={connectingFrom}
           pan={pan}
           zoom={zoom}
+        />
+      ))}
+
+      {/* Draggable Task Cards */}
+      {tasks.map((task) => (
+        <DraggableTaskCard
+          key={task.id}
+          task={task}
+          position={positions[task.id] || { x: 120, y: 120 }}
+          onPositionChange={handlePositionChangeWithSnap}
+          onTaskChange={handleTaskChange}
+          onDelete={handleDeleteTask}
+          onConnectorClick={handleConnectorClick}
+          connectingFrom={connectingFrom}
+          pan={pan}
+          zoom={zoom}
+          teamMembers={teamMembers}
         />
       ))}
 
@@ -1187,6 +1572,22 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
           );
         })}
 
+        {/* Snap alignment guides */}
+        {snapLines.map((line, i) => (
+          <line
+            key={`snap-${i}`}
+            x1={line.x1 + SVG_OFFSET}
+            y1={line.y1 + SVG_OFFSET}
+            x2={line.x2 + SVG_OFFSET}
+            y2={line.y2 + SVG_OFFSET}
+            stroke="#3b82f6"
+            strokeWidth="1"
+            strokeDasharray="4 3"
+            opacity="0.7"
+            pointerEvents="none"
+          />
+        ))}
+
         {/* Connection preview line */}
         {connectingFrom && mousePos && (() => {
           const fromPos = positions[connectingFrom.cardId];
@@ -1258,6 +1659,28 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         <button onClick={handleZoomIn} style={zoomBtnStyle}>+</button>
         <div style={{ width: '1px', background: '#e2e8f0', margin: '0 4px' }} />
         <button onClick={handleReset} style={{ ...zoomBtnStyle, padding: '0 12px' }}>Reset</button>
+        <div style={{ width: '1px', background: '#e2e8f0', margin: '0 4px' }} />
+        <button
+          onClick={handleTidyUp}
+          style={{
+            ...zoomBtnStyle,
+            padding: '0 12px',
+            gap: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            opacity: isTidying ? 0.6 : 1,
+            transition: 'opacity 0.2s',
+          }}
+          title="Tidy Up — arrange all cards into a clean grid"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" />
+          </svg>
+          Tidy
+        </button>
       </div>
       </div>
 
@@ -1305,33 +1728,60 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
             </button>
           )}
           {contextMenu.type === 'canvas' && (
-            <button
-              onClick={() => handleCreateNote(contextMenu.wrapperX, contextMenu.wrapperY)}
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                border: 'none',
-                background: 'transparent',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '13px',
-                fontWeight: 500,
-                color: '#334155',
-                transition: 'background 0.1s',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="12" y1="11" x2="12" y2="17" />
-                <line x1="9" y1="14" x2="15" y2="14" />
-              </svg>
-              New Note
-            </button>
+            <>
+              <button
+                onClick={() => handleCreateNote(contextMenu.wrapperX, contextMenu.wrapperY)}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: '#334155',
+                  transition: 'background 0.1s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="12" y1="11" x2="12" y2="17" />
+                  <line x1="9" y1="14" x2="15" y2="14" />
+                </svg>
+                New Note
+              </button>
+              <button
+                onClick={() => handleCreateTask(contextMenu.wrapperX, contextMenu.wrapperY)}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: '#334155',
+                  transition: 'background 0.1s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth={2}>
+                  <rect x="3" y="3" width="18" height="18" rx="3" />
+                  <polyline points="9 12 11 14 15 10" />
+                </svg>
+                New Task
+              </button>
+            </>
           )}
         </div>
       )}

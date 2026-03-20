@@ -25,10 +25,8 @@ const ElectricalIcon = React.memo<ElectricalIconProps>(({
       onClick={onClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      style={{
-        cursor: 'pointer',
-        transform: `translate(${x - size / 2}px, ${y - size / 2}px)`,
-      }}
+      transform={`translate(${x - size / 2}, ${y - size / 2})`}
+      style={{ cursor: 'pointer' }}
     >
       <circle
         cx={size / 2}

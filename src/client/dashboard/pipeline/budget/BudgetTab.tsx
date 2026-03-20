@@ -34,6 +34,17 @@ interface BudgetState {
 }
 
 const BudgetTab: React.FC<BudgetTabProps> = ({ eventId }) => {
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const [state, setState] = useState<BudgetState>({
     budget: null,
     categories: [],

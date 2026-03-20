@@ -149,6 +149,10 @@ export const WorkSection: React.FC = () => {
           gridTemplateColumns: isMobile ? undefined : '260px minmax(0, 1fr)',
           gap: isMobile ? 12 : 16,
           position: 'relative',
+          height: isMobile ? 'auto' : undefined,
+          minHeight: isMobile ? 'auto' : undefined,
+          maxHeight: isMobile ? 'none' : undefined,
+          overflow: isMobile ? 'visible' : undefined,
         }}
       >
 
@@ -164,8 +168,8 @@ export const WorkSection: React.FC = () => {
             flexDirection: 'column',
             gap: 10,
             height: isMobile ? 'auto' : '100%',
-            maxHeight: isMobile ? '200px' : undefined,
-            overflowY: isMobile ? 'auto' : undefined,
+            maxHeight: isMobile ? 'none' : undefined,
+            overflowY: isMobile ? 'visible' : undefined,
           }}
         >
           {!isMobile && (
@@ -240,7 +244,16 @@ export const WorkSection: React.FC = () => {
         </div>
 
         {/* Event workspace */}
-        <div className="work-workspace" style={{ minHeight: isMobile ? 'calc(100vh - 300px)' : undefined }}>
+        <div 
+          className="work-workspace" 
+          style={{ 
+            minHeight: isMobile ? 'auto' : undefined,
+            height: isMobile ? 'auto' : undefined,
+            maxHeight: isMobile ? 'none' : undefined,
+            overflowY: isMobile ? 'visible' : undefined,
+            flex: isMobile ? 'none' : undefined,
+          }}
+        >
           {selectedEvent ? (
             <EventProjectPage eventId={selectedEvent.id} />
           ) : (

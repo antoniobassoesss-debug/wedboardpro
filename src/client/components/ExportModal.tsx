@@ -86,9 +86,9 @@ const PillButton: React.FC<{
     style={{
       padding: '6px 14px',
       borderRadius: '8px',
-      border: `1.5px solid ${selected ? '#6366f1' : '#e2e8f0'}`,
-      background: selected ? '#eef2ff' : '#ffffff',
-      color: selected ? '#4338ca' : '#64748b',
+      border: `1.5px solid ${selected ? '#0f172a' : '#e2e8f0'}`,
+      background: selected ? '#0f172a' : '#ffffff',
+      color: selected ? '#ffffff' : '#64748b',
       fontSize: '12px',
       fontWeight: 600,
       cursor: disabled ? 'not-allowed' : 'pointer',
@@ -212,9 +212,10 @@ const ExportModal: React.FC<ExportModalProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: visible ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0)',
+        background: visible ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0)',
         backdropFilter: visible ? 'blur(4px)' : 'none',
         transition: 'background 0.2s ease, backdrop-filter 0.2s ease',
+        padding: 16,
       }}
     >
       <div
@@ -224,11 +225,12 @@ const ExportModal: React.FC<ExportModalProps> = ({
           maxWidth: '95vw',
           maxHeight: '90vh',
           background: '#ffffff',
-          borderRadius: '16px',
-          boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+          borderRadius: '20px',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.22)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          border: '1px solid rgba(0,0,0,0.08)',
           transform: visible ? 'scale(1)' : 'scale(0.95)',
           opacity: visible ? 1 : 0,
           transition: 'transform 0.2s ease, opacity 0.2s ease',
@@ -236,54 +238,55 @@ const ExportModal: React.FC<ExportModalProps> = ({
       >
         {/* Header */}
         <div style={{
-          padding: '20px 24px 16px',
+          padding: '18px 24px',
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'space-between',
-          borderBottom: '1px solid #f1f5f9',
+          borderBottom: '1px solid #f3f4f6',
+          background: '#ffffff',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div style={{
-              width: '36px',
-              height: '36px',
+              width: '40px',
+              height: '40px',
               borderRadius: '10px',
-              background: '#eef2ff',
+              background: '#f1f5f9',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#6366f1',
+              color: '#0f172a',
             }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
             </div>
             <div>
-              <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Export Layout</h2>
-              <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#94a3b8' }}>Choose format and quality settings</p>
+              <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#0f172a' }}>Export Layout</h2>
+              <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748b' }}>Choose format and quality settings</p>
             </div>
           </div>
           <button
             onClick={onClose}
             disabled={isDisabled}
             style={{
-              width: '32px',
-              height: '32px',
+              width: '36px',
+              height: '36px',
               borderRadius: '8px',
               border: 'none',
-              background: 'transparent',
+              background: '#f1f5f9',
               cursor: isDisabled ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#94a3b8',
-              transition: 'all 0.15s',
+              color: '#64748b',
+              transition: 'background 0.15s',
             }}
-            onMouseEnter={(e) => { if (!isDisabled) { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#475569'; } }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8'; }}
+            onMouseEnter={(e) => { if (!isDisabled) e.currentTarget.style.background = '#e2e8f0'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
@@ -293,7 +296,7 @@ const ExportModal: React.FC<ExportModalProps> = ({
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
           {/* Section 1 — Format selector */}
           <div style={{ marginBottom: '24px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px', display: 'block' }}>
+            <label style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px', display: 'block' }}>
               Format
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
@@ -308,8 +311,8 @@ const ExportModal: React.FC<ExportModalProps> = ({
                       position: 'relative',
                       padding: '14px 12px',
                       borderRadius: '12px',
-                      border: `2px solid ${selected ? '#6366f1' : '#e2e8f0'}`,
-                      background: selected ? '#f5f3ff' : '#ffffff',
+                      border: `2px solid ${selected ? '#0f172a' : '#e2e8f0'}`,
+                      background: selected ? '#f8fafc' : '#ffffff',
                       cursor: isDisabled ? 'not-allowed' : 'pointer',
                       display: 'flex',
                       flexDirection: 'column',
@@ -320,8 +323,8 @@ const ExportModal: React.FC<ExportModalProps> = ({
                     }}
                     onMouseEnter={(e) => {
                       if (!selected && !isDisabled) {
-                        e.currentTarget.style.borderColor = '#c7d2fe';
-                        e.currentTarget.style.background = '#fafafe';
+                        e.currentTarget.style.borderColor = '#0f172a';
+                        e.currentTarget.style.background = '#f8fafc';
                       }
                     }}
                     onMouseLeave={(e) => {
@@ -340,7 +343,7 @@ const ExportModal: React.FC<ExportModalProps> = ({
                         width: '20px',
                         height: '20px',
                         borderRadius: '50%',
-                        background: '#6366f1',
+                        background: '#0f172a',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -350,20 +353,20 @@ const ExportModal: React.FC<ExportModalProps> = ({
                         </svg>
                       </div>
                     )}
-                    <div style={{ color: selected ? '#6366f1' : '#94a3b8' }}>
+                    <div style={{ color: selected ? '#0f172a' : '#64748b' }}>
                       {card.icon}
                     </div>
-                    <span style={{ fontSize: '14px', fontWeight: 700, color: selected ? '#4338ca' : '#0f172a' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 700, color: selected ? '#0f172a' : '#0f172a' }}>
                       {card.name}
                     </span>
-                    <span style={{ fontSize: '11px', color: '#94a3b8', textAlign: 'center' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', textAlign: 'center' }}>
                       {card.description}
                     </span>
                     <span style={{
                       fontSize: '10px',
                       fontWeight: 600,
-                      color: selected ? '#6366f1' : '#94a3b8',
-                      background: selected ? '#eef2ff' : '#f8fafc',
+                      color: selected ? '#0f172a' : '#64748b',
+                      background: selected ? '#e2e8f0' : '#f8fafc',
                       padding: '2px 8px',
                       borderRadius: '4px',
                     }}>
@@ -378,7 +381,7 @@ const ExportModal: React.FC<ExportModalProps> = ({
           {/* Section 2 — Quality (for JPG and PDF) */}
           {(format === 'jpg' || format === 'pdf' || format === 'png') && (
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontSize: '12px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'block' }}>
+              <label style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'block' }}>
                 Export Quality
               </label>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '4px' }}>
@@ -392,14 +395,14 @@ const ExportModal: React.FC<ExportModalProps> = ({
                   High (300 DPI)
                 </PillButton>
               </div>
-              <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>Higher quality = larger file size</p>
+              <p style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>Higher quality = larger file size</p>
             </div>
           )}
 
           {/* Section 3 — Paper Size (PDF only) */}
           {format === 'pdf' && (
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontSize: '12px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'block' }}>
+              <label style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'block' }}>
                 Paper Size
               </label>
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -415,7 +418,7 @@ const ExportModal: React.FC<ExportModalProps> = ({
           {/* Section 4 — Orientation (PDF only) */}
           {format === 'pdf' && (
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontSize: '12px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'block' }}>
+              <label style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'block' }}>
                 Orientation
               </label>
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -470,7 +473,7 @@ const ExportModal: React.FC<ExportModalProps> = ({
               flexShrink: 0,
               overflow: 'hidden',
             }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="1.5">
                 <rect x="3" y="3" width="7" height="7" rx="1" />
                 <rect x="14" y="3" width="7" height="7" rx="1" />
                 <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -481,7 +484,7 @@ const ExportModal: React.FC<ExportModalProps> = ({
               <div style={{
                 fontSize: '12px',
                 fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
-                color: '#475569',
+                color: '#0f172a',
                 fontWeight: 600,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -489,11 +492,11 @@ const ExportModal: React.FC<ExportModalProps> = ({
               }}>
                 {filenamePreview}
               </div>
-              <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
                 Estimated size: {FILE_SIZE_ESTIMATES[format][quality]}
               </div>
               {format === 'pdf' && (
-                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
                   {paperSize} {orientation}  ·  {PAPER_SIZES[paperSize]?.w ?? 210} × {PAPER_SIZES[paperSize]?.h ?? 297} mm
                 </div>
               )}
@@ -504,21 +507,22 @@ const ExportModal: React.FC<ExportModalProps> = ({
         {/* Footer */}
         <div style={{
           padding: '16px 24px',
-          borderTop: '1px solid #f1f5f9',
+          borderTop: '1px solid #f3f4f6',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          background: '#ffffff',
         }}>
           {/* Left: Print button */}
           <button
             onClick={handlePrint}
             disabled={isDisabled}
             style={{
-              padding: '8px 16px',
+              padding: '10px 16px',
               borderRadius: '8px',
-              border: '1px solid #e2e8f0',
+              border: '1px solid #e5e7eb',
               background: 'transparent',
-              color: '#475569',
+              color: '#374151',
               fontSize: '13px',
               fontWeight: 600,
               cursor: isDisabled ? 'not-allowed' : 'pointer',
@@ -545,11 +549,11 @@ const ExportModal: React.FC<ExportModalProps> = ({
               onClick={onClose}
               disabled={isDisabled}
               style={{
-                padding: '8px 16px',
+                padding: '10px 16px',
                 borderRadius: '8px',
-                border: '1px solid #e2e8f0',
-                background: 'transparent',
-                color: '#64748b',
+                border: '1px solid #e5e7eb',
+                background: '#ffffff',
+                color: '#374151',
                 fontSize: '13px',
                 fontWeight: 600,
                 cursor: isDisabled ? 'not-allowed' : 'pointer',
@@ -564,10 +568,10 @@ const ExportModal: React.FC<ExportModalProps> = ({
               onClick={handleExport}
               disabled={isDisabled}
               style={{
-                padding: '8px 20px',
-                borderRadius: '8px',
+                padding: '10px 20px',
+                borderRadius: '10px',
                 border: 'none',
-                background: status === 'success' ? '#22c55e' : (status === 'error' ? '#ef4444' : '#6366f1'),
+                background: status === 'success' ? '#22c55e' : (status === 'error' ? '#ef4444' : '#0f172a'),
                 color: '#ffffff',
                 fontSize: '13px',
                 fontWeight: 600,
@@ -578,13 +582,12 @@ const ExportModal: React.FC<ExportModalProps> = ({
                 minWidth: '120px',
                 justifyContent: 'center',
                 transition: 'background 0.2s ease',
-                boxShadow: status === 'idle' ? '0 1px 3px rgba(99,102,241,0.3)' : 'none',
               }}
               onMouseEnter={(e) => {
-                if (status === 'idle') e.currentTarget.style.background = '#4f46e5';
+                if (status === 'idle') e.currentTarget.style.background = '#1e293b';
               }}
               onMouseLeave={(e) => {
-                if (status === 'idle') e.currentTarget.style.background = '#6366f1';
+                if (status === 'idle') e.currentTarget.style.background = '#0f172a';
               }}
             >
               {status === 'exporting' && (

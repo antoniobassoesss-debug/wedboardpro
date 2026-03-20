@@ -1044,6 +1044,25 @@
   display: none;
 }
 
+/* Mobile wrapper fix - allow full height for scrolling */
+@media (max-width: 767px) {
+  .pipeline-wrapper {
+    max-height: none !important;
+    overflow: visible !important;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .pipeline-sidebar {
+    display: none;
+  }
+
+  .pipeline-main {
+    width: 100% !important;
+    flex: none;
+  }
+}
+
 @media (max-width: 767px) {
   .pipeline-fab {
     display: flex;
@@ -1117,6 +1136,44 @@
     padding-bottom: 100px;
   }
 
+  /* Budget Tab Mobile Fixes */
+  .pipeline-detail:has(.budget-container) {
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+    border: none !important;
+    padding: 12px !important;
+  }
+
+  .pipeline-detail:has(.budget-container) .budget-container {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Financial Command Center Mobile */
+  .pipeline-detail:has(.fcc-container) {
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  .pipeline-detail:has(.fcc-container) .fcc-container {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Ensure html/body can scroll on mobile for budget pages */
+  html:has(.budget-container),
+  html:has(.fcc-container) {
+    height: auto !important;
+    overflow-y: auto !important;
+  }
+}
+
 .projects-fab {
   display: flex;
   position: fixed;
@@ -1188,7 +1245,6 @@
   .projects-panel {
     padding-bottom: 100px;
   }
-}
 
 .project-tabs {
   overflow-x: auto;

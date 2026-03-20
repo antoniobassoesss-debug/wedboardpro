@@ -157,14 +157,14 @@ export const ElementPlacementModal: React.FC<ElementPlacementModalProps> = ({
     for (let i = 0; i <= gridCount; i++) {
       const pos = i * gridSizePx;
       gridElements.push(
-        <line key={`v-${i}`} x1={pos} y1={0} x2={pos} y2={canvasSize} stroke="#e5e7eb" strokeWidth="0.5" />,
-        <line key={`h-${i}`} x1={0} y1={pos} x2={canvasSize} y2={pos} stroke="#e5e7eb" strokeWidth="0.5" />
+        <line key={`v-${i}`} x1={pos} y1={0} x2={pos} y2={canvasSize} stroke="#e2e8f0" strokeWidth="0.5" />,
+        <line key={`h-${i}`} x1={0} y1={pos} x2={canvasSize} y2={pos} stroke="#e2e8f0" strokeWidth="0.5" />
       );
     }
 
     return (
       <g>
-        <rect width="100%" height="100%" fill="#fafafa" />
+        <rect width="100%" height="100%" fill="#f8fafc" />
         {gridElements}
       </g>
     );
@@ -186,8 +186,8 @@ export const ElementPlacementModal: React.FC<ElementPlacementModalProps> = ({
             y={py - height / 2}
             width={width}
             height={height}
-            fill="rgba(59, 130, 246, 0.2)"
-            stroke="#3b82f6"
+            fill="rgba(15, 23, 42, 0.15)"
+            stroke="#0f172a"
             strokeWidth="2"
             rx={4}
           />
@@ -197,7 +197,7 @@ export const ElementPlacementModal: React.FC<ElementPlacementModalProps> = ({
             textAnchor="middle"
             dominantBaseline="middle"
             fontSize="12"
-            fill="#3b82f6"
+            fill="#0f172a"
           >
             {index + 1}
           </text>
@@ -218,13 +218,13 @@ export const ElementPlacementModal: React.FC<ElementPlacementModalProps> = ({
             y={py - height / 2}
             width={width}
             height={height}
-            fill="rgba(59, 130, 246, 0.1)"
-            stroke="#3b82f6"
+            fill="rgba(15, 23, 42, 0.08)"
+            stroke="#0f172a"
             strokeWidth="2"
             strokeDasharray="4,2"
             rx={4}
           />
-          <circle cx={px} cy={py} r="6" fill="#3b82f6" />
+          <circle cx={px} cy={py} r="6" fill="#0f172a" />
         </g>
       );
     }
@@ -250,8 +250,8 @@ export const ElementPlacementModal: React.FC<ElementPlacementModalProps> = ({
           y={minY - spacingPx / 2}
           width={maxX - minX + width + spacingPx}
           height={maxY - minY + height + spacingPx}
-          fill="rgba(59, 130, 246, 0.1)"
-          stroke="#3b82f6"
+          fill="rgba(15, 23, 42, 0.08)"
+          stroke="#0f172a"
           strokeWidth="1"
           strokeDasharray="4,2"
         />
@@ -269,8 +269,8 @@ export const ElementPlacementModal: React.FC<ElementPlacementModalProps> = ({
               y={ey}
               width={width}
               height={height}
-              fill="rgba(59, 130, 246, 0.1)"
-              stroke="#3b82f6"
+              fill="rgba(15, 23, 42, 0.08)"
+              stroke="#0f172a"
               strokeWidth="1"
               rx={4}
             />
@@ -288,50 +288,100 @@ export const ElementPlacementModal: React.FC<ElementPlacementModalProps> = ({
     return 0;
   }, [placementMode, placedElements, startPoint, gridRows, gridCols]);
 
-  console.log('[ElementPlacementModal] RENDER - isOpen:', isOpen);
-
   if (!isOpen) {
-    console.log('[ElementPlacementModal] Not rendering - isOpen is false');
     return null;
   }
 
-  console.log('[ElementPlacementModal] Rendering modal content');
-
   const modalContent = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(0,0,0,0.55)',
+        padding: 16,
+      }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="bg-white rounded-xl shadow-2xl overflow-hidden"
-        style={{ width: '800px', maxWidth: '95vw' }}
+        style={{
+          width: 800,
+          maxWidth: '95vw',
+          background: '#ffffff',
+          borderRadius: 20,
+          boxShadow: '0 20px 60px rgba(0,0,0,0.22)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          border: '1px solid rgba(0,0,0,0.08)',
+        }}
         onKeyDown={handleKeyDown}
         tabIndex={0}
       >
-        <div className="px-6 py-4 border-b flex items-center justify-between">
+        {/* Header */}
+        <div style={{
+          padding: '18px 24px',
+          borderBottom: '1px solid #f3f4f6',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: '#ffffff',
+        }}>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Place {elementLabel}</h2>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0f172a' }}>
+              Place {elementLabel}
+            </h2>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748b' }}>
               Click to place {elementLabel.toLowerCase()}s on the canvas
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400">
-              Press <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-600">Esc</kbd> to cancel, <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-600">Enter</kbd> to confirm
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, color: '#94a3b8' }}>
+              Press <kbd style={{ padding: '2px 6px', background: '#f1f5f9', borderRadius: 4, fontSize: 11, color: '#475569' }}>Esc</kbd> to cancel, <kbd style={{ padding: '2px 6px', background: '#f1f5f9', borderRadius: 4, fontSize: 11, color: '#475569' }}>Enter</kbd> to confirm
             </span>
-            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-              <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <button
+              onClick={onClose}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 8,
+                border: 'none',
+                background: '#f1f5f9',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#64748b',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
+              onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6L6 18M6 6l12 12" />
               </svg>
             </button>
           </div>
         </div>
 
-        <div className="flex">
-          <div className="flex-1 p-4 bg-gray-50">
+        <div style={{ display: 'flex' }}>
+          {/* Canvas area */}
+          <div style={{ flex: 1, padding: 20, background: '#fafafa' }}>
             <div
-              className="relative bg-white rounded-lg border border-gray-200 overflow-hidden cursor-crosshair"
-              style={{ width: canvasSize, height: canvasSize, margin: '0 auto' }}
+              style={{
+                position: 'relative',
+                background: '#ffffff',
+                borderRadius: 12,
+                border: '1px solid #e2e8f0',
+                overflow: 'hidden',
+                cursor: 'crosshair',
+                width: canvasSize,
+                height: canvasSize,
+                margin: '0 auto',
+              }}
             >
               <svg
                 ref={svgRef}
@@ -346,96 +396,133 @@ export const ElementPlacementModal: React.FC<ElementPlacementModalProps> = ({
               </svg>
             </div>
 
-            <div className="mt-4 flex items-center justify-center gap-4">
-              <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-gray-200">
-                <span className="text-sm text-gray-600">Mode:</span>
+            {/* Controls */}
+            <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+              {/* Mode selector */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#ffffff', padding: '8px 12px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: 13, color: '#475569' }}>Mode:</span>
                 <button
                   onClick={() => setPlacementMode('single')}
-                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                    placementMode === 'single'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: placementMode === 'single' ? '#0f172a' : '#f1f5f9',
+                    color: placementMode === 'single' ? '#ffffff' : '#475569',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                  }}
                 >
                   Single
                 </button>
                 <button
                   onClick={() => setPlacementMode('grid')}
-                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                    placementMode === 'grid'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: placementMode === 'grid' ? '#0f172a' : '#f1f5f9',
+                    color: placementMode === 'grid' ? '#ffffff' : '#475569',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                  }}
                 >
                   Grid
                 </button>
               </div>
 
+              {/* Spacing (grid mode) */}
               {placementMode === 'grid' && (
-                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-gray-200">
-                  <span className="text-sm text-gray-600">Spacing:</span>
-                  <input
-                    type="number"
-                    value={spacing}
-                    onChange={(e) => setSpacing(Math.max(0, parseFloat(e.target.value) || 0))}
-                    step="0.1"
-                    min="0"
-                    className="w-16 px-2 py-1 text-sm border border-gray-300 rounded"
-                  />
-                  <span className="text-sm text-gray-500">m</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#ffffff', padding: '8px 12px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: 13, color: '#475569' }}>Spacing:</span>
+                <input
+                  type="number"
+                  value={spacing}
+                  onChange={(e) => setSpacing(Math.max(0, parseFloat(e.target.value) || 0))}
+                  step="0.1"
+                  min="0"
+                  style={{
+                    width: 64,
+                    padding: '6px 8px',
+                    fontSize: 13,
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 6,
+                    outline: 'none',
+                  }}
+                />
+                <span style={{ fontSize: 12, color: '#64748b' }}>m</span>
                 </div>
               )}
 
-              <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-gray-200">
+              {/* Clear button */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button
                   onClick={handleClear}
                   disabled={placedElements.length === 0}
-                  className="px-3 py-1 text-sm bg-gray-100 text-gray-600 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: 13,
+                    background: '#f1f5f9',
+                    color: '#475569',
+                    border: 'none',
+                    borderRadius: 8,
+                    cursor: placedElements.length === 0 ? 'not-allowed' : 'pointer',
+                    opacity: placedElements.length === 0 ? 0.5 : 1,
+                  }}
                 >
                   Clear All
                 </button>
               </div>
             </div>
 
-            <div className="mt-3 flex items-center justify-center gap-4 text-xs text-gray-500">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 bg-blue-500 rounded-full" />
+            {/* Help text */}
+            <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, fontSize: 11, color: '#64748b' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 6, height: 6, background: '#0f172a', borderRadius: '50%' }} />
                 Click to place
               </span>
-              <span className="flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-600">⌘Z</kbd>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <kbd style={{ padding: '2px 6px', background: '#f1f5f9', borderRadius: 4, fontSize: 10, color: '#475569' }}>⌘Z</kbd>
                 Undo
               </span>
             </div>
           </div>
 
-          <div className="w-72 border-l p-4 bg-white">
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <h4 className="text-sm font-medium text-gray-900 mb-3">Placement Info</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Element:</span>
-                    <span className="text-gray-900 font-medium">{elementLabel}</span>
+          {/* Sidebar */}
+          <div style={{ width: 300, borderLeft: '1px solid #f1f5f9', padding: 20, background: '#ffffff' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Info card */}
+              <div style={{ padding: 16, background: '#f8fafc', borderRadius: 12, border: '1px solid #f1f5f9' }}>
+                <h4 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600, color: '#0f172a' }}>Placement Info</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                    <span style={{ color: '#64748b' }}>Element:</span>
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{elementLabel}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Size:</span>
-                    <span className="text-gray-900 font-medium">{defaultWidth}m × {defaultHeight}m</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                    <span style={{ color: '#64748b' }}>Size:</span>
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{defaultWidth}m × {defaultHeight}m</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">To place:</span>
-                    <span className="text-gray-900 font-medium">{previewCount}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                    <span style={{ color: '#64748b' }}>To place:</span>
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{previewCount}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Total placed:</span>
-                    <span className="text-gray-900 font-medium">{placedElements.length}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                    <span style={{ color: '#64748b' }}>Total placed:</span>
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{placedElements.length}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              {/* Help tip */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#64748b' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, marginTop: 2 }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 16v-4M12 8h.01" />
                 </svg>
                 <span>{placementMode === 'single' ? 'Click to place individual elements' : 'Drag to create a grid of elements'}</span>
               </div>
@@ -443,17 +530,46 @@ export const ElementPlacementModal: React.FC<ElementPlacementModalProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t bg-gray-50">
+        {/* Footer */}
+        <div style={{
+          padding: '16px 24px',
+          borderTop: '1px solid #f3f4f6',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: '#ffffff',
+        }}>
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
+            style={{
+              padding: '10px 16px',
+              borderRadius: 8,
+              border: '1px solid #e5e7eb',
+              background: '#ffffff',
+              color: '#374151',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
           >
             Cancel
           </button>
           <button
             onClick={handlePlaceElements}
             disabled={placedElements.length === 0}
-            className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              padding: '10px 20px',
+              borderRadius: 10,
+              border: 'none',
+              background: placedElements.length === 0 ? '#94a3b8' : '#0f172a',
+              color: '#ffffff',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: placedElements.length === 0 ? 'not-allowed' : 'pointer',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={(e) => { if (placedElements.length > 0) e.currentTarget.style.background = '#1e293b'; }}
+            onMouseLeave={(e) => { if (placedElements.length > 0) e.currentTarget.style.background = '#0f172a'; }}
           >
             Place {placedElements.length} {elementLabel.toLowerCase()}{placedElements.length !== 1 ? 's' : ''}
           </button>

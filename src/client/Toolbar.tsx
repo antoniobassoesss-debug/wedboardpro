@@ -21,9 +21,14 @@ interface ToolbarProps {
   onBrushSizeChange?: (size: number) => void;
   onBrushColorChange?: (color: string) => void;
   availableSpaces?: SpaceOption[];
+  onOpenSatelliteModal?: () => void;
+  onOpenCustomUploadModal?: () => void;
+  onNewLayout?: () => void;
+  /** Increment to imperatively open the Wall Maker */
+  openWallMakerTrigger?: number;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange, onAddSpace, onAddTable, onAddWalls, brushSize = 2, brushColor = '#000000', onBrushSizeChange, onBrushColorChange, availableSpaces = [] }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange, onAddSpace, onAddTable, onAddWalls, brushSize = 2, brushColor = '#000000', onBrushSizeChange, onBrushColorChange, availableSpaces = [], onOpenSatelliteModal, onOpenCustomUploadModal, onNewLayout, openWallMakerTrigger }) => {
   const toolbarWidth = 60;
   const toolbarHeight = 300;
   const buttonSize = 60; // Matches Elements button size
@@ -144,6 +149,15 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange, onAddSpace,
   const structureMenuRef = useRef<HTMLDivElement>(null);
   const presetContextMenuRef = useRef<HTMLDivElement>(null);
   const brushSettingsRef = useRef<HTMLDivElement>(null);
+
+  // Open Wall Maker whenever the parent increments this trigger
+  useEffect(() => {
+    if (openWallMakerTrigger && openWallMakerTrigger > 0) {
+      setShowWallMaker(true);
+      setWallMakerSize({ width: 800, height: 600 });
+    }
+  }, [openWallMakerTrigger]);
+
   const activeSpace = useMemo(() => availableSpaces.length > 0 ? availableSpaces[availableSpaces.length - 1] : null, [availableSpaces]);
   const hasActiveSpace = Boolean(activeSpace);
 
@@ -468,54 +482,51 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange, onAddSpace,
 
   return (
     <>
-      {/* Wall Maker Button - Floating above toolbar */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          console.log('Wall Maker button clicked');
-          setShowWallMaker(true);
-          setWallMakerSize({ width: 800, height: 600 });
-        }}
-        style={{
-          position: 'fixed',
-          left: `${padding}px`,
-          top: 'calc(50% - 215px - 60px - 8px)',
-          width: '60px',
-          height: '60px',
-          borderRadius: '50%',
-          background: 'white',
-          border: '1px solid #e0e0e0',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-          zIndex: 10002,
-          transition: 'all 0.2s ease',
-          pointerEvents: 'auto',
-        }}
-        title="Wall Maker"
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = '#f8fafc';
-          e.currentTarget.style.borderColor = '#3b82f6';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'white';
-          e.currentTarget.style.borderColor = '#e0e0e0';
-        }}
-      >
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 20 20"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
+      {/* Top-left: single + New button replacing the old Wall Maker / Satellite / Upload trio */}
+      {onNewLayout && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onNewLayout();
+          }}
+          style={{
+            position: 'fixed',
+            top: 16,
+            left: 24,
+            height: 36,
+            padding: '0 16px',
+            borderRadius: 20,
+            background: '#111827',
+            color: '#ffffff',
+            border: 'none',
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            letterSpacing: '0.01em',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+            transition: 'background 150ms ease',
+            zIndex: 100,
+            pointerEvents: 'auto',
+            whiteSpace: 'nowrap',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#374151';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#111827';
+          }}
+          title="New Layout"
         >
-          <rect x="2" y="4" width="4" height="12" rx="1" stroke="#666666" strokeWidth="1.5" fill="none" />
-          <rect x="8" y="4" width="4" height="12" rx="1" stroke="#666666" strokeWidth="1.5" fill="none" />
-          <rect x="14" y="4" width="4" height="12" rx="1" stroke="#666666" strokeWidth="1.5" fill="none" />
-        </svg>
-      </button>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="6" y1="1" x2="6" y2="11" />
+            <line x1="1" y1="6" x2="11" y2="6" />
+          </svg>
+          New
+        </button>
+      )}
 
       {/* Structure Button - Floating above toolbar, below Wall Maker */}
       <button

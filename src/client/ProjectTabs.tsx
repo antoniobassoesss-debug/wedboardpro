@@ -257,28 +257,31 @@ const ProjectTabs: React.FC<ProjectTabsProps> = ({
         onClick={onNewProject}
         style={{
           height: '32px',
-          width: '32px',
+          padding: '0 14px',
           borderRadius: '16px',
           border: 'none',
-          background: '#e5e5e5',
-          color: '#666666',
-          fontSize: '18px',
+          background: '#111827',
+          color: '#ffffff',
+          fontSize: '13px',
+          fontWeight: '500',
           cursor: 'pointer',
-          transition: 'all 0.2s ease',
+          transition: 'background 0.2s ease',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+          gap: '4px',
+          whiteSpace: 'nowrap',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15)',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = '#d0d0d0';
+          e.currentTarget.style.background = '#374151';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = '#e5e5e5';
+          e.currentTarget.style.background = '#111827';
         }}
-        title="New Project"
+        title="New Layout"
       >
-        +
+        + New
       </button>
     </div>
 

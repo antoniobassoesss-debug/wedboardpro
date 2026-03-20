@@ -17,10 +17,22 @@ export type ElementType =
   | 'table-rectangular'
   | 'table-oval'
   | 'table-square'
-  // Seating
+  // Seating — individual (internal 'chair' type kept for table auto-fill)
   | 'chair'
-  | 'bench'
-  | 'lounge'
+  | 'seat-standard'
+  | 'seat-armchair'
+  | 'seat-chaise'
+  | 'seat-sofa'    // sidebar entry — places seat-sofa-2 or seat-sofa-3
+  | 'seat-sofa-2'
+  | 'seat-sofa-3'
+  | 'seat-bench'
+  | 'seat-barstool'
+  | 'seat-throne'
+  // Seating — ceremony block
+  | 'ceremony-block'
+  // Ceremony elements
+  | 'altar'
+  | 'pathway'
   // Zones
   | 'dance-floor'
   | 'stage'
@@ -28,6 +40,7 @@ export type ElementType =
   | 'ceremony-area'
   // Service
   | 'bar'
+  | 'cocktail'
   | 'buffet'
   | 'cake-table'
   | 'gift-table'
@@ -37,6 +50,20 @@ export type ElementType =
   | 'photo-booth'
   | 'arch'
   | 'custom'
+  // Audio Visual equipment
+  | 'av-mixing-desk'
+  | 'av-speaker'
+  | 'av-subwoofer'
+  | 'av-truss'
+  | 'av-moving-head'
+  | 'av-led-wall'
+  | 'av-screen'
+  | 'av-projector'
+  | 'av-light-console'
+  | 'av-preset-full-stage'
+  // Lighting — anchor-based string decorations
+  | 'string-lights'
+  | 'bunting'
   // Custom template reference (format: custom-{uuid})
   | `custom-${string}`;
 
@@ -157,20 +184,86 @@ export interface ZoneElement extends BaseElement {
   estimatedCapacity: number | null;
 }
 
+// Seat type subset
+export type SeatType =
+  | 'seat-standard'
+  | 'seat-armchair'
+  | 'seat-chaise'
+  | 'seat-sofa-2'
+  | 'seat-sofa-3'
+  | 'seat-bench'
+  | 'seat-barstool'
+  | 'seat-throne';
+
 /**
- * Bench Element
+ * Seat Element (individual seating — sidebar placed)
+ * Uses BaseElement.label for throne/named seat labels (always set, defaults to type label).
  */
-export interface BenchElement extends BaseElement {
-  type: 'bench';
-  capacity: number;
+export interface SeatElement extends BaseElement {
+  type: SeatType;
 }
 
 /**
- * Lounge Element
+ * Ceremony Seating Data
  */
-export interface LoungeElement extends BaseElement {
-  type: 'lounge';
-  capacity: number;
+export interface CeremonyData {
+  mode: 'full-block' | 'row-by-row';
+  seatsPerRow: number;    // per section (each side of the aisle)
+  rowCount: number;
+  seatWidthPx: number;    // SVG pixels
+  seatHeightPx: number;   // SVG pixels
+  rowGapPx: number;       // SVG pixels between rows
+  seatGapPx: number;      // SVG pixels between seats in a row
+  aisleWidthPx: number;   // SVG pixels (0 = no aisle)
+  showLabels: boolean;
+}
+
+/**
+ * Ceremony Block Element (full ceremony seating arrangement)
+ */
+export interface CeremonyElement extends BaseElement {
+  type: 'ceremony-block';
+  ceremonyData: CeremonyData;
+}
+
+/**
+ * String Lights Element
+ *
+ * Anchor-based element defined by start anchor (x, y) and endAnchorOffset.
+ * Rendered as a catenary wire with Edison/festoon bulbs.
+ *
+ * x, y          = start anchor (absolute meters)
+ * endAnchorOffset = offset from start to end anchor (meters, can be negative)
+ * width, height = |endAnchorOffset.x|, |endAnchorOffset.y| (bounding box)
+ */
+export interface StringLightsElement extends BaseElement {
+  type: 'string-lights';
+  endAnchorOffset: Point;
+  bulbColor: 'warm-white' | 'cool-white' | 'multicolor' | string;
+  bulbSize: 'small' | 'medium' | 'large';
+  spacing: 'dense' | 'normal' | 'sparse';
+  wireColor: string;
+}
+
+/**
+ * Bunting / Arraial Flags Element
+ *
+ * Anchor-based element defined by start anchor (x, y) and endAnchorOffset.
+ * Rendered as a catenary string with hanging triangular pennant flags.
+ *
+ * x, y          = start anchor (absolute meters)
+ * endAnchorOffset = offset from start to end anchor (meters, can be negative)
+ * width, height = |endAnchorOffset.x|, |endAnchorOffset.y| (bounding box)
+ */
+export interface BuntingElement extends BaseElement {
+  type: 'bunting';
+  endAnchorOffset: Point;
+  colorScheme: 'arraial-classic' | 'rainbow' | 'solid' | 'custom';
+  customColors: string[];
+  flagSize: 'small' | 'medium' | 'large';
+  flagShape: 'triangle' | 'rectangle';
+  spacing: 'dense' | 'normal' | 'sparse';
+  stringColor: string;
 }
 
 /**
@@ -229,10 +322,12 @@ export type CanvasElement =
   | TableElement
   | ChairElement
   | ZoneElement
-  | BenchElement
-  | LoungeElement
+  | SeatElement
+  | CeremonyElement
   | ServiceElement
   | DecorationElement
+  | StringLightsElement
+  | BuntingElement
   | CustomElementInstance;
 
 /**
@@ -280,6 +375,35 @@ export function isDecorationElement(element: BaseElement): element is Decoration
   );
 }
 
+export function isStringLightsElement(element: BaseElement): element is StringLightsElement {
+  return element.type === 'string-lights';
+}
+
+export function isBuntingElement(element: BaseElement): element is BuntingElement {
+  return element.type === 'bunting';
+}
+
+export function isAnchorElement(element: BaseElement): element is StringLightsElement | BuntingElement {
+  return element.type === 'string-lights' || element.type === 'bunting';
+}
+
 export function isCustomTemplate(element: BaseElement): element is CustomElementInstance {
   return typeof element.type === 'string' && element.type.startsWith('custom-');
+}
+
+export function isSeatElement(element: BaseElement): element is SeatElement {
+  return (
+    element.type === 'seat-standard' ||
+    element.type === 'seat-armchair' ||
+    element.type === 'seat-chaise' ||
+    element.type === 'seat-sofa-2' ||
+    element.type === 'seat-sofa-3' ||
+    element.type === 'seat-bench' ||
+    element.type === 'seat-barstool' ||
+    element.type === 'seat-throne'
+  );
+}
+
+export function isCeremonyElement(element: BaseElement): element is CeremonyElement {
+  return element.type === 'ceremony-block';
 }

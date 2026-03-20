@@ -22,10 +22,29 @@ import AssociateProjectModal from './AssociateProjectModal';
 import ElectricalDashboard from './components/ElectricalDashboard';
 import ErrorBoundary from './components/ErrorBoundary';
 import ExportButton from './components/ExportButton';
+import { BuildGuideButton } from '../layout-maker/components/BuildGuideModal/BuildGuideButton';
 import A4Canvas, { type A4Dimensions, getInitialA4Dimensions } from './components/A4Canvas';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator';
 import ZoomControls from './components/ZoomControls';
 import { useCanvasStore } from '../layout-maker/store/canvasStore';
+import { CustomUploadModal } from './components/CustomUploadModal';
+import { CustomBackgroundInfoChip } from './components/CustomBackgroundInfoChip';
+import { SeatingConfigModal } from './components/SeatingConfigModal';
+import { CeremonySeatingModal } from './components/CeremonySeatingModal';
+import { DanceFloorConfigModal } from './components/DanceFloorConfigModal';
+import type { DanceFloorData } from './components/DanceFloorConfigModal';
+import { StageConfigModal } from './components/StageConfigModal';
+import type { StageData } from './components/StageConfigModal';
+import { AltarConfigModal } from './components/AltarConfigModal';
+import type { AltarData } from './components/AltarConfigModal';
+import { PathwayConfigModal } from './components/PathwayConfigModal';
+import type { PathwayData } from './components/PathwayConfigModal';
+import { AVElementModal } from './components/AVElementModal';
+import type { AVData } from './components/AVElementModal';
+import { BarConfigModal } from './components/BarConfigModal';
+import type { BarData } from './components/BarConfigModal';
+import { CocktailConfigModal } from './components/CocktailConfigModal';
+import type { CocktailData } from './components/CocktailConfigModal';
 import { useAutoSync } from '../layout-maker/hooks/useAutoSync';
 import { ElementLibrary } from '../layout-maker/components/Sidebar/ElementLibrary';
 import { ElementPlacementModal } from '../layout-maker/components/Sidebar/ElementPlacementModal';
@@ -40,9 +59,13 @@ import type { Wall, Door } from './types/wall';
 import type { PowerPoint } from './types/powerPoint';
 import type { ElementType } from '../layout-maker/types/elements';
 import type { Connection, WorkflowNote } from './components/WorkflowCanvas';
+import type { WorkflowTask } from './components/TaskCard';
+import { loadWorkflowData, saveWorkflowData } from './api/workflowApi';
 import { ELEMENT_DEFAULTS, getElementDefault } from '../layout-maker/constants';
 import { generateChairPositions } from '../layout-maker/utils/chairGeneration';
 import { v4 as uuidv4 } from 'uuid';
+import { NewLayoutModal } from './components/layout/NewLayoutModal';
+import type { LayoutFlow } from './components/layout/NewLayoutModal';
 
 export interface Project {
   id: string;
@@ -62,10 +85,63 @@ const CANVAS_STORAGE_PREFIX = 'layout-maker-canvas-';
 // ============ LOCAL STORAGE HELPERS ============
 
 const getCanvasStorageKey = (projectId: string) => `${CANVAS_STORAGE_PREFIX}${projectId}`;
+// Separate key for large background images so they don't blow up the main canvas JSON
+const getBgImageStorageKey = (projectId: string) => `${CANVAS_STORAGE_PREFIX}${projectId}__bgimage`;
 
 const saveCanvasToLocalStorage = (projectId: string, canvasData: any) => {
   try {
-    localStorage.setItem(getCanvasStorageKey(projectId), JSON.stringify(canvasData));
+    // Strip imageBase64 from satellite/custom background before saving the main JSON —
+    // a single AI-enhanced satellite image can be 1-2 MB as base64, which quickly
+    // exhausts the 5 MB localStorage quota and causes silent save failures.
+    const satellite = canvasData.satelliteBackground;
+    const custom = canvasData.customBackground;
+
+    // Detect destructive saves: saving WITHOUT background to a key that HAS one
+    if (!satellite && !custom) {
+      const existingRaw = localStorage.getItem(getCanvasStorageKey(projectId));
+      if (existingRaw) {
+        try {
+          const existing = JSON.parse(existingRaw);
+          if (existing.satelliteBackground || existing.customBackground) {
+            console.error('[Storage:SAVE DESTRUCTIVE] Writing null background over existing background! Stack:');
+            console.trace();
+          }
+        } catch {}
+      }
+    }
+    console.log('[Storage:SAVE] projectId:', projectId, 'hasSatellite:', !!satellite, 'imageBase64Len:', satellite?.imageBase64?.length ?? 0, 'hasCustom:', !!custom);
+
+    const strippedData = {
+      ...canvasData,
+      satelliteBackground: satellite
+        ? { ...satellite, imageBase64: '__bg__' }
+        : null,
+      customBackground: custom
+        ? { ...custom, imageBase64: '__bg__' }
+        : null,
+    };
+
+    // Store the actual image(s) in a dedicated key (raw base64, no JSON overhead)
+    const bgPayload: { satellite?: string; custom?: string } = {};
+    if (satellite?.imageBase64) bgPayload.satellite = satellite.imageBase64;
+    if (custom?.imageBase64) bgPayload.custom = custom.imageBase64;
+    const bgKey = getBgImageStorageKey(projectId);
+    if (bgPayload.satellite || bgPayload.custom) {
+      try {
+        localStorage.setItem(bgKey, JSON.stringify(bgPayload));
+        console.log('[Storage:SAVE] bg image key saved, satelliteLen:', bgPayload.satellite?.length ?? 0);
+      } catch (e) {
+        // Image too large even on its own — skip image persistence, keep metadata
+        console.error('[Storage:SAVE] bg image key FAILED (quota?):', e);
+        localStorage.removeItem(bgKey);
+      }
+    } else {
+      localStorage.removeItem(bgKey);
+      console.log('[Storage:SAVE] no image to save — bg key cleared');
+    }
+
+    localStorage.setItem(getCanvasStorageKey(projectId), JSON.stringify(strippedData));
+    console.log('[Storage:SAVE] main canvas key saved, satelliteBackground in stripped:', !!strippedData.satelliteBackground);
   } catch (error) {
     console.error('[Storage] Failed to save canvas data:', error);
   }
@@ -74,9 +150,53 @@ const saveCanvasToLocalStorage = (projectId: string, canvasData: any) => {
 const loadCanvasFromLocalStorage = (projectId: string): any | null => {
   try {
     const stored = localStorage.getItem(getCanvasStorageKey(projectId));
-    if (stored) {
-      return JSON.parse(stored);
+    console.log('[Storage:LOAD] projectId:', projectId, 'found main key:', !!stored);
+    if (!stored) return null;
+
+    const parsed = JSON.parse(stored);
+    console.log('[Storage:LOAD] parsed satelliteBackground:', !!parsed.satelliteBackground, 'imageBase64:', parsed.satelliteBackground?.imageBase64?.slice(0, 20));
+
+    // Restore imageBase64 from the dedicated image key
+    try {
+      const bgRaw = localStorage.getItem(getBgImageStorageKey(projectId));
+      console.log('[Storage:LOAD] bg image key found:', !!bgRaw, 'len:', bgRaw?.length ?? 0);
+      if (bgRaw) {
+        const bgPayload = JSON.parse(bgRaw);
+        if (parsed.satelliteBackground && bgPayload.satellite) {
+          parsed.satelliteBackground = { ...parsed.satelliteBackground, imageBase64: bgPayload.satellite };
+          console.log('[Storage:LOAD] satellite image restored, len:', bgPayload.satellite?.length ?? 0);
+        }
+        if (parsed.customBackground && bgPayload.custom) {
+          parsed.customBackground = { ...parsed.customBackground, imageBase64: bgPayload.custom };
+          console.log('[Storage:LOAD] custom image restored, len:', bgPayload.custom?.length ?? 0);
+        }
+      }
+    } catch (e) {
+      console.error('[Storage:LOAD] failed to restore bg image:', e);
     }
+
+    // Final fallback: check the dedicated bg key (written directly by the store action,
+    // immune to any canvas-save overwrite). This rescues backgrounds that were lost
+    // when initializeProject / handleProjectSelect saved the canvas without bg data.
+    if (!parsed.satelliteBackground && !parsed.customBackground) {
+      try {
+        const dedicatedRaw = localStorage.getItem(`layout-maker-bg-${projectId}`);
+        if (dedicatedRaw) {
+          const dedicated = JSON.parse(dedicatedRaw) as { type: 'satellite' | 'custom'; data: any };
+          if (dedicated.type === 'satellite' && dedicated.data) {
+            parsed.satelliteBackground = dedicated.data;
+            console.log('[Storage:LOAD] satellite restored from dedicated bg key');
+          } else if (dedicated.type === 'custom' && dedicated.data) {
+            parsed.customBackground = dedicated.data;
+            console.log('[Storage:LOAD] custom bg restored from dedicated bg key');
+          }
+        }
+      } catch (e) {
+        console.warn('[Storage:LOAD] could not read dedicated bg key:', e);
+      }
+    }
+
+    return parsed;
   } catch (error) {
     console.error('[Storage] Failed to load canvas data:', error);
   }
@@ -86,6 +206,8 @@ const loadCanvasFromLocalStorage = (projectId: string): any | null => {
 const deleteCanvasFromLocalStorage = (projectId: string) => {
   try {
     localStorage.removeItem(getCanvasStorageKey(projectId));
+    localStorage.removeItem(getBgImageStorageKey(projectId));
+    localStorage.removeItem(`layout-maker-bg-${projectId}`);
   } catch (error) {
     console.error('[Storage] Failed to delete canvas data:', error);
   }
@@ -189,6 +311,18 @@ const canvasDataToStoreFormat = (canvasData: any) => {
     storeData.wallScale = canvasData.wallScale;
   }
 
+  if (canvasData.satelliteBackground) {
+    storeData.satelliteBackground = canvasData.satelliteBackground;
+  }
+
+  if (canvasData.customBackground) {
+    storeData.customBackground = canvasData.customBackground;
+  }
+
+  if (canvasData.notes && Array.isArray(canvasData.notes)) {
+    storeData.notes = canvasData.notes;
+  }
+
   return storeData;
 };
 
@@ -240,9 +374,46 @@ const LayoutMakerPageStore: React.FC = () => {
   const [squareTableModalOpen, setSquareTableModalOpen] = useState(false);
   const [ovalTableModalOpen, setOvalTableModalOpen] = useState(false);
   const [customElementModalOpen, setCustomElementModalOpen] = useState(false);
+  const [customUploadOpen, setCustomUploadOpen] = useState(false);
+  const [newLayoutModalOpen, setNewLayoutModalOpen] = useState(false);
+  const [wallMakerTrigger, setWallMakerTrigger] = useState(0);
   const [editingCustomTemplate, setEditingCustomTemplate] = useState<CustomElementTemplate | null>(null);
   const [placementModalOpen, setPlacementModalOpen] = useState(false);
   const [placementElementType, setPlacementElementType] = useState<ElementType>('chair');
+  const [seatingModalOpen, setSeatingModalOpen] = useState(false);
+  const [seatingModalType, setSeatingModalType] = useState<ElementType>('seat-standard');
+  const [seatingEditingShapeId, setSeatingEditingShapeId] = useState<string | null>(null);
+  const [ceremonyModalOpen, setCeremonyModalOpen] = useState(false);
+  const [danceFloorModalOpen, setDanceFloorModalOpen] = useState(false);
+  const [stageModalOpen, setStageModalOpen] = useState(false);
+  const [stageEditShapeId, setStageEditShapeId] = useState<string | null>(null);
+  const [altarModalOpen, setAltarModalOpen] = useState(false);
+  const [altarEditShapeId, setAltarEditShapeId] = useState<string | null>(null);
+  const [pathwayModalOpen, setPathwayModalOpen] = useState(false);
+  const [pathwayEditShapeId, setPathwayEditShapeId] = useState<string | null>(null);
+  const [avModalOpen, setAvModalOpen] = useState(false);
+  const [avModalType, setAvModalType] = useState<string>('av-mixing-desk');
+  const [avEditShapeId, setAvEditShapeId] = useState<string | null>(null);
+  const [barModalOpen, setBarModalOpen] = useState(false);
+  const [barEditShapeId, setBarEditShapeId] = useState<string | null>(null);
+  const [cocktailModalOpen, setCocktailModalOpen] = useState(false);
+  const [cocktailEditShapeId, setCocktailEditShapeId] = useState<string | null>(null);
+
+  const [hiddenCategories, setHiddenCategories] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('layout-maker-hidden-categories') || '[]') as string[];
+    } catch { return []; }
+  });
+
+  const handleToggleCategoryVisibility = useCallback((category: string) => {
+    setHiddenCategories((prev) => {
+      const next = prev.includes(category)
+        ? prev.filter((c) => c !== category)
+        : [...prev, category];
+      localStorage.setItem('layout-maker-hidden-categories', JSON.stringify(next));
+      return next;
+    });
+  }, []);
   const [placementElementLabel, setPlacementElementLabel] = useState('Chair');
   const [placementElementWidth, setPlacementElementWidth] = useState(0.45);
   const [placementElementHeight, setPlacementElementHeight] = useState(0.45);
@@ -313,8 +484,11 @@ const LayoutMakerPageStore: React.FC = () => {
   const addElement = useCanvasStore((s) => s.addElement);
   const a4Bounds = useCanvasStore((s) => s.a4Bounds);
   const wallScale = useCanvasStore((s) => s.wallScale);
+  const customBackground = useCanvasStore((s) => s.customBackground);
+  const clearCustomBackground = useCanvasStore((s) => s.clearCustomBackground);
 
-  // Get the effective pixels-per-meter from the current space, falling back to wallScale then 100
+  // Get the effective pixels-per-meter from the current space, falling back to
+  // satellite/custom background calibrated scale, then wallScale, then 100.
   const getEffectivePPM = useCallback((): number => {
     const state = useCanvasStore.getState();
     const allElements = state.elementOrder
@@ -331,6 +505,9 @@ const LayoutMakerPageStore: React.FC = () => {
         return el.pixelsPerMeter;
       }
     }
+    // Calibrated backgrounds take precedence over wall scale
+    if (state.satelliteBackground?.pixelsPerMeter) return state.satelliteBackground.pixelsPerMeter;
+    if (state.customBackground?.pixelsPerMeter) return state.customBackground.pixelsPerMeter;
     return state.wallScale?.pxPerMeter || 100;
   }, []);
 
@@ -376,11 +553,57 @@ const LayoutMakerPageStore: React.FC = () => {
   }, [addElement, a4Bounds]);
 
   const handleOpenPlacementModal = useCallback((type: ElementType) => {
+    // Route ceremony-block to CeremonySeatingModal
+    if (type === 'ceremony-block') {
+      setCeremonyModalOpen(true);
+      setShowElementLibrary(false);
+      return;
+    }
+    // Route individual seat types to SeatingConfigModal
+    const seatTypes: ElementType[] = [
+      'seat-standard', 'seat-armchair', 'seat-chaise',
+      'seat-sofa', 'seat-sofa-2', 'seat-sofa-3',
+      'seat-bench', 'seat-barstool', 'seat-throne',
+    ];
+    if (seatTypes.includes(type)) {
+      setSeatingModalType(type);
+      setSeatingModalOpen(true);
+      setShowElementLibrary(false);
+      return;
+    }
+    // Route AV types to AVElementModal
+    const avTypes = [
+      'av-mixing-desk', 'av-speaker', 'av-subwoofer', 'av-truss', 'av-moving-head',
+      'av-led-wall', 'av-screen', 'av-projector', 'av-light-console', 'av-preset-full-stage',
+    ];
+    if (avTypes.includes(type as string)) {
+      if (type === 'av-preset-full-stage') {
+        handleAddElementFromLibrary(type);
+        return;
+      }
+      setAvModalType(type as string);
+      setAvEditShapeId(null);
+      setAvModalOpen(true);
+      setShowElementLibrary(false);
+      return;
+    }
+    // Bar and cocktail
+    if (type === 'bar') {
+      setBarEditShapeId(null);
+      setBarModalOpen(true);
+      setShowElementLibrary(false);
+      return;
+    }
+    if (type === 'cocktail') {
+      setCocktailEditShapeId(null);
+      setCocktailModalOpen(true);
+      setShowElementLibrary(false);
+      return;
+    }
+    // Legacy path for 'chair'
     console.log('[LayoutMakerPageStore] handleOpenPlacementModal called with type:', type);
     const elementConfigs: Record<string, { label: string; width: number; height: number }> = {
       'chair': { label: 'Chair', width: 0.45, height: 0.45 },
-      'bench': { label: 'Bench', width: 1.5, height: 0.5 },
-      'lounge': { label: 'Lounge', width: 2, height: 0.8 },
     };
 
     const config = elementConfigs[type];
@@ -438,6 +661,366 @@ const LayoutMakerPageStore: React.FC = () => {
     setPlacementModalOpen(false);
   }, [addElement]);
 
+  // Place individual seat elements from SeatingConfigModal
+  const handlePlaceSeats = useCallback((items: Array<{
+    elementType: ElementType;
+    widthM: number;
+    heightM: number;
+    label: string;
+    fill?: string;
+    count: number;
+  }>) => {
+    const ppm = getEffectivePPM();
+    const COLS = 5;
+    const GAP = 10; // px between elements
+    const startX = a4Bounds.x + 40;
+    const startY = a4Bounds.y + 40;
+    let placed = 0;
+    items.forEach(({ elementType, widthM, heightM, label, fill, count }) => {
+      const widthPx = widthM * ppm;
+      const heightPx = heightM * ppm;
+      for (let i = 0; i < count; i++) {
+        const col = placed % COLS;
+        const row = Math.floor(placed / COLS);
+        addElement({
+          type: 'rectangle',
+          x: startX + col * (widthPx + GAP),
+          y: startY + row * (heightPx + GAP),
+          width: widthPx,
+          height: heightPx,
+          fill: fill || '#f5f0eb',
+          stroke: '#a08060',
+          strokeWidth: 1.5,
+          elementType,
+          label,
+          rotation: 0,
+          color: null,
+        } as any);
+        placed++;
+      }
+    });
+  }, [addElement, a4Bounds]);
+
+  // Place ceremony seating block from CeremonySeatingModal
+  const handlePlaceCeremony = useCallback((data: {
+    totalWidthM: number;
+    totalHeightM: number;
+    ceremonyData: {
+      mode: 'full-block' | 'row-by-row';
+      seatsPerRow: number;
+      rowCount: number;
+      seatWidthPx: number;
+      seatHeightPx: number;
+      rowGapPx: number;
+      seatGapPx: number;
+      aisleWidthPx: number;
+      showLabels: boolean;
+      removedSeats?: string[];
+      curvature?: number;
+      chairStyle?: 'chiavari' | 'ghost' | 'folding' | 'banquet';
+      aisleType?: 'none' | 'center' | 'sides' | 'double';
+      sectionLabels?: { enabled: boolean; left: string; right: string };
+      reservedRows?: number[];
+      perRowOverrides?: Record<number, number>;
+    };
+  }) => {
+    const ppm = getEffectivePPM();
+    const widthPx = data.totalWidthM * ppm;
+    const heightPx = data.totalHeightM * ppm;
+    const x = a4Bounds.x + (a4Bounds.width - widthPx) / 2;
+    const y = a4Bounds.y + (a4Bounds.height - heightPx) / 2;
+    addElement({
+      type: 'rectangle',
+      x,
+      y,
+      width: widthPx,
+      height: heightPx,
+      fill: 'transparent',
+      stroke: 'transparent',
+      strokeWidth: 0,
+      elementType: 'ceremony-block',
+      ceremonyData: data.ceremonyData,
+      label: 'Ceremony Seating',
+      rotation: 0,
+      color: null,
+    } as any);
+  }, [addElement, a4Bounds]);
+
+  // Place dance floor element from DanceFloorConfigModal
+  const handlePlaceDanceFloor = useCallback((data: DanceFloorData) => {
+    const ppm = getEffectivePPM();
+    const effectiveW = data.shape === 'circle' ? data.widthM : data.widthM;
+    const effectiveH = data.shape === 'circle' ? data.widthM : data.heightM;
+    const widthPx = effectiveW * ppm;
+    const heightPx = effectiveH * ppm;
+    const x = a4Bounds.x + (a4Bounds.width - widthPx) / 2;
+    const y = a4Bounds.y + (a4Bounds.height - heightPx) / 2;
+    addElement({
+      type: 'rectangle',
+      x,
+      y,
+      width: widthPx,
+      height: heightPx,
+      fill: 'rgba(255,228,181,0.5)',
+      stroke: '#DEB887',
+      strokeWidth: 2,
+      rotation: 0,
+      elementType: 'dance-floor',
+      label: data.labelVisible ? data.label : '',
+      danceFloorData: data,
+      color: null,
+    } as any);
+  }, [addElement, a4Bounds]);
+
+  // Place / update stage element from StageConfigModal
+  const handlePlaceStage = useCallback((data: StageData) => {
+    const ppm = getEffectivePPM();
+    const widthPx = data.widthM * ppm;
+    const heightPx = data.depthM * ppm;
+
+    if (stageEditShapeId) {
+      // Update existing stage in place
+      useCanvasStore.getState().updateElement(stageEditShapeId, {
+        width: widthPx,
+        height: heightPx,
+        fill: data.fillColor,
+        label: data.labelVisible ? data.label : '',
+        stageData: data,
+      } as any);
+      setStageEditShapeId(null);
+      return;
+    }
+
+    const x = a4Bounds.x + (a4Bounds.width - widthPx) / 2;
+    const y = a4Bounds.y + (a4Bounds.height - heightPx) / 2;
+    addElement({
+      type: 'rectangle',
+      x, y,
+      width: widthPx,
+      height: heightPx,
+      fill: data.fillColor,
+      stroke: data.borderEnabled ? data.borderColor : 'transparent',
+      strokeWidth: 2,
+      rotation: 0,
+      elementType: 'stage',
+      label: data.labelVisible ? data.label : '',
+      stageData: data,
+      color: null,
+    } as any);
+  }, [addElement, a4Bounds, stageEditShapeId]);
+
+  // Place / update altar element
+  const handlePlaceAltar = useCallback((data: AltarData) => {
+    const ppm = getEffectivePPM();
+    const widthPx = data.widthM * ppm;
+    const heightPx = data.depthM * ppm;
+    if (altarEditShapeId) {
+      useCanvasStore.getState().updateElement(altarEditShapeId, {
+        width: widthPx, height: heightPx,
+        fill: data.fillColor,
+        label: data.labelVisible ? data.label : '',
+        altarData: data,
+      } as any);
+      setAltarEditShapeId(null);
+      return;
+    }
+    const x = a4Bounds.x + (a4Bounds.width - widthPx) / 2;
+    const y = a4Bounds.y + (a4Bounds.height - heightPx) / 2;
+    addElement({
+      type: 'rectangle', x, y, width: widthPx, height: heightPx,
+      fill: data.fillColor,
+      stroke: data.borderEnabled ? data.borderColor : 'transparent',
+      strokeWidth: 2, rotation: 0,
+      elementType: 'altar',
+      label: data.labelVisible ? data.label : '',
+      altarData: data, color: null,
+    } as any);
+  }, [addElement, a4Bounds, altarEditShapeId]);
+
+  // Place / update bar element
+  const handlePlaceBar = useCallback((data: BarData) => {
+    const ppm = getEffectivePPM();
+    const widthPx = data.widthM * ppm;
+    const heightPx = data.depthM * ppm;
+    if (barEditShapeId) {
+      useCanvasStore.getState().updateElement(barEditShapeId, {
+        width: widthPx, height: heightPx,
+        fill: data.fillColor,
+        label: data.labelVisible ? data.label : '',
+        barData: data,
+      } as any);
+      setBarEditShapeId(null);
+      return;
+    }
+    const x = a4Bounds.x + (a4Bounds.width - widthPx) / 2;
+    const y = a4Bounds.y + (a4Bounds.height - heightPx) / 2;
+    addElement({
+      type: 'rectangle', x, y, width: widthPx, height: heightPx,
+      fill: data.fillColor,
+      stroke: data.borderEnabled ? data.borderColor : 'transparent',
+      strokeWidth: 2, rotation: 0,
+      elementType: 'bar',
+      label: data.labelVisible ? data.label : '',
+      barData: data, color: null,
+    } as any);
+  }, [addElement, a4Bounds, barEditShapeId]);
+
+  // Place / update cocktail table element
+  const handlePlaceCocktail = useCallback((data: CocktailData) => {
+    const ppm = getEffectivePPM();
+    const widthPx = data.widthM * ppm;
+    const heightPx = data.depthM * ppm;
+    if (cocktailEditShapeId) {
+      useCanvasStore.getState().updateElement(cocktailEditShapeId, {
+        width: widthPx, height: heightPx,
+        fill: data.fillColor,
+        label: data.labelVisible ? data.label : '',
+        cocktailData: data,
+      } as any);
+      setCocktailEditShapeId(null);
+      return;
+    }
+    const x = a4Bounds.x + (a4Bounds.width - widthPx) / 2;
+    const y = a4Bounds.y + (a4Bounds.height - heightPx) / 2;
+    addElement({
+      type: 'rectangle', x, y, width: widthPx, height: heightPx,
+      fill: data.fillColor,
+      stroke: data.borderEnabled ? data.borderColor : 'transparent',
+      strokeWidth: 2, rotation: 0,
+      elementType: 'cocktail',
+      label: data.labelVisible ? data.label : '',
+      cocktailData: data, color: null,
+    } as any);
+  }, [addElement, a4Bounds, cocktailEditShapeId]);
+
+  // Place / update pathway element
+  const handlePlacePathway = useCallback((data: PathwayData) => {
+    const ppm = getEffectivePPM();
+    // Pathway stored as width × length (portrait orientation by default)
+    const widthPx = data.widthM * ppm;
+    const heightPx = data.lengthM * ppm;
+    if (pathwayEditShapeId) {
+      useCanvasStore.getState().updateElement(pathwayEditShapeId, {
+        width: widthPx, height: heightPx,
+        fill: data.fillColor,
+        label: data.labelVisible ? data.label : '',
+        pathwayData: data,
+      } as any);
+      setPathwayEditShapeId(null);
+      return;
+    }
+    const x = a4Bounds.x + (a4Bounds.width - widthPx) / 2;
+    const y = a4Bounds.y + (a4Bounds.height - heightPx) / 2;
+    addElement({
+      type: 'rectangle', x, y, width: widthPx, height: heightPx,
+      fill: data.fillColor,
+      stroke: 'transparent', strokeWidth: 0, rotation: 0,
+      elementType: 'pathway',
+      label: data.labelVisible ? data.label : '',
+      pathwayData: data, color: null,
+    } as any);
+  }, [addElement, a4Bounds, pathwayEditShapeId]);
+
+  // Place an AV element from AVElementModal
+  const handlePlaceAV = useCallback((data: AVData) => {
+    const ppm = getEffectivePPM();
+    const widthPx = data.widthM * ppm;
+    const heightPx = data.heightM * ppm;
+    const x = a4Bounds.x + (a4Bounds.width - widthPx) / 2;
+    const y = a4Bounds.y + (a4Bounds.height - heightPx) / 2;
+    addElement({
+      type: 'rectangle',
+      x, y,
+      width: widthPx,
+      height: heightPx,
+      fill: '#1a1a2e',
+      stroke: '#3b82f6',
+      strokeWidth: 1.5,
+      rotation: 0,
+      elementType: data.type,
+      label: data.labelVisible ? data.label : '',
+      avData: data,
+      color: null,
+    } as any);
+    setAvEditShapeId(null);
+  }, [addElement, a4Bounds]);
+
+  // Update existing AV element from AVElementModal (double-click edit)
+  const handleUpdateAV = useCallback((data: AVData) => {
+    if (!avEditShapeId) return;
+    const ppm = getEffectivePPM();
+    useCanvasStore.getState().updateElement(avEditShapeId, {
+      width: data.widthM * ppm,
+      height: data.heightM * ppm,
+      label: data.labelVisible ? data.label : '',
+      avData: data,
+    } as any);
+    setAvEditShapeId(null);
+  }, [avEditShapeId]);
+
+  // Update an existing seat element's dimensions, fill, label, and type
+  const handleUpdateSeat = useCallback((
+    shapeId: string,
+    widthM: number,
+    heightM: number,
+    fill: string,
+    label: string,
+    newElementType: ElementType,
+  ) => {
+    const ppm = getEffectivePPM();
+    useCanvasStore.getState().updateElement(shapeId, {
+      width: widthM * ppm,
+      height: heightM * ppm,
+      fill,
+      label,
+      elementType: newElementType,
+    } as any);
+    setSeatingEditingShapeId(null);
+  }, []);
+
+  // Double-click on a canvas shape — re-open edit modal if applicable
+  const handleShapeDoubleClick = useCallback((shapeId: string) => {
+    const shape = useCanvasStore.getState().elements[shapeId];
+    if (!shape) return;
+
+    const et = (shape as any).elementType as string | undefined;
+    const seatTypes = ['seat-standard', 'seat-armchair', 'seat-chaise', 'seat-sofa-2', 'seat-sofa-3', 'seat-bench'];
+    if (et && seatTypes.includes(et)) {
+      // Map sofa variants to the unified 'seat-sofa' modal type
+      const modalType: ElementType = (et === 'seat-sofa-2' || et === 'seat-sofa-3') ? 'seat-sofa' : et as ElementType;
+      setSeatingModalType(modalType);
+      setSeatingEditingShapeId(shapeId);
+      setSeatingModalOpen(true);
+      return;
+    }
+    const avEditTypes = [
+      'av-mixing-desk', 'av-speaker', 'av-subwoofer', 'av-truss', 'av-moving-head',
+      'av-led-wall', 'av-screen', 'av-projector', 'av-light-console',
+    ];
+    if (et && avEditTypes.includes(et) && (shape as any).avData) {
+      setAvModalType(et);
+      setAvEditShapeId(shapeId);
+      setAvModalOpen(true);
+      return;
+    }
+    if (et === 'stage' && (shape as any).stageData) {
+      setStageEditShapeId(shapeId);
+      setStageModalOpen(true);
+    } else if (et === 'altar' && (shape as any).altarData) {
+      setAltarEditShapeId(shapeId);
+      setAltarModalOpen(true);
+    } else if (et === 'pathway' && (shape as any).pathwayData) {
+      setPathwayEditShapeId(shapeId);
+      setPathwayModalOpen(true);
+    } else if (et === 'bar' && (shape as any).barData) {
+      setBarEditShapeId(shapeId);
+      setBarModalOpen(true);
+    } else if (et === 'cocktail' && (shape as any).cocktailData) {
+      setCocktailEditShapeId(shapeId);
+      setCocktailModalOpen(true);
+    }
+  }, []);
+
   const [workflowPositions, setWorkflowPositions] = useState<Record<string, { x: number; y: number }>>(() => {
     try {
       const stored = localStorage.getItem('workflow-positions');
@@ -461,6 +1044,52 @@ const LayoutMakerPageStore: React.FC = () => {
     } catch {}
     return [];
   });
+
+  // Load workflow data from Supabase when eventId is available
+  const [isWorkflowLoaded, setIsWorkflowLoaded] = useState(false);
+
+  useEffect(() => {
+    const eventId = eventIdFromUrl;
+
+    // No eventId means no workflow to load — unblock initialization immediately
+    if (!eventId) {
+      setIsWorkflowLoaded(true);
+      return;
+    }
+
+    if (isWorkflowLoaded) return;
+
+    const loadWorkflowFromSupabase = async () => {
+      console.log('[Workflow] Loading from Supabase for event:', eventId);
+      const result = await loadWorkflowData(eventId);
+
+      if (result.error) {
+        console.error('[Workflow] Error loading from Supabase:', result.error);
+      } else if (result.notes.length > 0 || result.connections.length > 0) {
+        console.log('[Workflow] Loaded from Supabase:', {
+          notes: result.notes.length,
+          connections: result.connections.length
+        });
+        setWorkflowNotes(result.notes as WorkflowNote[]);
+        setWorkflowConnections(result.connections);
+        // Also save to localStorage as backup
+        localStorage.setItem('workflow-notes-cards', JSON.stringify(result.notes));
+        localStorage.setItem('workflow-connections', JSON.stringify(result.connections));
+      }
+      setIsWorkflowLoaded(true);
+    };
+
+    loadWorkflowFromSupabase();
+  }, [eventIdFromUrl]);
+
+  const [workflowTasks, setWorkflowTasks] = useState<WorkflowTask[]>(() => {
+    try {
+      const stored = localStorage.getItem('workflow-task-cards');
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return [];
+  });
+
 
   const handleSelectCustomTemplate = useCallback((template: CustomElementTemplate) => {
     const PIXELS_PER_METER = getEffectivePPM();
@@ -508,6 +1137,7 @@ const LayoutMakerPageStore: React.FC = () => {
     resetZoom: () => void;
     fitToCanvas: () => void;
     getSvgElement: () => SVGSVGElement | null;
+    openSatelliteModal: () => void;
   } | null>(null);
 
   const exportSvgRef = useRef<SVGSVGElement | null>(null);
@@ -545,6 +1175,7 @@ const LayoutMakerPageStore: React.FC = () => {
   // Keep refs for save interval to avoid recreating it
   const getCanvasDataRef = useRef(getCanvasData);
   const storeSupabaseLayoutIdRef = useRef(storeSupabaseLayoutId);
+  const forceSaveRef = useRef(forceSave);
 
   useEffect(() => {
     getCanvasDataRef.current = getCanvasData;
@@ -553,6 +1184,20 @@ const LayoutMakerPageStore: React.FC = () => {
   useEffect(() => {
     storeSupabaseLayoutIdRef.current = storeSupabaseLayoutId;
   }, [storeSupabaseLayoutId]);
+
+  useEffect(() => {
+    forceSaveRef.current = forceSave;
+  }, [forceSave]);
+
+  // Listen for force sync events (e.g., from satellite picker)
+  useEffect(() => {
+    const handleForceSync = () => {
+      console.log('[LayoutMakerPageStore] Force sync triggered');
+      forceSaveRef.current?.();
+    };
+    window.addEventListener('forceLayoutSync', handleForceSync);
+    return () => window.removeEventListener('forceLayoutSync', handleForceSync);
+  }, []);
 
   // Load event info and set eventId on projects when URL has eventId
   useEffect(() => {
@@ -585,23 +1230,46 @@ const LayoutMakerPageStore: React.FC = () => {
   }, [eventIdFromUrl]);
 
   // Save current canvas to localStorage periodically
+  // IMPORTANT: check isInitializedRef INSIDE the callback, not before creating the interval.
+  // With empty deps the effect runs once before initialization, so the old guard caused the
+  // interval to never be created at all — meaning saves only happened on unmount.
   useEffect(() => {
-    if (!isInitializedRef.current) return;
-
+    console.log('[Storage] Save interval created on mount');
     const saveInterval = setInterval(() => {
+      if (!isInitializedRef.current) {
+        console.log('[Storage] interval tick — NOT initialized yet, skipping');
+        return;
+      }
+      const state = useCanvasStore.getState();
+      const projectId = currentProjectIdRef.current;
+
+      // Safety: if the store's activeProjectId doesn't match our ref, the store is mid-switch.
+      // Skip this tick to avoid saving the wrong project's (possibly empty) data.
+      if (state.activeProjectId && state.activeProjectId !== projectId) {
+        console.warn('[Storage] interval: store projectId', state.activeProjectId, '≠ ref', projectId, '— skipping');
+        return;
+      }
+
       const canvasData = getCanvasDataRef.current();
-      // Add supabaseLayoutId to saved data
-      const dataToSave = {
+      // Read supabaseLayoutId directly from store (not via ref which can lag a render behind)
+      saveCanvasToLocalStorage(projectId, {
         ...canvasData,
-        supabaseLayoutId: storeSupabaseLayoutIdRef.current,
-      };
-      saveCanvasToLocalStorage(currentProjectIdRef.current, dataToSave);
+        supabaseLayoutId: state.supabaseLayoutId,
+      });
     }, 1000); // Save every second
 
     return () => clearInterval(saveInterval);
   }, []); // Empty deps - only run once, use refs for current values
 
-  // Initialize on mount - load the active project's canvas data
+  // Initialize on mount IMMEDIATELY from localStorage — do NOT wait for workflow.
+  //
+  // WHY: When eventId is in the URL, isWorkflowLoaded stays false for 1-5 seconds while
+  // Supabase loads workflow data. During that delay the canvas is rendered (empty store).
+  // If the user adds elements before the workflow loads, those elements are in the store
+  // but isInitializedRef is false so the 1-second interval skips saving them. When the
+  // workflow finally loads and triggers the old init, initializeProject is called with the
+  // old localStorage data — CLEARING the new elements. The interval then saves the now-empty
+  // store, permanently losing the elements. Fix: init immediately, handle notes separately.
   useEffect(() => {
     if (isInitializedRef.current) return;
 
@@ -613,21 +1281,70 @@ const LayoutMakerPageStore: React.FC = () => {
       height: a4.a4HeightPx,
     };
 
-    // Load canvas data from localStorage
     const savedCanvas = loadCanvasFromLocalStorage(activeProjectId);
 
     if (savedCanvas) {
       console.log('[Init] Loading canvas from localStorage for project:', activeProjectId);
       const storeData = canvasDataToStoreFormat(savedCanvas);
+      console.log('[Init] storeData — satelliteBackground:', !!storeData.satelliteBackground, 'customBackground:', !!storeData.customBackground, 'shapes:', storeData.elementOrder?.length ?? 0);
       initializeProject(activeProjectId, bounds, storeData);
+      console.log('[Init] initializeProject called, store satelliteBackground after:', !!useCanvasStore.getState().satelliteBackground);
     } else {
       console.log('[Init] No saved canvas, initializing empty project:', activeProjectId);
       initializeProject(activeProjectId, bounds);
     }
 
+    // Post-init safety net: if initializeProject ran without a background, check the
+    // dedicated bg key (written by the store action, immune to canvas-save overwrites).
+    const storeAfterInit = useCanvasStore.getState();
+    if (!storeAfterInit.satelliteBackground && !storeAfterInit.customBackground) {
+      try {
+        const dedicatedRaw = localStorage.getItem(`layout-maker-bg-${activeProjectId}`);
+        if (dedicatedRaw) {
+          const dedicated = JSON.parse(dedicatedRaw) as { type: 'satellite' | 'custom'; data: any };
+          if (dedicated.type === 'satellite' && dedicated.data) {
+            storeAfterInit.setSatelliteBackground(dedicated.data);
+            console.log('[Init] satellite restored from dedicated bg key after init');
+          } else if (dedicated.type === 'custom' && dedicated.data) {
+            storeAfterInit.setCustomBackground(dedicated.data);
+            console.log('[Init] custom bg restored from dedicated bg key after init');
+          }
+        }
+      } catch (e) {
+        console.warn('[Init] could not read dedicated bg key:', e);
+      }
+    }
+
     isInitializedRef.current = true;
     currentProjectIdRef.current = activeProjectId;
-  }, []); // Only run once on mount
+    console.log('[Init] DONE — isInitializedRef=true, projectId:', activeProjectId, 'shapes in store:', useCanvasStore.getState().elementOrder.length);
+  }, []); // Empty deps — runs once immediately on mount, never re-initializes
+
+  // Separate effect: update workflow notes in the store when they load from Supabase.
+  // This does NOT reinitialize the project — just merges notes into existing canvas state.
+  useEffect(() => {
+    if (!isWorkflowLoaded) return;
+    if (!isInitializedRef.current) return;
+
+    const connectedNoteIds = workflowConnections
+      .filter(c => c.toCardId === activeProjectId && c.fromCardId.startsWith('note-'))
+      .map(c => c.fromCardId.replace('note-', ''));
+
+    const connectedNotes = workflowNotes
+      .filter(n => connectedNoteIds.includes(n.id))
+      .map(n => ({
+        id: n.id,
+        content: n.content,
+        color: n.color,
+        width: n.width,
+        height: n.height,
+      }));
+
+    if (connectedNotes.length > 0) {
+      console.log('[Init] Updating workflow notes in store:', connectedNotes.length);
+      useCanvasStore.getState().setNotes(connectedNotes);
+    }
+  }, [isWorkflowLoaded, workflowNotes, workflowConnections, activeProjectId]);
 
   // Sync Supabase layout ID back to local project when it's assigned
   useEffect(() => {
@@ -652,12 +1369,32 @@ const LayoutMakerPageStore: React.FC = () => {
   const handleWorkflowConnectionsChange = useCallback((connections: Connection[]) => {
     setWorkflowConnections(connections);
     localStorage.setItem('workflow-connections', JSON.stringify(connections));
-  }, []);
+    
+    // Also save to Supabase
+    if (eventIdFromUrl) {
+      saveWorkflowData(eventIdFromUrl, workflowNotes, connections).catch(err => {
+        console.error('[Workflow] Error saving connections to Supabase:', err);
+      });
+    }
+  }, [eventIdFromUrl, workflowNotes]);
 
   const handleWorkflowNotesChange = useCallback((notes: WorkflowNote[]) => {
     setWorkflowNotes(notes);
     localStorage.setItem('workflow-notes-cards', JSON.stringify(notes));
+    
+    // Also save to Supabase
+    if (eventIdFromUrl) {
+      saveWorkflowData(eventIdFromUrl, notes, workflowConnections).catch(err => {
+        console.error('[Workflow] Error saving notes to Supabase:', err);
+      });
+    }
+  }, [eventIdFromUrl, workflowConnections]);
+
+  const handleWorkflowTasksChange = useCallback((tasks: WorkflowTask[]) => {
+    setWorkflowTasks(tasks);
+    localStorage.setItem('workflow-task-cards', JSON.stringify(tasks));
   }, []);
+
 
   const handleReorderProjects = useCallback((fromIndex: number, toIndex: number) => {
     setProjects(prev => {
@@ -704,26 +1441,51 @@ const LayoutMakerPageStore: React.FC = () => {
 
     const savedCanvas = loadCanvasFromLocalStorage(projectId);
 
+    // Get connected notes from workflow
+    const connectedNoteIds = workflowConnections
+      .filter(c => c.toCardId === projectId && c.fromCardId.startsWith('note-'))
+      .map(c => c.fromCardId.replace('note-', ''));
+    
+    const connectedNotes = workflowNotes
+      .filter(n => connectedNoteIds.includes(n.id))
+      .map(n => ({
+        id: n.id,
+        content: n.content,
+        color: n.color,
+        width: n.width,
+        height: n.height,
+      }));
+
+    // 2b. Trigger Supabase sync for the OLD project NOW, before clearing the store.
+    // forceSave() calls syncToSupabase() which reads getCanvasData() synchronously
+    // at its very start (before the first await). If called after initializeProject the
+    // store already holds the NEW project's data (often empty), creating a corrupt row.
+    forceSave();
+
     if (savedCanvas) {
       console.log('[ProjectSwitch] Loading canvas from localStorage:', {
         drawings: savedCanvas.drawings?.length || 0,
         shapes: savedCanvas.shapes?.length || 0,
       });
       const storeData = canvasDataToStoreFormat(savedCanvas);
+      if (connectedNotes.length > 0 && (!storeData.notes || storeData.notes.length === 0)) {
+        storeData.notes = connectedNotes;
+      }
       initializeProject(projectId, bounds, storeData);
     } else {
       console.log('[ProjectSwitch] No saved canvas, initializing empty');
-      initializeProject(projectId, bounds);
+      if (connectedNotes.length > 0) {
+        initializeProject(projectId, bounds, { notes: connectedNotes } as any);
+      } else {
+        initializeProject(projectId, bounds);
+      }
     }
 
     // 3. Update active project
     currentProjectIdRef.current = projectId;
     setActiveProjectId(projectId);
     localStorage.setItem(STORAGE_ACTIVE_PROJECT_KEY, projectId);
-
-    // 4. Trigger background Supabase sync for the old project
-    forceSave();
-  }, [activeProjectId, isWorkflowOpen, projects, getCanvasData, storeSupabaseLayoutId, initializeProject, forceSave]);
+  }, [activeProjectId, isWorkflowOpen, projects, getCanvasData, storeSupabaseLayoutId, initializeProject, forceSave, workflowNotes, workflowConnections]);
 
   const handleProjectHighlight = useCallback((projectId: string) => {
     // This is used by workflow canvas - treat same as select
@@ -764,6 +1526,18 @@ const LayoutMakerPageStore: React.FC = () => {
     localStorage.setItem(STORAGE_ACTIVE_PROJECT_KEY, newProject.id);
     setNewlyCreatedProjectId(newProject.id);
   }, [projects, activeProjectId, getCanvasData, storeSupabaseLayoutId, initializeProject]);
+
+  const handleNewLayoutConfirm = useCallback((flow: LayoutFlow) => {
+    setNewLayoutModalOpen(false);
+    if (flow === 'scratch') {
+      // Open the Wall Maker on the current canvas — no new project needed
+      setWallMakerTrigger(t => t + 1);
+    } else if (flow === 'import') {
+      setTimeout(() => setCustomUploadOpen(true), 80);
+    } else if (flow === 'location') {
+      setTimeout(() => gridCanvasRef.current?.openSatelliteModal(), 80);
+    }
+  }, []);
 
   const handleRenameProject = useCallback((projectId: string, newName: string) => {
     setProjects(prev => {
@@ -857,7 +1631,174 @@ const LayoutMakerPageStore: React.FC = () => {
       setShowElementLibrary(false);
       return;
     }
-  }, []);
+
+    // Anchor-based lighting tools: activate placement mode (two-click placement on canvas)
+    if (elementType === 'string-lights' || elementType === 'bunting') {
+      setActiveTool(elementType);
+      setShowElementLibrary(false);
+      return;
+    }
+
+    // New individual seat types → SeatingConfigModal
+    const seatTypes: ElementType[] = [
+      'seat-standard', 'seat-armchair', 'seat-chaise', 'seat-sofa-2',
+      'seat-sofa-3', 'seat-bench', 'seat-barstool', 'seat-throne',
+    ];
+    if (seatTypes.includes(elementType)) {
+      setSeatingModalType(elementType);
+      setSeatingModalOpen(true);
+      setShowElementLibrary(false);
+      return;
+    }
+    if (elementType === 'ceremony-block') {
+      setCeremonyModalOpen(true);
+      setShowElementLibrary(false);
+      return;
+    }
+    if (elementType === 'dance-floor') {
+      setDanceFloorModalOpen(true);
+      setShowElementLibrary(false);
+      return;
+    }
+    if (elementType === 'stage') {
+      setStageEditShapeId(null);
+      setStageModalOpen(true);
+      setShowElementLibrary(false);
+      return;
+    }
+    if (elementType === 'altar') {
+      setAltarEditShapeId(null);
+      setAltarModalOpen(true);
+      setShowElementLibrary(false);
+      return;
+    }
+    if (elementType === 'pathway') {
+      setPathwayEditShapeId(null);
+      setPathwayModalOpen(true);
+      setShowElementLibrary(false);
+      return;
+    }
+    if (elementType === 'bar') {
+      setBarEditShapeId(null);
+      setBarModalOpen(true);
+      setShowElementLibrary(false);
+      return;
+    }
+    if (elementType === 'cocktail') {
+      setCocktailEditShapeId(null);
+      setCocktailModalOpen(true);
+      setShowElementLibrary(false);
+      return;
+    }
+
+    // AV equipment types → AVElementModal
+    const avTypes = [
+      'av-mixing-desk', 'av-speaker', 'av-subwoofer', 'av-truss', 'av-moving-head',
+      'av-led-wall', 'av-screen', 'av-projector', 'av-light-console',
+    ];
+    if (avTypes.includes(elementType as string)) {
+      setAvModalType(elementType as string);
+      setAvEditShapeId(null);
+      setAvModalOpen(true);
+      setShowElementLibrary(false);
+      return;
+    }
+
+    // Full Stage AV preset — place a collection of AV elements
+    if (elementType === 'av-preset-full-stage') {
+      const ppm = getEffectivePPM();
+      const stageW = 6 * ppm, stageH = 1 * ppm;
+      const cx = a4Bounds.x + a4Bounds.width / 2;
+      const stageCy = a4Bounds.y + a4Bounds.height * 0.55;
+      // Stage backdrop LED wall — 0.25m depth (top-down: thin strip)
+      addElement({ type: 'rectangle', x: cx - stageW / 2, y: stageCy - 2 * ppm, width: stageW, height: 0.25 * ppm,
+        fill: '#0a0a0a', stroke: '#3b82f6', strokeWidth: 1.5, rotation: 0,
+        elementType: 'av-led-wall', label: 'LED Wall',
+        avData: { type: 'av-led-wall', widthM: 6, heightM: 0.25, label: 'LED Wall', labelVisible: true, screenAspect: '16:9' } as any, color: null } as any);
+      // Truss
+      addElement({ type: 'rectangle', x: cx - stageW / 2, y: stageCy - 3.5 * ppm, width: stageW, height: 0.3 * ppm,
+        fill: '#aaa', stroke: '#888', strokeWidth: 1.5, rotation: 0,
+        elementType: 'av-truss', label: 'Front Truss',
+        avData: { type: 'av-truss', widthM: 6, heightM: 0.3, label: 'Front Truss', labelVisible: true } as any, color: null } as any);
+      // Stage platform
+      addElement({ type: 'rectangle', x: cx - stageW / 2, y: stageCy, width: stageW, height: stageH,
+        fill: '#1a1a1a', stroke: '#555', strokeWidth: 1.5, rotation: 0,
+        elementType: 'av-screen', label: 'Stage',
+        avData: { type: 'av-screen', widthM: 6, heightM: 1, label: 'Stage', labelVisible: true } as any, color: null } as any);
+      // Mixing desk (FOH)
+      addElement({ type: 'rectangle', x: cx - 0.6 * ppm, y: stageCy + 3 * ppm, width: 1.2 * ppm, height: 0.8 * ppm,
+        fill: '#2a2a2a', stroke: '#3b82f6', strokeWidth: 1.5, rotation: 0,
+        elementType: 'av-mixing-desk', label: 'FOH Desk',
+        avData: { type: 'av-mixing-desk', widthM: 1.2, heightM: 0.8, label: 'FOH Desk', labelVisible: true, channels: 24 } as any, color: null } as any);
+      // Left speaker
+      addElement({ type: 'rectangle', x: cx - stageW / 2 - 0.4 * ppm, y: stageCy - 0.2 * ppm, width: 0.4 * ppm, height: 0.6 * ppm,
+        fill: '#1a1a1a', stroke: '#555', strokeWidth: 1.5, rotation: 0,
+        elementType: 'av-speaker', label: 'PA L',
+        avData: { type: 'av-speaker', widthM: 0.4, heightM: 0.6, label: 'PA L', labelVisible: true } as any, color: null } as any);
+      // Right speaker
+      addElement({ type: 'rectangle', x: cx + stageW / 2, y: stageCy - 0.2 * ppm, width: 0.4 * ppm, height: 0.6 * ppm,
+        fill: '#1a1a1a', stroke: '#555', strokeWidth: 1.5, rotation: 0,
+        elementType: 'av-speaker', label: 'PA R',
+        avData: { type: 'av-speaker', widthM: 0.4, heightM: 0.6, label: 'PA R', labelVisible: true } as any, color: null } as any);
+      setShowElementLibrary(false);
+      return;
+    }
+
+    // Legacy chair: open placement modal
+    if (elementType === 'chair') {
+      setPlacementElementType(elementType);
+      setPlacementElementLabel('Chair');
+      setPlacementElementWidth(0.45);
+      setPlacementElementHeight(0.45);
+      setPlacementModalOpen(true);
+      setShowElementLibrary(false);
+      return;
+    }
+
+    // Zone, service, and decoration elements: add directly to canvas at A4 center
+    const defaults = getElementDefault(elementType);
+    const ppm = getEffectivePPM();
+    const widthPx = defaults.width * ppm;
+    const heightPx = defaults.height * ppm;
+    const currentA4 = useCanvasStore.getState().a4Bounds;
+    const centerX = currentA4 ? currentA4.x + (currentA4.width / 2) - (widthPx / 2) : 200;
+    const centerY = currentA4 ? currentA4.y + (currentA4.height / 2) - (heightPx / 2) : 200;
+
+    const zoneColors: Record<string, { fill: string; stroke: string }> = {
+      'dance-floor': { fill: 'rgba(255,228,181,0.5)', stroke: '#DEB887' },
+      'stage': { fill: 'rgba(221,160,221,0.5)', stroke: '#BA55D3' },
+      'cocktail-area': { fill: 'rgba(152,251,152,0.5)', stroke: '#32CD32' },
+      'ceremony-area': { fill: 'rgba(230,230,250,0.5)', stroke: '#9370DB' },
+    };
+    const serviceColors: Record<string, { fill: string; stroke: string }> = {
+      'bar': { fill: '#8B4513', stroke: '#654321' },
+      'buffet': { fill: '#F5DEB3', stroke: '#D2B48C' },
+      'cake-table': { fill: '#FFB6C1', stroke: '#FF69B4' },
+      'gift-table': { fill: '#87CEEB', stroke: '#4682B4' },
+      'dj-booth': { fill: '#2F2F2F', stroke: '#1A1A1A' },
+    };
+    const decorationColors: Record<string, { fill: string; stroke: string }> = {
+      'flower-arrangement': { fill: '#FFB7C5', stroke: '#FF69B4' },
+      'photo-booth': { fill: '#F0E68C', stroke: '#DAA520' },
+      'arch': { fill: '#D4AF37', stroke: '#B8860B' },
+    };
+    const colors = zoneColors[elementType] || serviceColors[elementType] || decorationColors[elementType] || { fill: '#CCCCCC', stroke: '#999999' };
+
+    addElement({
+      type: 'rectangle' as const,
+      x: centerX,
+      y: centerY,
+      width: widthPx,
+      height: heightPx,
+      rotation: 0,
+      fill: colors.fill,
+      stroke: colors.stroke,
+      strokeWidth: 2,
+      elementType,
+      label: defaults.label || elementType,
+    } as any);
+    setShowElementLibrary(false);
+  }, [addElement]);
 
   // Handler for opening config modal for rectangular tables
   const handleOpenRectangularTableModal = useCallback((elementType: ElementType) => {
@@ -1312,8 +2253,7 @@ const LayoutMakerPageStore: React.FC = () => {
       }));
   }, [getCanvasData]);
 
-  // Build projects with canvas data for workflow preview
-  // Only recalculate when workflow is open to avoid performance issues during canvas editing
+  // Build projects with canvas data for workflow preview and load connected notes
   const projectsWithCanvasData = useMemo(() => {
     const emptyCanvasData = {
       drawings: [],
@@ -1323,21 +2263,36 @@ const LayoutMakerPageStore: React.FC = () => {
       doors: [],
       powerPoints: [],
       viewBox: { x: 0, y: 0, width: 800, height: 1132 },
+      notes: [],
     };
 
-    // Only load canvas data when workflow is open (for performance)
-    if (!isWorkflowOpen) {
-      return projects.map(p => ({ ...p, canvasData: emptyCanvasData }));
-    }
-
     return projects.map(p => {
+      // Find notes connected to this project from workflow
+      const connectedNoteIds = workflowConnections
+        .filter(c => c.toCardId === p.id && c.fromCardId.startsWith('note-'))
+        .map(c => c.fromCardId.replace('note-', ''));
+      
+      const connectedNotes = workflowNotes
+        .filter(n => connectedNoteIds.includes(n.id))
+        .map(n => ({
+          id: n.id,
+          content: n.content,
+          color: n.color,
+          width: n.width,
+          height: n.height,
+        }));
+
       // For the active project, get current store data
       if (p.id === activeProjectId) {
         // Save current data to localStorage first so we have the latest
         const currentData = getCanvasData();
+        const data = currentData || emptyCanvasData;
         return {
           ...p,
-          canvasData: currentData || emptyCanvasData,
+          canvasData: {
+            ...data,
+            notes: connectedNotes.length > 0 ? connectedNotes : (data.notes || []),
+          },
         };
       }
 
@@ -1354,13 +2309,21 @@ const LayoutMakerPageStore: React.FC = () => {
             doors: savedCanvas.doors || [],
             powerPoints: savedCanvas.powerPoints || [],
             viewBox: savedCanvas.viewBox || { x: 0, y: 0, width: 800, height: 1132 },
+            satelliteBackground: savedCanvas.satelliteBackground || null,
+            notes: connectedNotes.length > 0 ? connectedNotes : (savedCanvas.notes || []),
           },
         };
       }
 
-      return { ...p, canvasData: emptyCanvasData };
+      return { 
+        ...p, 
+        canvasData: {
+          ...emptyCanvasData,
+          notes: connectedNotes,
+        } 
+      };
     });
-  }, [projects, activeProjectId, isWorkflowOpen, getCanvasData]);
+  }, [projects, activeProjectId, getCanvasData, workflowConnections, workflowNotes]);
 
   const handleZoomToPoints = useCallback((points: { x: number; y: number }[]) => {
     gridCanvasRef.current?.zoomToPoints(points);
@@ -1456,13 +2419,27 @@ const LayoutMakerPageStore: React.FC = () => {
   useEffect(() => {
     return () => {
       const canvasData = getCanvasDataRef.current();
-      const dataToSave = {
+      saveCanvasToLocalStorage(currentProjectIdRef.current, {
         ...canvasData,
-        supabaseLayoutId: storeSupabaseLayoutIdRef.current,
-      };
-      saveCanvasToLocalStorage(currentProjectIdRef.current, dataToSave);
+        supabaseLayoutId: useCanvasStore.getState().supabaseLayoutId,
+      });
     };
   }, []); // Empty deps - cleanup only runs on unmount
+
+  // Save canvas when the page is refreshed or closed (beforeunload fires before React unmount)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!isInitializedRef.current) return;
+      const canvasData = getCanvasDataRef.current();
+      // Read supabaseLayoutId directly from store — the ref may lag by one render
+      saveCanvasToLocalStorage(currentProjectIdRef.current, {
+        ...canvasData,
+        supabaseLayoutId: useCanvasStore.getState().supabaseLayoutId,
+      });
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   if (!projects || projects.length === 0) {
     return (
@@ -1499,6 +2476,8 @@ const LayoutMakerPageStore: React.FC = () => {
             brushSize={brushSize}
             brushColor={brushColor}
             isViewMode={viewMode}
+            hiddenCategories={hiddenCategories}
+            onShapeDoubleClick={handleShapeDoubleClick}
             {...(activeProject.eventId ? { eventId: activeProject.eventId } : eventIdFromUrl ? { eventId: eventIdFromUrl } : {})}
           />
         </ErrorBoundary>
@@ -1537,6 +2516,10 @@ const LayoutMakerPageStore: React.FC = () => {
               onBrushSizeChange={setBrushSize}
               onBrushColorChange={setBrushColor}
               availableSpaces={spaceOptions}
+              onOpenSatelliteModal={() => gridCanvasRef.current?.openSatelliteModal()}
+              onOpenCustomUploadModal={() => setCustomUploadOpen(true)}
+              onNewLayout={() => setNewLayoutModalOpen(true)}
+              openWallMakerTrigger={wallMakerTrigger}
             />
 
             {/* Element Library Toggle Button - Positioned above toolbar */}
@@ -1549,15 +2532,15 @@ const LayoutMakerPageStore: React.FC = () => {
                 width: '60px',
                 height: '60px',
                 borderRadius: '50%',
-                border: showElementLibrary ? '2px solid #3b82f6' : '1px solid #e0e0e0',
-                background: showElementLibrary ? '#3b82f6' : 'white',
+                border: showElementLibrary ? '2px solid #0f172a' : '1px solid #e0e0e0',
+                background: showElementLibrary ? '#0f172a' : 'white',
                 color: showElementLibrary ? 'white' : '#64748b',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 boxShadow: showElementLibrary
-                  ? '0 4px 12px rgba(59, 130, 246, 0.4)'
+                  ? '0 4px 12px rgba(15, 23, 42, 0.4)'
                   : '0 4px 12px rgba(0,0,0,0.15)',
                 zIndex: 10001,
                 transition: 'all 0.2s ease',
@@ -1567,7 +2550,7 @@ const LayoutMakerPageStore: React.FC = () => {
               onMouseEnter={(e) => {
                 if (!showElementLibrary) {
                   e.currentTarget.style.background = '#f8fafc';
-                  e.currentTarget.style.borderColor = '#3b82f6';
+                  e.currentTarget.style.borderColor = '#0f172a';
                 }
               }}
               onMouseLeave={(e) => {
@@ -1639,7 +2622,7 @@ const LayoutMakerPageStore: React.FC = () => {
                         width: '32px',
                         height: '32px',
                         borderRadius: '10px',
-                        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                        background: '#0f172a',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -1707,6 +2690,8 @@ const LayoutMakerPageStore: React.FC = () => {
                       onDeleteCustomTemplate={handleDeleteCustomTemplate}
                       onOpenPlacementModal={handleOpenPlacementModal}
                       customTemplates={customTemplates}
+                      hiddenCategories={hiddenCategories}
+                      onToggleCategoryVisibility={handleToggleCategoryVisibility}
                     />
                   </div>
                 </div>
@@ -1735,6 +2720,43 @@ const LayoutMakerPageStore: React.FC = () => {
             svgRef={exportSvgRef}
             a4Bounds={a4Bounds ? { x: a4Bounds.x, y: a4Bounds.y, width: a4Bounds.width, height: a4Bounds.height } : null}
             layoutName={activeProject.name}
+          />
+        </div>
+      )}
+
+      {/* Build Guide Button */}
+      {!viewMode && !isWorkflowOpen && (
+        <div style={{ position: 'fixed', top: 20, right: 290, zIndex: 20051 }}>
+          <BuildGuideButton
+            eventId={activeProject.eventId || eventIdFromUrl || ''}
+            eventName={activeProject.name}
+            layouts={projectsWithCanvasData.map(p => ({
+              layoutId: p.id,
+              layoutName: p.name,
+              spaceName: p.category || 'Layout',
+              included: true,
+              pageSize: 'half',
+              shapes: p.canvasData?.shapes || [],
+              viewBox: p.canvasData?.viewBox || { x: 0, y: 0, width: 800, height: 600 },
+              satelliteBackground: (p.canvasData as any)?.satelliteBackground ?? undefined,
+              elementVisibility: [
+                { category: 'tables', visible: true },
+                { category: 'seating', visible: true },
+                { category: 'ceremony', visible: true },
+                { category: 'entertainment', visible: true },
+                { category: 'service', visible: true },
+                { category: 'decor', visible: true },
+                { category: 'lighting', visible: true },
+                { category: 'custom', visible: true },
+              ],
+              includeLegend: true,
+              includeDimensions: true,
+              includeNotes: true,
+              includeTasks: true,
+              notes: [],
+              tasks: [],
+            }))}
+            spaceNames={spaceOptions.map(s => s.label)}
           />
         </div>
       )}
@@ -1863,12 +2885,143 @@ const LayoutMakerPageStore: React.FC = () => {
         defaultHeight={placementElementHeight}
       />
 
+      <SeatingConfigModal
+        isOpen={seatingModalOpen}
+        onClose={() => { setSeatingModalOpen(false); setSeatingEditingShapeId(null); }}
+        elementType={seatingModalType}
+        onPlaceSeats={handlePlaceSeats}
+        pixelsPerMeter={getEffectivePPM()}
+        editingShape={seatingEditingShapeId ? (() => {
+          const s = useCanvasStore.getState().elements[seatingEditingShapeId];
+          if (!s) return null;
+          return {
+            id: seatingEditingShapeId,
+            elementType: (s as any).elementType ?? seatingModalType,
+            widthPx: s.width,
+            heightPx: s.height,
+            fill: s.fill || '#D4C5B0',
+            label: (s as any).label,
+          };
+        })() : null}
+        onUpdateSeat={handleUpdateSeat}
+      />
+
+      <CeremonySeatingModal
+        isOpen={ceremonyModalOpen}
+        onClose={() => setCeremonyModalOpen(false)}
+        onPlaceCeremony={handlePlaceCeremony}
+      />
+
+      <DanceFloorConfigModal
+        isOpen={danceFloorModalOpen}
+        onClose={() => setDanceFloorModalOpen(false)}
+        onPlace={handlePlaceDanceFloor}
+      />
+
+      <StageConfigModal
+        key={stageEditShapeId ?? 'new-stage'}
+        isOpen={stageModalOpen}
+        onClose={() => { setStageModalOpen(false); setStageEditShapeId(null); }}
+        onPlace={handlePlaceStage}
+        initialData={
+          stageEditShapeId
+            ? (useCanvasStore.getState().elements[stageEditShapeId] as any)?.stageData
+            : undefined
+        }
+      />
+
+      <AltarConfigModal
+        key={altarEditShapeId ?? 'new-altar'}
+        isOpen={altarModalOpen}
+        onClose={() => { setAltarModalOpen(false); setAltarEditShapeId(null); }}
+        onPlace={handlePlaceAltar}
+        initialData={
+          altarEditShapeId
+            ? (useCanvasStore.getState().elements[altarEditShapeId] as any)?.altarData
+            : undefined
+        }
+      />
+
+      <BarConfigModal
+        key={barEditShapeId ?? 'new-bar'}
+        isOpen={barModalOpen}
+        onClose={() => { setBarModalOpen(false); setBarEditShapeId(null); }}
+        onPlace={handlePlaceBar}
+        initialData={
+          barEditShapeId
+            ? (useCanvasStore.getState().elements[barEditShapeId] as any)?.barData
+            : undefined
+        }
+      />
+
+      <CocktailConfigModal
+        key={cocktailEditShapeId ?? 'new-cocktail'}
+        isOpen={cocktailModalOpen}
+        onClose={() => { setCocktailModalOpen(false); setCocktailEditShapeId(null); }}
+        onPlace={handlePlaceCocktail}
+        initialData={
+          cocktailEditShapeId
+            ? (useCanvasStore.getState().elements[cocktailEditShapeId] as any)?.cocktailData
+            : undefined
+        }
+      />
+
+      <PathwayConfigModal
+        key={pathwayEditShapeId ?? 'new-pathway'}
+        isOpen={pathwayModalOpen}
+        onClose={() => { setPathwayModalOpen(false); setPathwayEditShapeId(null); }}
+        onPlace={handlePlacePathway}
+        initialData={
+          pathwayEditShapeId
+            ? (useCanvasStore.getState().elements[pathwayEditShapeId] as any)?.pathwayData
+            : undefined
+        }
+      />
+
+      <AVElementModal
+        key={avEditShapeId ?? `new-av-${avModalType}`}
+        isOpen={avModalOpen}
+        avType={avModalType}
+        onClose={() => { setAvModalOpen(false); setAvEditShapeId(null); }}
+        onPlace={handlePlaceAV}
+        onUpdate={handleUpdateAV}
+        editingData={
+          avEditShapeId
+            ? (useCanvasStore.getState().elements[avEditShapeId] as any)?.avData ?? null
+            : null
+        }
+      />
+
       {showElectricalDashboard && (
         <ElectricalDashboard
           electricalProjectId={electricalProjectId}
           powerPoints={currentPowerPoints}
           onZoomToPoints={handleZoomToPoints}
           onClose={() => setShowElectricalDashboard(false)}
+        />
+      )}
+
+      {/* New Layout Modal — pick how to start: scratch / import / location */}
+      <NewLayoutModal
+        isOpen={newLayoutModalOpen}
+        onClose={() => setNewLayoutModalOpen(false)}
+        onConfirm={handleNewLayoutConfirm}
+      />
+
+      {/* Custom Upload Modal - managed here to avoid ref chain issues */}
+      <CustomUploadModal
+        isOpen={customUploadOpen}
+        onClose={() => setCustomUploadOpen(false)}
+        a4WidthPx={activeProject.a4Dimensions?.a4WidthPx ?? 794}
+        {...(customBackground ? { initialData: customBackground } : {})}
+      />
+
+      {/* Custom Background Info Chip - shown when a custom background is active */}
+      {customBackground && !customUploadOpen && (
+        <CustomBackgroundInfoChip
+          background={customBackground}
+          onEdit={() => setCustomUploadOpen(true)}
+          onClear={clearCustomBackground}
         />
       )}
 
@@ -1912,6 +3065,8 @@ const LayoutMakerPageStore: React.FC = () => {
           onConnectionsChange={handleWorkflowConnectionsChange}
           notes={workflowNotes}
           onNotesChange={handleWorkflowNotesChange}
+          tasks={workflowTasks}
+          onTasksChange={handleWorkflowTasksChange}
           eventId={eventIdFromUrl || ''}
         />
       )}

@@ -11,39 +11,60 @@ import { ChairElementComponent } from './ChairElement';
 import { ZoneElementComponent } from './ZoneElement';
 import { ServiceElementComponent } from './ServiceElement';
 import { DecorationElementComponent } from './DecorationElement';
+import { StringLightsElementComponent } from './StringLightsElement';
+import { BuntingElementComponent } from './BuntingElement';
 import type { TableElement as TableElementType, ChairElement as ChairElementType } from '../../../types/layout-elements';
-import { isTableElement, isChairElement, isZoneElement, isServiceElement, isDecorationElement } from '../../types/elements';
+import {
+  isTableElement, isChairElement, isZoneElement, isServiceElement, isDecorationElement,
+  isStringLightsElement, isBuntingElement,
+} from '../../types/elements';
 import { RotateButton } from '../Elements/RotateButton';
 import { useSelectionStore, useUIStore } from '../../stores';
 
 interface ElementsLayerProps {
   layout: Layout;
   pixelsPerMeter?: number;
+  hiddenCategories?: string[];
   onElementClick?: (elementId: string, event: React.MouseEvent) => void;
   onElementDoubleClick?: (elementId: string, event: React.MouseEvent) => void;
   onElementHover?: (elementId: string | null) => void;
   onElementMouseDown?: (elementId: string, event: React.MouseEvent) => void;
   onElementRotate?: (elementId: string, newRotation: number) => void;
+  onAnchorMouseDown?: (elementId: string, anchor: 'start' | 'end', event: React.MouseEvent) => void;
 }
 
 export const ElementsLayer: React.FC<ElementsLayerProps> = ({
   layout,
   pixelsPerMeter = 100,
+  hiddenCategories = [],
   onElementClick,
   onElementDoubleClick,
   onElementHover,
   onElementMouseDown,
   onElementRotate,
+  onAnchorMouseDown,
 }) => {
   const selectionStore = useSelectionStore();
   const uiStore = useUIStore();
   const selectedIds = selectionStore.selectedIds;
-  console.log('[ElementsLayer] Selected IDs:', selectedIds, 'pixelsPerMeter:', pixelsPerMeter);
 
   const handleRotate = useCallback((elementId: string, newRotation: number) => {
     console.log('[ElementsLayer] Rotating element:', elementId, 'to:', newRotation);
     onElementRotate?.(elementId, newRotation);
   }, [onElementRotate]);
+
+  const getElementCategory = (element: (typeof layout.elements)[string]): string | null => {
+    if (isTableElement(element)) return 'tables';
+    if (isChairElement(element)) {
+      // Chairs that belong to a table hide with their table, not with standalone seating
+      return element.parentTableId ? 'tables' : 'seating';
+    }
+    if (isZoneElement(element)) return 'entertainment';
+    if (isServiceElement(element)) return 'service';
+    if (isStringLightsElement(element) || isBuntingElement(element)) return 'lighting';
+    if (isDecorationElement(element)) return 'decor';
+    return null;
+  };
 
   const renderElement = (element: (typeof layout.elements)[string]) => {
     const isSelected = selectedIds.includes(element.id);
@@ -229,6 +250,40 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
       );
     }
 
+    if (isStringLightsElement(element)) {
+      return (
+        <StringLightsElementComponent
+          key={element.id}
+          element={element}
+          pixelsPerMeter={pixelsPerMeter}
+          isSelected={isSelected}
+          onClick={handleElementClick}
+          onDoubleClick={handleDoubleClick}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          onMouseDown={handleMouseDown}
+          {...(onAnchorMouseDown !== undefined && { onAnchorMouseDown })}
+        />
+      );
+    }
+
+    if (isBuntingElement(element)) {
+      return (
+        <BuntingElementComponent
+          key={element.id}
+          element={element}
+          pixelsPerMeter={pixelsPerMeter}
+          isSelected={isSelected}
+          onClick={handleElementClick}
+          onDoubleClick={handleDoubleClick}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          onMouseDown={handleMouseDown}
+          {...(onAnchorMouseDown !== undefined && { onAnchorMouseDown })}
+        />
+      );
+    }
+
     return null;
   };
 
@@ -237,7 +292,15 @@ export const ElementsLayer: React.FC<ElementsLayerProps> = ({
       {layout.elementOrder.map((id) => {
         const element = layout.elements[id];
         if (!element || !element.visible) return null;
-        return renderElement(element);
+        const category = getElementCategory(element);
+        if (category && hiddenCategories.includes(category)) return null;
+        const rendered = renderElement(element);
+        if (!rendered) return null;
+        return (
+          <g key={id} data-element-category={category ?? 'custom'}>
+            {rendered}
+          </g>
+        );
       })}
     </g>
   );

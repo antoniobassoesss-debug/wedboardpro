@@ -7,6 +7,7 @@
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useViewportStore, useUIStore, useLayoutStore, useSelectionStore } from '../../stores';
+import { useCanvasStore } from '../../store/canvasStore';
 import { useViewport } from '../../hooks/useViewport';
 import { useAddElement } from '../../hooks/useAddElement';
 import { useGuestAssignment } from '../../hooks/useGuestAssignment';
@@ -20,12 +21,14 @@ import { ScaleBar } from './ScaleBar';
 import { RulerX, RulerY } from './Rulers';
 import GuestSearchDropdown from '../GuestAssignment/GuestSearchDropdown';
 import type { ElementType } from '../../types/elements';
-import { isChairElement } from '../../types/elements';
+import { isChairElement, isStringLightsElement, isBuntingElement } from '../../types/elements';
 import { ELEMENT_DEFAULTS } from '../../constants';
+import type { Point } from '../../types/elements';
 
 export interface CanvasAreaProps {
   className?: string;
   eventId?: string;
+  hiddenCategories?: string[];
   onCanvasClick?: (event: React.MouseEvent) => void;
   onElementClick?: (elementId: string, event: React.MouseEvent) => void;
   onElementDoubleClick?: (elementId: string, event: React.MouseEvent) => void;
@@ -34,6 +37,7 @@ export interface CanvasAreaProps {
 export const CanvasArea: React.FC<CanvasAreaProps> = ({
   className = '',
   eventId,
+  hiddenCategories = [],
   onCanvasClick,
   onElementClick,
   onElementDoubleClick,
@@ -50,6 +54,19 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
   const guestAssignment = useGuestAssignment(eventId);
 
   const [ghostPosition, setGhostPosition] = useState<{ x: number; y: number } | null>(null);
+
+  // Anchor element placement state (two-click placement)
+  const [anchorPlacement, setAnchorPlacement] = useState<{
+    firstAnchor: Point | null;
+    livePoint: Point | null;
+  }>({ firstAnchor: null, livePoint: null });
+
+  // Anchor handle drag state
+  const [anchorDrag, setAnchorDrag] = useState<{
+    elementId: string;
+    anchor: 'start' | 'end';
+  } | null>(null);
+
   const [guestDropdownChairId, setGuestDropdownChairId] = useState<string | null>(null);
   const [guestDropdownPosition, setGuestDropdownPosition] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [hoveredElementId, setHoveredElementId] = useState<string | null>(null);
@@ -69,8 +86,12 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
     zoomOut,
   } = useViewport();
 
-  // Always use layout.space.pixelsPerMeter (default 100) as single source of truth
-  const pixelsPerMeter = layoutStore.layout?.space?.pixelsPerMeter || defaultPixelsPerMeter;
+  // When a satellite or custom background is active, its calibrated pixelsPerMeter overrides
+  // the default so that all elements (tables, chairs, etc.) render at the correct real-world scale.
+  const satelliteBackground = useCanvasStore((s) => s.satelliteBackground);
+  const customBackground = useCanvasStore((s) => s.customBackground);
+  const activeBackgroundPpm = satelliteBackground?.pixelsPerMeter ?? customBackground?.pixelsPerMeter ?? null;
+  const pixelsPerMeter = activeBackgroundPpm ?? layoutStore.layout?.space?.pixelsPerMeter ?? defaultPixelsPerMeter;
 
   const [isPanning, setIsPanning] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -209,6 +230,73 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
     [layoutStore]
   );
 
+  // Commit a two-click anchor element (string lights or bunting) to the canvas
+  const commitAnchorElement = useCallback(
+    (start: Point, end: Point) => {
+      const tool = uiStore.activeTool;
+      const endOffsetX = end.x - start.x;
+      const endOffsetY = end.y - start.y;
+      const spanX = Math.abs(endOffsetX);
+      const spanY = Math.abs(endOffsetY);
+
+      const baseData = {
+        x: start.x,
+        y: start.y,
+        width: Math.max(spanX, 0.01),
+        height: Math.max(spanY, 0.01),
+        rotation: 0,
+        zIndex: layoutStore.maxZIndex + 1,
+        groupId: null,
+        parentId: null,
+        locked: false,
+        visible: true,
+        notes: '',
+        color: null,
+        endAnchorOffset: { x: endOffsetX, y: endOffsetY },
+      };
+
+      // addElement accepts Omit<BaseElement, 'id'|'createdAt'|'updatedAt'>.
+      // Anchor elements extend BaseElement with extra fields; cast via unknown to avoid
+      // TypeScript excess-property complaint while retaining runtime data.
+      if (tool === 'string-lights') {
+        const el = {
+          ...baseData,
+          type: 'string-lights' as ElementType,
+          label: 'String Lights',
+          bulbColor: 'warm-white',
+          bulbSize: 'medium',
+          spacing: 'normal',
+          wireColor: '#3d2b1f',
+        };
+        layoutStore.addElement(el as unknown as Parameters<typeof layoutStore.addElement>[0]);
+      } else if (tool === 'bunting') {
+        const el = {
+          ...baseData,
+          type: 'bunting' as ElementType,
+          label: 'Bunting',
+          colorScheme: 'arraial-classic',
+          customColors: ['#dc2626', '#facc15', '#16a34a', '#3b82f6'],
+          flagSize: 'medium',
+          flagShape: 'triangle',
+          spacing: 'normal',
+          stringColor: '#c8b9a2',
+        };
+        layoutStore.addElement(el as unknown as Parameters<typeof layoutStore.addElement>[0]);
+      }
+    },
+    [uiStore.activeTool, layoutStore]
+  );
+
+  // Handle anchor handle mouse-down to start anchor drag
+  const handleAnchorMouseDown = useCallback(
+    (elementId: string, anchor: 'start' | 'end', event: React.MouseEvent) => {
+      event.stopPropagation();
+      selectionStore.select(elementId);
+      setAnchorDrag({ elementId, anchor });
+    },
+    [selectionStore]
+  );
+
 
   const startElementDrag = useCallback(
     (elementId: string, clientX: number, clientY: number) => {
@@ -240,6 +328,11 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
   const handleElementMouseDown = useCallback(
     (elementId: string, event: React.MouseEvent) => {
       if (uiStore.isViewMode) {
+        return;
+      }
+
+      // Don't start element drag while in anchor placement mode
+      if (uiStore.activeTool === 'string-lights' || uiStore.activeTool === 'bunting') {
         return;
       }
 
@@ -295,6 +388,24 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
 
+      // Two-click anchor placement for string lights / bunting
+      if (
+        event.button === 0 &&
+        (uiStore.activeTool === 'string-lights' || uiStore.activeTool === 'bunting')
+      ) {
+        const worldPos = screenToWorld({ x, y });
+        if (!anchorPlacement.firstAnchor) {
+          // First click — store start anchor
+          setAnchorPlacement({ firstAnchor: worldPos, livePoint: worldPos });
+        } else {
+          // Second click — commit element
+          commitAnchorElement(anchorPlacement.firstAnchor, worldPos);
+          setAnchorPlacement({ firstAnchor: null, livePoint: null });
+          uiStore.setActiveTool('select');
+        }
+        return;
+      }
+
       if (uiStore.activeTool === 'hand' || event.button === 1 || event.buttons === 4) {
         setIsPanning(true);
         lastPanPointRef.current = { x, y };
@@ -307,11 +418,60 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
 
       handleCanvasClick(event);
     },
-    [uiStore.activeTool, handlePanStart, handleCanvasClick]
+    [uiStore.activeTool, handlePanStart, handleCanvasClick, anchorPlacement, screenToWorld, commitAnchorElement]
   );
 
   const handleMouseMove = useCallback(
     (event: React.MouseEvent<SVGSVGElement>) => {
+      const svg = svgRef.current;
+
+      // Update live preview point during anchor placement (both before and after first click)
+      if (
+        (uiStore.activeTool === 'string-lights' || uiStore.activeTool === 'bunting') &&
+        svg
+      ) {
+        const rect = svg.getBoundingClientRect();
+        const worldPos = screenToWorld({
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        });
+        setAnchorPlacement((prev) => ({ ...prev, livePoint: worldPos }));
+      }
+
+      // Anchor handle drag
+      if (anchorDrag && svg) {
+        const rect = svg.getBoundingClientRect();
+        const worldPos = screenToWorld({
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        });
+        const element = layoutStore.getElementById(anchorDrag.elementId);
+        if (element && (isStringLightsElement(element) || isBuntingElement(element))) {
+          if (anchorDrag.anchor === 'end') {
+            const newOffset = {
+              x: worldPos.x - element.x,
+              y: worldPos.y - element.y,
+            };
+            layoutStore.updateElement(anchorDrag.elementId, {
+              endAnchorOffset: newOffset,
+            } as Parameters<typeof layoutStore.updateElement>[1]);
+          } else {
+            // Moving start anchor: keep end anchor at same absolute position
+            const endAbsX = element.x + (element as typeof element & { endAnchorOffset: { x: number; y: number } }).endAnchorOffset.x;
+            const endAbsY = element.y + (element as typeof element & { endAnchorOffset: { x: number; y: number } }).endAnchorOffset.y;
+            layoutStore.updateElement(anchorDrag.elementId, {
+              x: worldPos.x,
+              y: worldPos.y,
+              endAnchorOffset: {
+                x: endAbsX - worldPos.x,
+                y: endAbsY - worldPos.y,
+              },
+            } as Parameters<typeof layoutStore.updateElement>[1]);
+          }
+        }
+        return;
+      }
+
       if (isDragging) {
         updateElementDrag(event.clientX, event.clientY);
         return;
@@ -335,11 +495,18 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
 
       handlePanMove(event);
     },
-    [isDragging, isPanning, viewport, viewportStore, handlePanMove, updateElementDrag]
+    [isDragging, isPanning, viewport, viewportStore, handlePanMove, updateElementDrag,
+     uiStore.activeTool, anchorPlacement.firstAnchor, anchorDrag, screenToWorld, layoutStore]
   );
 
   const handleMouseUp = useCallback(
     (event: React.MouseEvent<SVGSVGElement>) => {
+      // Clear anchor handle drag
+      if (anchorDrag) {
+        setAnchorDrag(null);
+        return;
+      }
+
       if (isDragging) {
         endElementDrag();
         return;
@@ -482,6 +649,10 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
       }
 
       if (event.key === 'Escape') {
+        // Cancel anchor placement if active
+        if (uiStore.activeTool === 'string-lights' || uiStore.activeTool === 'bunting') {
+          setAnchorPlacement({ firstAnchor: null, livePoint: null });
+        }
         uiStore.setActiveTool('select');
       }
     },
@@ -537,6 +708,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
       <svg
         ref={svgRef}
         viewBox={viewBox}
+        data-layout-canvas="true"
         className="w-full h-full cursor-crosshair"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -619,14 +791,63 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
             <ElementsLayer
               layout={layoutStore.layout}
               pixelsPerMeter={pixelsPerMeter}
+              hiddenCategories={hiddenCategories}
               onElementClick={handleElementClick}
               onElementHover={handleElementHover}
               onElementMouseDown={handleElementMouseDown}
               onElementRotate={handleElementRotate}
+              onAnchorMouseDown={handleAnchorMouseDown}
               {...(onElementDoubleClick && { onElementDoubleClick })}
             />
           )}
         </g>
+
+        {/* Anchor element placement preview */}
+        {(uiStore.activeTool === 'string-lights' || uiStore.activeTool === 'bunting') && (
+          <g id="placement-preview-layer" style={{ pointerEvents: 'none' }}>
+            {/* First anchor indicator */}
+            {anchorPlacement.firstAnchor && (
+              <circle
+                cx={anchorPlacement.firstAnchor.x * pixelsPerMeter}
+                cy={anchorPlacement.firstAnchor.y * pixelsPerMeter}
+                r={7}
+                fill="#3b82f6"
+                opacity={0.9}
+              />
+            )}
+            {/* Live wire preview while placing */}
+            {anchorPlacement.firstAnchor && anchorPlacement.livePoint && (() => {
+              const sx = anchorPlacement.firstAnchor.x * pixelsPerMeter;
+              const sy = anchorPlacement.firstAnchor.y * pixelsPerMeter;
+              const ex = anchorPlacement.livePoint.x * pixelsPerMeter;
+              const ey = anchorPlacement.livePoint.y * pixelsPerMeter;
+              const spanPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
+              const sagPx = Math.max(2, 0.05 * spanPx);
+              const cqx = (sx + ex) / 2;
+              const cqy = (sy + ey) / 2 + sagPx;
+              const wirePath = `M ${sx} ${sy} Q ${cqx} ${cqy} ${ex} ${ey}`;
+              return (
+                <g opacity={0.65}>
+                  <path d={wirePath} stroke="#3b82f6" strokeWidth={1.5} fill="none" strokeDasharray="6,4" />
+                  <circle cx={ex} cy={ey} r={7} fill="white" stroke="#3b82f6" strokeWidth={2} />
+                  <circle cx={ex} cy={ey} r={3} fill="#3b82f6" />
+                </g>
+              );
+            })()}
+            {/* Crosshair cursor indicator (no first anchor yet) */}
+            {!anchorPlacement.firstAnchor && anchorPlacement.livePoint && (
+              <circle
+                cx={anchorPlacement.livePoint.x * pixelsPerMeter}
+                cy={anchorPlacement.livePoint.y * pixelsPerMeter}
+                r={6}
+                fill="none"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                opacity={0.7}
+              />
+            )}
+          </g>
+        )}
 
         <g id="ui-layer">
           <SelectionLayer

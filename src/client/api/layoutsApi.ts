@@ -18,6 +18,32 @@ export interface TabCanvasData {
   doors?: any[];
   powerPoints?: any[];
   viewBox: { x: number; y: number; width: number; height: number };
+  satelliteBackground?: import('../../layout-maker/store/canvasStore').SatelliteBackground;
+  notes?: Array<{
+    id: string;
+    content: string;
+    color: string;
+    width: number;
+    height: number;
+  }>;
+}
+
+// Legacy single canvas data (for backwards compatibility)
+export interface CanvasData {
+  drawings: any[];
+  shapes: any[];
+  textElements: any[];
+  walls?: any[];
+  doors?: any[];
+  viewBox: { x: number; y: number; width: number; height: number };
+  satelliteBackground?: import('../../layout-maker/store/canvasStore').SatelliteBackground;
+  notes?: Array<{
+    id: string;
+    content: string;
+    color: string;
+    width: number;
+    height: number;
+  }>;
 }
 
 // A single tab within a layout file
@@ -66,6 +92,18 @@ export interface CanvasData {
   walls?: any[];
   doors?: any[];
   viewBox: { x: number; y: number; width: number; height: number };
+  satelliteBackground?: {
+    center: { lat: number; lng: number };
+    address: string;
+    realWorldWidth: number;
+    realWorldHeight: number;
+    orientation: 'landscape' | 'portrait';
+    rotation: number;
+    pixelsPerMeter: number;
+    aiEnhanced: boolean;
+    imageBase64: string;
+    addedAt: string;
+  };
 }
 
 export interface LayoutRecord {

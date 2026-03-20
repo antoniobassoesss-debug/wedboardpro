@@ -21,7 +21,9 @@ import { useCustomElements } from '../hooks/useCustomElements';
 import { BottomSheet } from './common/BottomSheet';
 import { FloatingActionButton } from './Toolbar/FloatingActionButton';
 import { TabBar } from './Toolbar/TabBar';
+import { BuildGuideButton } from './BuildGuideModal/BuildGuideButton';
 import type { Layout, FloorPlanBackground, ElementType } from '../types';
+import { ELEMENT_DEFAULTS } from '../constants';
 import type { MeasurementUnit } from '../types/layout';
 import type { TableType, ChairConfig, TableDimensions } from '../../types/layout-elements';
 import type { CustomElementTemplate } from '../types/elements';
@@ -81,6 +83,24 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [uiStore]);
 
+  const [hiddenCategories, setHiddenCategories] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('layout-maker-hidden-categories') || '[]') as string[];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleToggleCategoryVisibility = useCallback((category: string) => {
+    setHiddenCategories((prev) => {
+      const next = prev.includes(category)
+        ? prev.filter((c) => c !== category)
+        : [...prev, category];
+      localStorage.setItem('layout-maker-hidden-categories', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const [elementsSheetOpen, setElementsSheetOpen] = useState(false);
   const [propertiesSheetOpen, setPropertiesSheetOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('Tables');
@@ -127,6 +147,13 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
   }, [selectionStore]);
 
   const handleAddElement = useCallback((type: ElementType) => {
+    // Anchor-based lighting elements activate a placement tool (two-click placement)
+    if (type === 'string-lights' || type === 'bunting') {
+      uiStore.setActiveTool(type);
+      setElementsSheetOpen(false);
+      return;
+    }
+
     const defaults: Record<string, { width: number; height: number; capacity: number }> = {
       'table-round': { width: 1.5, height: 1.5, capacity: 8 },
       'table-rectangular': { width: 2, height: 1, capacity: 8 },
@@ -144,7 +171,7 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
       height: config.height,
       capacity: config.capacity,
     });
-  }, [layoutStore]);
+  }, [layoutStore, uiStore]);
 
   const handleAddElementFromSheet = useCallback((type: ElementType) => {
     handleAddElement(type);
@@ -416,10 +443,39 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
             </button>
             <button
               onClick={() => setElementsSheetOpen(true)}
-              className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
+              className="px-3 py-1.5 text-white text-sm rounded-lg transition-colors"
+              style={{ background: '#0f172a' }}
             >
               Add Element
             </button>
+            <BuildGuideButton
+              eventId={eventId}
+              eventName={layoutStore.layout?.name || 'Untitled Layout'}
+              layouts={layoutStore.layout ? [{
+                layoutId: layoutStore.layout.id,
+                layoutName: layoutStore.layout.name,
+                spaceName: 'Main Space',
+                included: true,
+                pageSize: 'half',
+                elementVisibility: [
+                  { category: 'tables', visible: true },
+                  { category: 'seating', visible: true },
+                  { category: 'ceremony', visible: true },
+                  { category: 'entertainment', visible: true },
+                  { category: 'service', visible: true },
+                  { category: 'decor', visible: true },
+                  { category: 'lighting', visible: true },
+                  { category: 'custom', visible: true },
+                ],
+                includeLegend: true,
+                includeDimensions: true,
+                includeNotes: true,
+                includeTasks: true,
+                notes: [],
+                tasks: [],
+              }] : []}
+              spaceNames={['Main Space']}
+            />
           </div>
         </header>
       )}
@@ -457,6 +513,8 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
               onDeleteCustomTemplate={handleDeleteCustomTemplate}
               onOpenPlacementModal={handleOpenPlacementModal}
               customTemplates={customTemplates}
+              hiddenCategories={hiddenCategories}
+              onToggleCategoryVisibility={handleToggleCategoryVisibility}
             />
           </aside>
         )}
@@ -465,6 +523,7 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
           <CanvasArea
             onCanvasClick={handleCanvasClick}
             onElementClick={handleElementClick}
+            hiddenCategories={hiddenCategories}
           />
 
           {!isDesktop && !uiStore.isViewMode && (
@@ -542,6 +601,8 @@ export const LayoutMaker: React.FC<LayoutMakerProps> = ({
           onDeleteCustomTemplate={handleDeleteCustomTemplate}
           onOpenPlacementModal={handleOpenPlacementModal}
           customTemplates={customTemplates}
+          hiddenCategories={hiddenCategories}
+          onToggleCategoryVisibility={handleToggleCategoryVisibility}
           compact={!isDesktop}
         />
       </BottomSheet>

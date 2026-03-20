@@ -10,8 +10,8 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import type { TableElement, ChairElement, ElementType, BaseElement } from '../../types/elements';
-import { isTableElement, isChairElement, isZoneElement, isServiceElement, isDecorationElement } from '../../types/elements';
+import type { TableElement, ChairElement, ElementType, BaseElement, StringLightsElement, BuntingElement } from '../../types/elements';
+import { isTableElement, isChairElement, isZoneElement, isServiceElement, isDecorationElement, isStringLightsElement, isBuntingElement } from '../../types/elements';
 import { ELEMENT_DEFAULTS, DIETARY_COLORS } from '../../constants';
 import { generateChairPositions } from '../../utils/chairGeneration';
 
@@ -103,6 +103,11 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const isService = isServiceElement(selectedElement);
   const isDecor = isDecorationElement(selectedElement);
   const isFurniture = isService || isDecor;
+  const isStringLights = isStringLightsElement(selectedElement);
+  const isBunting = isBuntingElement(selectedElement);
+  const isAnchor = isStringLights || isBunting;
+  const stringLightsEl = isStringLights ? (selectedElement as StringLightsElement) : null;
+  const buntingEl = isBunting ? (selectedElement as BuntingElement) : null;
 
   const formatDimension = (value: number): string => {
     if (unit === 'm') {
@@ -273,33 +278,334 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               unit={unit}
             />
           </InputRow>
-          <InputField
-            label="Rotation"
-            value={Math.round(localValues.rotation)}
-            onChange={(v) => handleValueChange('rotation', v)}
-            unit="°"
-          />
-        </Section>
-
-        {/* Dimensions Section */}
-        <Section title="Dimensions">
-          {!isChair && (
-            <InputRow>
-              <InputField
-                label="Width"
-                value={formatDimension(localValues.width)}
-                onChange={(v) => handleValueChange('width', v)}
-                unit={unit}
-              />
-              <InputField
-                label="Height"
-                value={formatDimension(localValues.height)}
-                onChange={(v) => handleValueChange('height', v)}
-                unit={unit}
-              />
-            </InputRow>
+          {!isAnchor && (
+            <InputField
+              label="Rotation"
+              value={Math.round(localValues.rotation)}
+              onChange={(v) => handleValueChange('rotation', v)}
+              unit="°"
+            />
           )}
         </Section>
+
+        {/* Dimensions Section — hidden for anchor elements (resize via canvas handles) */}
+        {!isAnchor && (
+          <Section title="Dimensions">
+            {!isChair && (
+              <InputRow>
+                <InputField
+                  label="Width"
+                  value={formatDimension(localValues.width)}
+                  onChange={(v) => handleValueChange('width', v)}
+                  unit={unit}
+                />
+                <InputField
+                  label="Height"
+                  value={formatDimension(localValues.height)}
+                  onChange={(v) => handleValueChange('height', v)}
+                  unit={unit}
+                />
+              </InputRow>
+            )}
+          </Section>
+        )}
+
+        {/* String Lights Style Section */}
+        {isStringLights && stringLightsEl && (
+          <Section title="String Lights">
+            {/* Bulb Color */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#475569', marginBottom: '8px' }}>
+                Bulb Color
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '8px' }}>
+                {([
+                  { value: 'warm-white', label: 'Warm', color: '#fbbf24' },
+                  { value: 'cool-white', label: 'Cool', color: '#bae6fd' },
+                  { value: 'multicolor', label: 'Multi', color: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 33%, #3b82f6 66%, #22c55e 100%)' },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => onUpdate(selectedElement.id, { bulbColor: opt.value })}
+                    style={{
+                      padding: '8px 4px',
+                      fontSize: '11px',
+                      fontWeight: 500,
+                      background: stringLightsEl.bulbColor === opt.value ? '#eff6ff' : '#f8fafc',
+                      border: `1px solid ${stringLightsEl.bulbColor === opt.value ? '#3b82f6' : '#e5e7eb'}`,
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      color: stringLightsEl.bulbColor === opt.value ? '#3b82f6' : '#475569',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <span style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      background: opt.color,
+                      border: '1px solid rgba(0,0,0,0.1)',
+                      display: 'block',
+                    }} />
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="color"
+                  value={
+                    stringLightsEl.bulbColor === 'warm-white' ? '#fbbf24'
+                    : stringLightsEl.bulbColor === 'cool-white' ? '#bae6fd'
+                    : stringLightsEl.bulbColor === 'multicolor' ? '#f59e0b'
+                    : stringLightsEl.bulbColor
+                  }
+                  onChange={(e) => onUpdate(selectedElement.id, { bulbColor: e.target.value })}
+                  style={{ width: '32px', height: '32px', padding: '2px', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '12px', color: '#475569' }}>Custom color</span>
+              </div>
+            </div>
+
+            {/* Bulb Size */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#475569', marginBottom: '8px' }}>
+                Bulb Size
+              </label>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {(['small', 'medium', 'large'] as const).map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => onUpdate(selectedElement.id, { bulbSize: size })}
+                    style={{
+                      flex: 1,
+                      padding: '7px 4px',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      background: stringLightsEl.bulbSize === size ? '#eff6ff' : '#f8fafc',
+                      border: `1px solid ${stringLightsEl.bulbSize === size ? '#3b82f6' : '#e5e7eb'}`,
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      color: stringLightsEl.bulbSize === size ? '#3b82f6' : '#475569',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {size.charAt(0).toUpperCase() + size.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Spacing */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#475569', marginBottom: '8px' }}>
+                Spacing
+              </label>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {(['dense', 'normal', 'sparse'] as const).map((spacing) => (
+                  <button
+                    key={spacing}
+                    onClick={() => onUpdate(selectedElement.id, { spacing })}
+                    style={{
+                      flex: 1,
+                      padding: '7px 4px',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      background: stringLightsEl.spacing === spacing ? '#eff6ff' : '#f8fafc',
+                      border: `1px solid ${stringLightsEl.spacing === spacing ? '#3b82f6' : '#e5e7eb'}`,
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      color: stringLightsEl.spacing === spacing ? '#3b82f6' : '#475569',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {spacing.charAt(0).toUpperCase() + spacing.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Wire Color */}
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#475569', marginBottom: '8px' }}>
+                Wire Color
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="color"
+                  value={stringLightsEl.wireColor}
+                  onChange={(e) => onUpdate(selectedElement.id, { wireColor: e.target.value })}
+                  style={{ width: '32px', height: '32px', padding: '2px', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '12px', color: '#475569', fontFamily: 'monospace' }}>
+                  {stringLightsEl.wireColor}
+                </span>
+              </div>
+            </div>
+          </Section>
+        )}
+
+        {/* Bunting Style Section */}
+        {isBunting && buntingEl && (
+          <Section title="Bunting / Flags">
+            {/* Color Scheme */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#475569', marginBottom: '8px' }}>
+                Color Scheme
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                {([
+                  { value: 'arraial-classic', label: 'Arraial', colors: ['#dc2626', '#facc15', '#16a34a'] },
+                  { value: 'rainbow', label: 'Rainbow', colors: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6'] },
+                  { value: 'solid', label: 'Solid', colors: [buntingEl.customColors?.[0] || '#dc2626'] },
+                  { value: 'custom', label: 'Custom', colors: buntingEl.customColors?.slice(0, 4) || ['#dc2626'] },
+                ] as const).map((scheme) => (
+                  <button
+                    key={scheme.value}
+                    onClick={() => onUpdate(selectedElement.id, { colorScheme: scheme.value })}
+                    style={{
+                      padding: '8px',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      background: buntingEl.colorScheme === scheme.value ? '#eff6ff' : '#f8fafc',
+                      border: `1px solid ${buntingEl.colorScheme === scheme.value ? '#3b82f6' : '#e5e7eb'}`,
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      color: buntingEl.colorScheme === scheme.value ? '#3b82f6' : '#475569',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: '3px' }}>
+                      {scheme.colors.map((c, i) => (
+                        <span key={i} style={{
+                          width: '10px',
+                          height: '14px',
+                          background: c,
+                          clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+                          display: 'block',
+                        }} />
+                      ))}
+                    </div>
+                    {scheme.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Flag Shape */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#475569', marginBottom: '8px' }}>
+                Flag Shape
+              </label>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {(['triangle', 'rectangle'] as const).map((shape) => (
+                  <button
+                    key={shape}
+                    onClick={() => onUpdate(selectedElement.id, { flagShape: shape })}
+                    style={{
+                      flex: 1,
+                      padding: '7px 4px',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      background: buntingEl.flagShape === shape ? '#eff6ff' : '#f8fafc',
+                      border: `1px solid ${buntingEl.flagShape === shape ? '#3b82f6' : '#e5e7eb'}`,
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      color: buntingEl.flagShape === shape ? '#3b82f6' : '#475569',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {shape.charAt(0).toUpperCase() + shape.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Flag Size */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#475569', marginBottom: '8px' }}>
+                Flag Size
+              </label>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {(['small', 'medium', 'large'] as const).map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => onUpdate(selectedElement.id, { flagSize: size })}
+                    style={{
+                      flex: 1,
+                      padding: '7px 4px',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      background: buntingEl.flagSize === size ? '#eff6ff' : '#f8fafc',
+                      border: `1px solid ${buntingEl.flagSize === size ? '#3b82f6' : '#e5e7eb'}`,
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      color: buntingEl.flagSize === size ? '#3b82f6' : '#475569',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {size.charAt(0).toUpperCase() + size.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Spacing */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#475569', marginBottom: '8px' }}>
+                Spacing
+              </label>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {(['dense', 'normal', 'sparse'] as const).map((spacing) => (
+                  <button
+                    key={spacing}
+                    onClick={() => onUpdate(selectedElement.id, { spacing })}
+                    style={{
+                      flex: 1,
+                      padding: '7px 4px',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      background: buntingEl.spacing === spacing ? '#eff6ff' : '#f8fafc',
+                      border: `1px solid ${buntingEl.spacing === spacing ? '#3b82f6' : '#e5e7eb'}`,
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      color: buntingEl.spacing === spacing ? '#3b82f6' : '#475569',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {spacing.charAt(0).toUpperCase() + spacing.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* String Color */}
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#475569', marginBottom: '8px' }}>
+                String Color
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="color"
+                  value={buntingEl.stringColor}
+                  onChange={(e) => onUpdate(selectedElement.id, { stringColor: e.target.value })}
+                  style={{ width: '32px', height: '32px', padding: '2px', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '12px', color: '#475569', fontFamily: 'monospace' }}>
+                  {buntingEl.stringColor}
+                </span>
+              </div>
+            </div>
+          </Section>
+        )}
 
         {/* Label Section */}
         <Section title="Label">

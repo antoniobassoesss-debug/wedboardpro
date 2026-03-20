@@ -182,33 +182,33 @@ const TopBar: React.FC<TopBarProps> = ({ title, onMobileMenu, activeSectionId })
   </header>
 );
 
-const HomeSection: React.FC<{ onNavigate: (id: string) => void }> = ({ onNavigate }) => (
+const HomeSection: React.FC<{ onNavigate: (id: string) => void; isMobile?: boolean }> = ({ onNavigate, isMobile }) => (
   <div className="home-section">
-    <div className="home-hero">
-      <div>
+    <div className="home-hero" style={{ flexDirection: isMobile ? 'column' : 'row' }}>
+      <div style={{ flex: isMobile ? 'none' : 1 }}>
         <p className="eyebrow">Workspace</p>
-        <h2>Planning made calm</h2>
-        <p>Create layouts, manage proposals, and keep every event under control in one single page.</p>
-        <div className="home-actions">
-          <button type="button" className="primary" onClick={() => onNavigate('layouts')}>
+        <h2 style={{ fontSize: isMobile ? '22px' : '24px' }}>Planning made calm</h2>
+        <p style={{ fontSize: isMobile ? '14px' : '15px' }}>Create layouts, manage proposals, and keep every event under control in one single page.</p>
+        <div className="home-actions" style={{ flexDirection: isMobile ? 'column' : 'row' }}>
+          <button type="button" className="primary" onClick={() => onNavigate('layouts')} style={{ width: isMobile ? '100%' : 'auto' }}>
             Go to Layouts
           </button>
-          <button type="button" className="ghost">
+          <button type="button" className="ghost" style={{ width: isMobile ? '100%' : 'auto' }}>
             Invite teammate
           </button>
         </div>
       </div>
-      <div className="home-hero-panel">
+      <div className="home-hero-panel" style={{ width: isMobile ? '100%' : 'auto', minWidth: isMobile ? 'auto' : '260px', marginTop: isMobile ? '20px' : 0 }}>
         <div>Next Milestone</div>
         <strong>Launch summer venue library</strong>
         <p>Due in 4 days</p>
       </div>
     </div>
-    <div className="stats-grid">
+    <div className="stats-grid" style={{ display: isMobile ? 'grid' : 'flex', gridTemplateColumns: isMobile ? '1fr 1fr' : 'flex', gap: isMobile ? '12px' : '16px' }}>
       {['Active Layouts', 'Signed Quotes', 'Upcoming Events', 'Tasks'].map((label, idx) => (
-        <div key={label} className="stat-card">
-          <span>{label}</span>
-          <strong>{[12, 8, 5, 14][idx]}</strong>
+        <div key={label} className="stat-card" style={{ minWidth: isMobile ? 'auto' : '180px', padding: isMobile ? '16px' : '22px' }}>
+          <span style={{ fontSize: isMobile ? '11px' : '13px' }}>{label}</span>
+          <strong style={{ fontSize: isMobile ? '22px' : '32px' }}>{[12, 8, 5, 14][idx]}</strong>
         </div>
       ))}
     </div>
@@ -593,13 +593,24 @@ const DashboardLayout: React.FC = () => {
   const [activeSectionId, setActiveSectionId] = useState<string>('home');
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
   const [isMobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const activeItem = MENU_ITEMS.find((item) => item.id === activeSectionId) ?? MENU_ITEMS[0]!;
 
   const renderContent = () => {
     switch (activeItem.id) {
       case 'home':
-        return <HomeSection onNavigate={setActiveSectionId} />;
+        return <HomeSection onNavigate={setActiveSectionId} isMobile={isMobile} />;
       case 'layouts':
         return <LayoutsSection />;
       case 'work':
@@ -609,13 +620,13 @@ const DashboardLayout: React.FC = () => {
       default:
         return (
           <div className="placeholder-card">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexDirection: isMobile ? 'column' : 'row' }}>
               <div>
-                <h2>{activeItem.label}</h2>
-                <p style={{ color: '#475467', margin: 0 }}>{activeItem.description}</p>
+                <h2 style={{ fontSize: isMobile ? '18px' : '24px' }}>{activeItem.label}</h2>
+                <p style={{ color: '#475467', margin: 0, fontSize: isMobile ? '14px' : '15px' }}>{activeItem.description}</p>
               </div>
             </div>
-            <div className="placeholder-grid" style={{ marginTop: '24px' }}>
+            <div className="placeholder-grid" style={{ marginTop: '24px', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)' }}>
               <div className="placeholder-tile">Widget</div>
               <div className="placeholder-tile">Widget</div>
               <div className="placeholder-tile">Widget</div>

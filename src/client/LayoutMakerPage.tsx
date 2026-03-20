@@ -90,10 +90,23 @@ const loadProjectsFromStorage = (): Project[] => {
 const LayoutMakerPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const eventIdFromUrl = searchParams.get('eventId');
+  const [isMobile, setIsMobile] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const [activeTool, setActiveTool] = useState<string>('hand');
   const [brushSize, setBrushSize] = useState<number>(2);
   const [brushColor, setBrushColor] = useState<string>('#000000');
+
+  // Detect mobile on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768 || window.matchMedia('(max-width: 768px)').matches;
+      setIsMobile(mobile);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Event info state (when opened for a specific event)
   const [eventInfo, setEventInfo] = useState<{ title: string; weddingDate?: string } | null>(null);
@@ -666,7 +679,8 @@ const LayoutMakerPage: React.FC = () => {
           {...(eventInfo ? { eventInfo } : {})}
         />
         
-        {!isWorkflowOpen && (
+        {/* Desktop toolbar - hidden on mobile */}
+        {!isMobile && !isWorkflowOpen && (
           <Toolbar
             activeTool={activeTool}
             onToolChange={setActiveTool}
@@ -680,6 +694,123 @@ const LayoutMakerPage: React.FC = () => {
             availableSpaces={spaceOptions}
           />
         )}
+
+        {/* Mobile-only: Show toolbar toggle button */}
+        {isMobile && !isWorkflowOpen && (
+          <button
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            style={{
+              position: 'fixed',
+              left: '16px',
+              top: '80px',
+              width: '48px',
+              height: '48px',
+              borderRadius: '14px',
+              background: '#ffffff',
+              border: '1px solid #e0e0e0',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10005,
+              pointerEvents: 'auto',
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2">
+              <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round"/>
+            </svg>
+          </button>
+        )}
+
+        {/* Mobile menu overlay */}
+        {isMobile && showMobileMenu && (
+          <>
+            <div
+              onClick={() => setShowMobileMenu(false)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0,0,0,0.3)',
+                zIndex: 10003,
+                pointerEvents: 'auto',
+              }}
+            />
+            <div
+              style={{
+                position: 'fixed',
+                left: '16px',
+                top: '140px',
+                width: '200px',
+                background: '#ffffff',
+                borderRadius: '16px',
+                boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
+                zIndex: 10004,
+                pointerEvents: 'auto',
+                overflow: 'hidden',
+              }}
+            >
+              {[
+                { id: 'hand', label: 'Hand / Pan', icon: '✋' },
+                { id: 'brush', label: 'Brush', icon: '🖌️' },
+                { id: 'eraser', label: 'Eraser', icon: '🧹' },
+                { id: 'shapes', label: 'Forms', icon: '⬜' },
+                { id: 'text', label: 'Text', icon: 'T' },
+                { id: 'power-point', label: 'Power Point', icon: '⚡' },
+              ].map((tool) => (
+                <button
+                  key={tool.id}
+                  onClick={() => {
+                    setActiveTool(tool.id);
+                    setShowMobileMenu(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    padding: '14px 16px',
+                    border: 'none',
+                    background: activeTool === tool.id ? '#111827' : 'transparent',
+                    color: activeTool === tool.id ? '#fff' : '#333',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    borderBottom: '1px solid #f0f0f0',
+                  }}
+                >
+                  <span style={{ fontSize: '18px' }}>{tool.icon}</span>
+                  <span>{tool.label}</span>
+                </button>
+              ))}
+              <button
+                onClick={() => {
+                  gridCanvasRef.current?.addSpace(12, 8);
+                  setShowMobileMenu(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '14px 16px',
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#333',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <span style={{ fontSize: '18px' }}>📐</span>
+                <span>Add Space</span>
+              </button>
+            </div>
+          </>
+        )}
+
         <ProjectTabs
           projects={projects}
           activeProjectId={activeProjectId}

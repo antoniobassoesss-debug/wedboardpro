@@ -11105,6 +11105,113 @@ app.delete('/api/v1/team/members/:id', async (req, res) => {
   }
 });
 
+// ============ Satellite Background API ============
+
+// Diagnostic endpoint — open in browser to test the key
+app.get('/api/satellite/test', async (req, res) => {
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) return res.json({ ok: false, error: 'GOOGLE_MAPS_API_KEY not set in env' });
+  const url = `https://maps.googleapis.com/maps/api/staticmap?center=38.7193,-9.1534&zoom=15&size=64x64&maptype=satellite&key=${key}`;
+  try {
+    const r = await fetch(url);
+    const ct = r.headers.get('content-type') ?? '';
+    const body = ct.includes('image') ? '(image binary)' : await r.text();
+    return res.json({ ok: r.ok, status: r.status, contentType: ct, body: body.slice(0, 500), keyPrefix: key.slice(0, 8) });
+  } catch (e: any) {
+    return res.json({ ok: false, error: e.message });
+  }
+});
+
+// Tile proxy — serves Google satellite tiles server-side so the browser can draw
+// them onto a canvas without CORS tainting (same-origin response).
+// No API key required for the Google tile CDN.
+app.get('/api/satellite/tile', async (req, res) => {
+  const x = parseInt(req.query.x as string, 10);
+  const y = parseInt(req.query.y as string, 10);
+  const z = parseInt(req.query.z as string, 10);
+  if ([x, y, z].some(isNaN) || z < 0 || z > 22) {
+    return res.status(400).send('Invalid tile coordinates');
+  }
+  const tileUrl = `https://mt.google.com/vt/lyrs=s&x=${x}&y=${y}&z=${z}`;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const r = await fetch(tileUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible)',
+        'Referer': 'https://www.google.com/maps/',
+      },
+    });
+    clearTimeout(timeout);
+    if (!r.ok) return res.status(r.status).send('Tile fetch failed');
+    const buf = await r.arrayBuffer();
+    res.setHeader('Content-Type', r.headers.get('content-type') || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(Buffer.from(buf));
+  } catch (err: any) {
+    if (err.name === 'AbortError') return res.status(504).send('Tile fetch timed out');
+    res.status(500).send(err.message || 'Tile fetch failed');
+  }
+});
+
+app.post('/api/satellite/capture', async (req, res) => {
+  try {
+    const { lat, lng, realWorldWidth, zoom: requestedZoom } = req.body as {
+      lat: number;
+      lng: number;
+      realWorldWidth: number;
+      realWorldHeight?: number;
+      highQuality?: boolean;
+      zoom?: number;
+    };
+
+    const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
+    if (!mapboxToken) {
+      return res.status(400).json({ error: 'MAPBOX_ACCESS_TOKEN not set in environment' });
+    }
+
+    // Use provided zoom or derive from real-world width
+    let zoom: number;
+    if (requestedZoom && requestedZoom > 0) {
+      zoom = Math.min(Math.max(Math.round(requestedZoom), 1), 22);
+    } else {
+      const EARTH_CIRC = 156543.03392;
+      const metersPerPixel = realWorldWidth / 640;
+      zoom = Math.round(Math.log2((EARTH_CIRC * Math.cos((lat * Math.PI) / 180)) / metersPerPixel));
+      zoom = Math.min(Math.max(zoom, 1), 22);
+    }
+
+    // Mapbox Static Images API — 1280×1280 native pixels with @2x
+    // satellite-v9 = pure satellite imagery, no labels
+    const url = `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/${lng},${lat},${zoom}/1280x1280@2x?access_token=${mapboxToken}`;
+
+    console.log('[satellite/capture] Calling Mapbox Static API, zoom:', zoom, 'center:', lat, lng);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const mapRes = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!mapRes.ok) {
+      const errText = await mapRes.text().catch(() => '');
+      console.error('[satellite/capture] Mapbox error:', mapRes.status, errText.slice(0, 300));
+      return res.status(502).json({ error: `Mapbox API error ${mapRes.status}: ${errText.slice(0, 200)}` });
+    }
+
+    const contentType = mapRes.headers.get('content-type') || 'image/jpeg';
+    const buffer = await mapRes.arrayBuffer();
+    const imageBase64 = `data:${contentType};base64,${Buffer.from(buffer).toString('base64')}`;
+
+    console.log('[satellite/capture] Mapbox image received, size:', Math.round(buffer.byteLength / 1024), 'KB');
+    res.json({ imageBase64 });
+  } catch (err: any) {
+    if (err.name === 'AbortError') return res.status(504).json({ error: 'Mapbox API timed out' });
+    res.status(500).json({ error: err.message || 'Failed to capture satellite image' });
+  }
+});
+
+
 // SEO Intelligence API routes
 app.use('/api/seo', seoRouter);
 

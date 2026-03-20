@@ -23,16 +23,24 @@ interface ElementLibraryProps {
   onDeleteCustomTemplate: (template: CustomElementTemplate) => void;
   onOpenPlacementModal?: (type: ElementType) => void;
   customTemplates?: CustomElementTemplate[];
+  hiddenCategories?: string[];
+  onToggleCategoryVisibility?: (category: string) => void;
   className?: string;
   compact?: boolean;
 }
 
-type CategoryKey = 'tables' | 'seating' | 'entertainment' | 'service' | 'decor' | 'custom';
+type CategoryKey = 'tables' | 'seating' | 'ceremony' | 'entertainment' | 'service' | 'lighting';
+
+interface SubcategoryConfig {
+  name: string;
+  elements: ElementType[];
+}
 
 interface CategoryConfig {
   name: string;
   icon: React.ReactNode;
   elements: ElementType[];
+  subcategories?: SubcategoryConfig[];
 }
 
 const CATEGORY_ICONS: Record<CategoryKey, React.ReactNode> = {
@@ -47,6 +55,19 @@ const CATEGORY_ICONS: Record<CategoryKey, React.ReactNode> = {
       <line x1="12" y1="6" x2="12" y2="18" stroke="#1a1a1a" strokeWidth="1" />
     </svg>
   ),
+  ceremony: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <rect x="2" y="4" width="8" height="2" rx="0.5" stroke="#1a1a1a" strokeWidth="1.2" />
+      <rect x="2" y="8" width="8" height="2" rx="0.5" stroke="#1a1a1a" strokeWidth="1.2" />
+      <rect x="2" y="12" width="8" height="2" rx="0.5" stroke="#1a1a1a" strokeWidth="1.2" />
+      <rect x="2" y="16" width="8" height="2" rx="0.5" stroke="#1a1a1a" strokeWidth="1.2" />
+      <rect x="14" y="4" width="8" height="2" rx="0.5" stroke="#1a1a1a" strokeWidth="1.2" />
+      <rect x="14" y="8" width="8" height="2" rx="0.5" stroke="#1a1a1a" strokeWidth="1.2" />
+      <rect x="14" y="12" width="8" height="2" rx="0.5" stroke="#1a1a1a" strokeWidth="1.2" />
+      <rect x="14" y="16" width="8" height="2" rx="0.5" stroke="#1a1a1a" strokeWidth="1.2" />
+      <line x1="12" y1="3" x2="12" y2="19" stroke="#1a1a1a" strokeWidth="0.8" strokeDasharray="2 1.5" />
+    </svg>
+  ),
   entertainment: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
       <rect x="4" y="4" width="16" height="16" rx="2" stroke="#1a1a1a" strokeWidth="1.5" />
@@ -59,18 +80,21 @@ const CATEGORY_ICONS: Record<CategoryKey, React.ReactNode> = {
       <path d="M4 8h16M8 8v12M16 8v12" stroke="#1a1a1a" strokeWidth="1" />
     </svg>
   ),
-  decor: (
+  lighting: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-      <path d="M12 4v16M4 12h16" stroke="#1a1a1a" strokeWidth="1.5" />
-      <circle cx="12" cy="12" r="6" stroke="#1a1a1a" strokeWidth="1.5" />
-    </svg>
-  ),
-  custom: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-      <path d="M12 3l2.5 5 5.5 1-4 4 1 5.5-5-2.5-5 2.5 1-5.5-4-4 5.5-1L12 3z" stroke="#1a1a1a" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M9 21h6M12 3a6 6 0 0 1 4 10.47V17H8v-3.53A6 6 0 0 1 12 3z" stroke="#1a1a1a" strokeWidth="1.5" strokeLinejoin="round" />
+      <line x1="12" y1="1" x2="12" y2="2.5" stroke="#1a1a1a" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="4.22" y1="4.22" x2="5.28" y2="5.28" stroke="#1a1a1a" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="19.78" y1="4.22" x2="18.72" y2="5.28" stroke="#1a1a1a" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   ),
 };
+
+const CUSTOM_ICON = (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <path d="M12 3l2.5 5 5.5 1-4 4 1 5.5-5-2.5-5 2.5 1-5.5-4-4 5.5-1L12 3z" stroke="#1a1a1a" strokeWidth="1.5" strokeLinejoin="round" />
+  </svg>
+);
 
 export const ElementLibrary: React.FC<ElementLibraryProps> = ({
   onSelectElement,
@@ -81,11 +105,13 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
   onDeleteCustomTemplate,
   onOpenPlacementModal,
   customTemplates = [],
+  hiddenCategories = [],
+  onToggleCategoryVisibility,
   className = '',
   compact = false,
 }) => {
   const [search, setSearch] = useState('');
-  const [expandedCategories, setExpandedCategories] = useState<Set<CategoryKey>>(
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(['tables'])
   );
 
@@ -99,33 +125,42 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
       seating: {
         name: 'Seating',
         icon: CATEGORY_ICONS.seating,
-        elements: ['chair', 'bench', 'lounge'],
+        elements: ['seat-standard', 'seat-armchair', 'seat-chaise', 'seat-sofa', 'seat-bench'],
+      },
+      ceremony: {
+        name: 'Ceremony',
+        icon: CATEGORY_ICONS.ceremony,
+        elements: ['ceremony-block', 'altar', 'pathway'],
       },
       entertainment: {
-        name: 'Zones',
+        name: 'Audio Visual',
         icon: CATEGORY_ICONS.entertainment,
-        elements: ['dance-floor', 'stage', 'cocktail-area', 'ceremony-area'],
+        elements: [
+          'dance-floor', 'stage',
+          'av-mixing-desk', 'av-speaker', 'av-subwoofer',
+          'av-truss', 'av-moving-head', 'av-led-wall',
+          'av-screen', 'av-projector', 'av-light-console',
+          'av-preset-full-stage',
+        ],
       },
       service: {
         name: 'Service',
         icon: CATEGORY_ICONS.entertainment,
-        elements: ['bar', 'buffet', 'cake-table', 'gift-table', 'dj-booth'],
+        elements: ['bar', 'cocktail'],
       },
-      decor: {
-        name: 'Decor',
-        icon: CATEGORY_ICONS.decor,
-        elements: ['flower-arrangement', 'arch', 'photo-booth'],
-      },
-      custom: {
-        name: 'Custom',
-        icon: CATEGORY_ICONS.custom,
-        elements: [], // Custom uses templates instead of predefined elements
+      lighting: {
+        name: 'Lighting',
+        icon: CATEGORY_ICONS.lighting,
+        elements: [
+          'string-lights',
+          'bunting',
+        ],
       },
     }),
     []
   );
 
-  const toggleCategory = useCallback((category: CategoryKey) => {
+  const toggleCategory = useCallback((category: string) => {
     setExpandedCategories((prev) => {
       const next = new Set(prev);
       if (next.has(category)) {
@@ -140,7 +175,7 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value);
     if (value && expandedCategories.size === 0) {
-      setExpandedCategories(new Set(['tables', 'seating', 'entertainment', 'service', 'decor', 'custom']));
+      setExpandedCategories(new Set(['tables', 'seating', 'ceremony', 'entertainment', 'service']));
     }
     if (!value) {
       setExpandedCategories(new Set(['tables']));
@@ -156,16 +191,19 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
 
   const handleOpenConfig = useCallback(
     (type: ElementType) => {
-      console.log('[ElementLibrary] handleOpenConfig called with type:', type);
-      const placementTypes: ElementType[] = ['chair', 'bench', 'lounge'];
-      console.log('[ElementLibrary] Is placement type?', placementTypes.includes(type));
-      console.log('[ElementLibrary] onOpenPlacementModal exists?', !!onOpenPlacementModal);
-      
-      if (placementTypes.includes(type) && onOpenPlacementModal) {
-        console.log('[ElementLibrary] Calling onOpenPlacementModal');
+      // Seat and ceremony types → placement modal (SeatingConfigModal / CeremonySeatingModal)
+      const seatingTypes: ElementType[] = [
+        'seat-standard', 'seat-armchair', 'seat-chaise', 'seat-sofa-2', 'seat-sofa-3',
+        'seat-bench', 'seat-barstool', 'seat-throne', 'ceremony-block',
+      ];
+      // AV types → AVElementModal via placement modal routing
+      const avTypes: ElementType[] = [
+        'av-mixing-desk', 'av-speaker', 'av-subwoofer', 'av-truss', 'av-moving-head',
+        'av-led-wall', 'av-screen', 'av-projector', 'av-light-console', 'av-preset-full-stage',
+      ];
+      if ((seatingTypes.includes(type) || avTypes.includes(type)) && onOpenPlacementModal) {
         onOpenPlacementModal(type);
       } else {
-        console.log('[ElementLibrary] Calling onOpenConfigModal');
         onOpenConfigModal(type);
       }
     },
@@ -209,21 +247,26 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
     const filtered: Record<CategoryKey, CategoryConfig | null> = {
       tables: null,
       seating: null,
+      ceremony: null,
       entertainment: null,
       service: null,
-      decor: null,
-      custom: null,
+      lighting: null,
     };
 
     for (const [key, config] of Object.entries(categories) as [CategoryKey, CategoryConfig][]) {
-      // Skip custom category - it's handled separately with template search
-      if (key === 'custom') continue;
 
       const filteredElements = filterElements(config.elements);
       if (filteredElements.length > 0) {
+        // Also filter subcategories if present
+        const filteredSubcategories = config.subcategories
+          ? config.subcategories
+              .map((sub) => ({ ...sub, elements: filterElements(sub.elements) }))
+              .filter((sub) => sub.elements.length > 0)
+          : undefined;
         filtered[key] = {
           ...config,
           elements: filteredElements,
+          ...(filteredSubcategories !== undefined ? { subcategories: filteredSubcategories } : {}),
         };
       }
     }
@@ -249,15 +292,15 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
 
   if (compact) {
     const templates = customTemplates || [];
-    const compactCategories: CategoryKey[] = ['tables', 'seating', 'entertainment', 'service', 'decor', 'custom'];
+    const compactCategories: CategoryKey[] = ['tables', 'seating', 'ceremony', 'entertainment', 'service'];
 
     return (
       <div className="flex flex-col h-full" style={{ width: '100%' }}>
         <div className="flex items-center gap-2 p-3 border-b overflow-x-auto" style={{ touchAction: 'pan-x' }}>
           {compactCategories.map((key) => {
-            const config = categories[key];
+            const config = categories[key as CategoryKey];
             const isActive = expandedCategories.has(key);
-            const isCustom = key === 'custom';
+            const isCustom = false;
             return (
               <button
                 key={key}
@@ -270,7 +313,7 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
                 style={{ touchAction: 'manipulation' }}
               >
                 <span className="flex items-center gap-1">
-                  <span className="w-4 h-4">{isCustom ? CATEGORY_ICONS.custom : config?.icon}</span>
+                  <span className="w-4 h-4">{isCustom ? CUSTOM_ICON : config?.icon}</span>
                   {isCustom ? 'Custom' : config?.name}
                 </span>
               </button>
@@ -283,9 +326,9 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
           {Array.from(expandedCategories).filter(k => k !== 'custom').length > 0 && (
             <div className="grid grid-cols-3 gap-2">
               {Array.from(expandedCategories).filter(k => k !== 'custom').flatMap((key) => {
-                const config = categories[key];
+                const config = categories[key as CategoryKey];
                 if (!config) return [];
-                return config.elements.map((type) => {
+                return config.elements.map((type: ElementType) => {
                   const defaults = ELEMENT_DEFAULTS[type as keyof typeof ELEMENT_DEFAULTS];
                   return (
                     <button
@@ -371,7 +414,7 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
                     justifyContent: 'center',
                   }}>
                     <span style={{ color: '#4f46e5', display: 'flex', transform: 'scale(0.75)' }}>
-                      {CATEGORY_ICONS.custom}
+                      {CUSTOM_ICON}
                     </span>
                   </div>
                   <span style={{
@@ -500,8 +543,11 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
                 name={config.name}
                 icon={config.icon}
                 elements={config.elements}
+                {...(config.subcategories !== undefined ? { subcategories: config.subcategories } : {})}
                 expanded={expandedCategories.has(key)}
+                isHidden={hiddenCategories.includes(key)}
                 onToggle={() => toggleCategory(key)}
+                onToggleVisibility={() => onToggleCategoryVisibility?.(key)}
                 onSelect={handleSelect}
                 onOpenConfig={handleOpenConfig}
               />
@@ -511,19 +557,14 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
 
         {!search && (
           <div style={{ marginBottom: '6px' }}>
-            <button
-              onClick={() => toggleCategory('custom')}
+            <div
               style={{
-                width: '100%',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px',
-                padding: '10px 12px',
-                background: expandedCategories.has('custom') ? '#f8fafc' : 'transparent',
-                border: 'none',
                 borderRadius: '12px',
-                cursor: 'pointer',
+                background: expandedCategories.has('custom') ? '#f8fafc' : 'transparent',
                 transition: 'all 0.18s ease',
+                opacity: hiddenCategories.includes('custom') ? 0.55 : 1,
               }}
               onMouseEnter={(e) => {
                 if (!expandedCategories.has('custom')) {
@@ -536,55 +577,103 @@ export const ElementLibrary: React.FC<ElementLibraryProps> = ({
                 }
               }}
             >
-              <div style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '8px',
-                background: expandedCategories.has('custom') ? '#e0e7ff' : '#f1f5f9',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.18s ease',
-              }}>
-                <span style={{ color: expandedCategories.has('custom') ? '#4f46e5' : '#64748b', display: 'flex', transform: 'scale(0.85)' }}>
-                  {CATEGORY_ICONS.custom}
-                </span>
-              </div>
-              <span style={{
-                flex: 1,
-                fontSize: '13px',
-                fontWeight: 500,
-                color: expandedCategories.has('custom') ? '#1e293b' : '#475569',
-                textAlign: 'left',
-                transition: 'color 0.18s ease',
-              }}>Custom</span>
-              <span style={{
-                fontSize: '11px',
-                padding: '3px 8px',
-                background: expandedCategories.has('custom') ? '#e0e7ff' : '#f1f5f9',
-                color: expandedCategories.has('custom') ? '#4f46e5' : '#64748b',
-                borderRadius: '8px',
-                fontWeight: 500,
-                transition: 'all 0.18s ease',
-              }}>
-                {(customTemplates || []).length}
-              </span>
-              <svg
+              <button
+                onClick={() => toggleCategory('custom')}
                 style={{
-                  width: '14px',
-                  height: '14px',
-                  color: expandedCategories.has('custom') ? '#4f46e5' : '#94a3b8',
-                  transition: 'all 0.2s ease',
-                  transform: expandedCategories.has('custom') ? 'rotate(90deg)' : 'rotate(0deg)',
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 4px 10px 12px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  minWidth: 0,
                 }}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2.5}
               >
-                <path d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  flexShrink: 0,
+                  borderRadius: '8px',
+                  background: expandedCategories.has('custom') ? '#e0e7ff' : '#f1f5f9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.18s ease',
+                }}>
+                  <span style={{ color: expandedCategories.has('custom') ? '#4f46e5' : '#64748b', display: 'flex', transform: 'scale(0.85)' }}>
+                    {CUSTOM_ICON}
+                  </span>
+                </div>
+                <span style={{
+                  flex: 1,
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: expandedCategories.has('custom') ? '#1e293b' : '#475569',
+                  textAlign: 'left',
+                  transition: 'color 0.18s ease',
+                }}>Custom</span>
+                <span style={{
+                  fontSize: '11px',
+                  padding: '3px 8px',
+                  background: expandedCategories.has('custom') ? '#e0e7ff' : '#f1f5f9',
+                  color: expandedCategories.has('custom') ? '#4f46e5' : '#64748b',
+                  borderRadius: '8px',
+                  fontWeight: 500,
+                  flexShrink: 0,
+                  transition: 'all 0.18s ease',
+                }}>
+                  {(customTemplates || []).length}
+                </span>
+                <svg
+                  style={{
+                    width: '14px',
+                    height: '14px',
+                    flexShrink: 0,
+                    color: expandedCategories.has('custom') ? '#4f46e5' : '#94a3b8',
+                    transition: 'all 0.2s ease',
+                    transform: expandedCategories.has('custom') ? 'rotate(90deg)' : 'rotate(0deg)',
+                  }}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                >
+                  <path d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <button
+                onClick={() => onToggleCategoryVisibility?.('custom')}
+                title={hiddenCategories.includes('custom') ? 'Show on canvas' : 'Hide on canvas'}
+                style={{
+                  flexShrink: 0,
+                  padding: '5px 8px',
+                  marginRight: '6px',
+                  background: hiddenCategories.includes('custom') ? '#fef3c7' : 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  color: hiddenCategories.includes('custom') ? '#d97706' : '#94a3b8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {hiddenCategories.includes('custom') ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                )}
+              </button>
+            </div>
 
             {expandedCategories.has('custom') && (
               <div style={{

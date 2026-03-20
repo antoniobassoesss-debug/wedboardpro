@@ -89,9 +89,17 @@ export function useAutoSync(options: UseAutoSyncOptions = {}) {
         throw new Error(result.error);
       }
 
-      // Store the new layout ID if this was a new layout
+      // Store the new layout ID if this was a new layout.
+      // Guard: only update if we're still on the same project — otherwise a forceSave
+      // that was called during a project switch would assign the old project's new Supabase
+      // ID to the new (now-active) project, corrupting both projects' layout IDs.
       if (result.data && !supabaseLayoutId) {
-        setSupabaseLayoutId(result.data.id);
+        const currentProjectId = useCanvasStore.getState().activeProjectId;
+        if (currentProjectId === activeProjectId) {
+          setSupabaseLayoutId(result.data.id);
+        } else {
+          console.warn('[AutoSync] Project switched during save; not updating supabaseLayoutId to prevent cross-project contamination');
+        }
       }
 
       lastSyncedDataRef.current = currentDataString;

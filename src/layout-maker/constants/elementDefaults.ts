@@ -52,10 +52,26 @@ export const ELEMENT_DEFAULTS: Record<string, ElementDefault> = {
   'table-square-4': { width: 1.0, height: 1.0, capacity: 4, label: 'Square Table (4)' },
   'table-square-8': { width: 1.5, height: 1.5, capacity: 8, label: 'Square Table (8)' },
 
-  // Seating
+  // Seating — internal chair (table auto-fill only)
   'chair': { width: 0.45, height: 0.45, label: 'Chair' },
-  'bench': { width: 1.8, height: 0.4, capacity: 4, label: 'Bench' },
-  'lounge': { width: 2.0, height: 0.9, capacity: 3, label: 'Lounge Seating' },
+
+  // Seating — individual sidebar elements
+  'seat-standard':  { width: 0.45, height: 0.45, label: 'Standard Chair' },
+  'seat-armchair':  { width: 0.80, height: 0.80, label: 'Armchair' },
+  'seat-chaise':    { width: 0.70, height: 1.90, label: 'Chaise Longue' },
+  'seat-sofa':      { width: 1.50, height: 0.90, label: 'Sofa' },
+  'seat-sofa-2':    { width: 1.50, height: 0.90, label: '2-Seat Sofa' },
+  'seat-sofa-3':    { width: 2.10, height: 0.90, label: '3-Seat Sofa' },
+  'seat-bench':     { width: 1.50, height: 0.40, label: 'Bench' },
+  'seat-barstool':  { width: 0.40, height: 0.40, label: 'Bar Stool' },
+  'seat-throne':    { width: 0.65, height: 0.70, label: 'Throne Chair' },
+
+  // Ceremony seating block
+  'ceremony-block': { width: 8.00, height: 6.00, label: 'Ceremony Seating' },
+
+  // Ceremony
+  'altar': { width: 2.0, height: 1.0, label: 'Altar' },
+  'pathway': { width: 1.5, height: 10.0, label: 'Pathway' },
 
   // Zones
   'dance-floor': { width: 4.0, height: 4.0, label: 'Dance Floor' },
@@ -65,6 +81,7 @@ export const ELEMENT_DEFAULTS: Record<string, ElementDefault> = {
 
   // Service
   'bar': { width: 2.0, height: 0.6, label: 'Bar' },
+  'cocktail': { width: 0.6, height: 0.6, label: 'Cocktail Table' },
   'buffet': { width: 2.4, height: 0.75, label: 'Buffet Table' },
   'cake-table': { width: 0.9, height: 0.9, label: 'Cake Table' },
   'gift-table': { width: 1.5, height: 0.75, label: 'Gift Table' },
@@ -75,6 +92,23 @@ export const ELEMENT_DEFAULTS: Record<string, ElementDefault> = {
   'photo-booth': { width: 2.5, height: 2.0, label: 'Photo Booth' },
   'arch': { width: 2.5, height: 0.5, label: 'Arch/Backdrop' },
   'custom': { width: 1.0, height: 1.0, label: 'Custom Element' },
+
+  // Audio Visual
+  'av-mixing-desk':    { width: 1.2, height: 0.8, label: 'Mixing Desk' },
+  'av-speaker':        { width: 0.4, height: 0.6, label: 'Speaker / PA' },
+  'av-subwoofer':      { width: 0.6, height: 0.6, label: 'Subwoofer' },
+  'av-truss':          { width: 3.0, height: 0.3, label: 'Truss' },
+  'av-moving-head':    { width: 0.4, height: 0.4, label: 'Moving Head' },
+  'av-led-wall':       { width: 3.0, height: 0.25, label: 'LED Wall' },
+  'av-screen':         { width: 2.5, height: 0.20, label: 'Projection Screen' },
+  'av-projector':      { width: 0.5, height: 0.4, label: 'Projector' },
+  'av-light-console':  { width: 0.9, height: 0.6, label: 'Lighting Console' },
+  'av-preset-full-stage': { width: 1.0, height: 1.0, label: 'Full Stage AV Setup' },
+
+  // Lighting — anchor-based decorative strings
+  // width/height here are placeholder defaults; actual bounding box derived from anchor positions at placement time
+  'string-lights': { width: 5.0, height: 0.1, label: 'String Lights' },
+  'bunting':       { width: 5.0, height: 0.1, label: 'Bunting / Flags' },
 };
 
 /**

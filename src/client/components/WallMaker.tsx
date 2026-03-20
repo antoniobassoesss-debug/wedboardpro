@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { Wall, WallMakerConfig, Door, WallCurveControl } from '../types/wall.js';
 import { snapToGrid, snapLineToAngle, calculateDistance, calculateAngle, type Point } from '../utils/gridSnap.js';
+import { toImperial } from '../../layout-maker/constants/viewport';
 
 // Helper function to calculate distance between two points
 const calculateDistanceBetweenPoints = (p1: Point, p2: Point): number => {
@@ -968,18 +969,21 @@ const WallMaker: React.FC<WallMakerProps> = ({
                 />
               );
             })}
-            {config.showMeasurements && (
-              <text
-                x={(wall.startX + wall.endX) / 2}
-                y={(wall.startY + wall.endY) / 2 - 50}
-                fontSize="60"
-                fill="#666666"
-                textAnchor="middle"
-                pointerEvents="none"
-              >
-                {wall.length ? pixelsToMeters(wall.length).toFixed(2) : '0'}m
-              </text>
-            )}
+            {config.showMeasurements && (() => {
+              const m = wall.length ? pixelsToMeters(wall.length) : 0;
+              return (
+                <text
+                  x={(wall.startX + wall.endX) / 2}
+                  y={(wall.startY + wall.endY) / 2 - 50}
+                  fontSize="60"
+                  fill="#666666"
+                  textAnchor="middle"
+                  pointerEvents="none"
+                >
+                  {m.toFixed(2)}m · {toImperial(m)}
+                </text>
+              );
+            })()}
             {config.showAngles && wall.angle !== undefined && (
               <text
                 x={wall.endX + 50}
@@ -1024,18 +1028,21 @@ const WallMaker: React.FC<WallMakerProps> = ({
               style={{ filter: isSelected ? 'drop-shadow(0 0 4px rgba(52, 152, 219, 0.5))' : 'none' }}
             />
           )}
-          {config.showMeasurements && (
-            <text
-              x={(wall.startX + wall.endX) / 2}
-              y={(wall.startY + wall.endY) / 2 - 50}
-              fontSize="60"
-              fill="#666666"
-              textAnchor="middle"
-              pointerEvents="none"
-            >
-              {wall.length ? pixelsToMeters(wall.length).toFixed(2) : '0'}m
-            </text>
-          )}
+          {config.showMeasurements && (() => {
+            const m = wall.length ? pixelsToMeters(wall.length) : 0;
+            return (
+              <text
+                x={(wall.startX + wall.endX) / 2}
+                y={(wall.startY + wall.endY) / 2 - 50}
+                fontSize="60"
+                fill="#666666"
+                textAnchor="middle"
+                pointerEvents="none"
+              >
+                {m.toFixed(2)}m · {toImperial(m)}
+              </text>
+            );
+          })()}
           {config.showAngles && wall.angle !== undefined && (
             <text
               x={wall.endX + 50}
@@ -1200,7 +1207,7 @@ const WallMaker: React.FC<WallMakerProps> = ({
             pointerEvents="none"
             opacity={0.8}
           >
-            {pixelsToMeters(length).toFixed(2)}m
+            {pixelsToMeters(length).toFixed(2)}m · {toImperial(pixelsToMeters(length))}
           </text>
         )}
         {config.showAngles && (
@@ -1402,7 +1409,7 @@ const WallMaker: React.FC<WallMakerProps> = ({
             opacity="0.6"
             fontWeight="500"
           >
-            {pixelsToMeters(doorWidth).toFixed(2)}m
+            {pixelsToMeters(doorWidth).toFixed(2)}m · {toImperial(pixelsToMeters(doorWidth))}
           </text>
         )}
       </g>

@@ -5,13 +5,12 @@
  */
 
 import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { ElementType } from '../types/elements';
 
 type SidebarTab = 'elements' | 'properties';
 type ActiveModal = 'export' | 'import' | 'settings' | null;
-type ActiveTool = 'select' | 'hand' | 'zoom';
+type ActiveTool = 'select' | 'hand' | 'zoom' | 'string-lights' | 'bunting';
 
 interface DragState {
   isDragging: boolean;
@@ -62,8 +61,7 @@ interface UIStore {
 }
 
 export const useUIStore = create<UIStore>()(
-  subscribeWithSelector(
-    immer((set, get) => ({
+  immer((set, get) => ({
       sidebarOpen: true,
       activeSidebarTab: 'elements',
       activeModal: null,
@@ -188,5 +186,4 @@ export const useUIStore = create<UIStore>()(
           };
         }),
     }))
-  )
 );

@@ -68,6 +68,65 @@ export interface Shape {
   attachedSpaceId?: string;
   customShape?: string;
   customShapeScale?: number;
+  elementType?: string; // Original ElementType from the sidebar (e.g. 'dance-floor', 'string-lights')
+  label?: string; // Display label (used for throne chairs, zone labels, etc.)
+  lightingData?: {
+    // Offsets from the bounding-box top-left corner (shape.x, shape.y) to each anchor.
+    // This lets clampElementToA4 move shape.x/y freely without breaking geometry.
+    startOffX: number;
+    startOffY: number;
+    endOffX: number;
+    endOffY: number;
+    bulbColor?: string;
+    bulbSize?: 'small' | 'medium' | 'large';
+    wireColor?: string;
+    colorScheme?: string;
+    customColors?: string[];
+    flagSize?: 'small' | 'medium' | 'large';
+    flagShape?: 'triangle' | 'rectangle';
+    stringColor?: string;
+    spacing?: 'dense' | 'normal' | 'sparse';
+  };
+  avData?: {
+    type: string; // original elementType e.g. 'av-mixing-desk'
+    widthM: number;
+    heightM: number;
+    label: string;
+    labelVisible: boolean;
+    orientation?: 'landscape' | 'portrait';
+    // type-specific optional fields
+    quantity?: number;           // speakers, moving heads, etc.
+    color?: string;              // brand/accent color
+    model?: string;              // free-text model name
+    stackedSub?: boolean;        // speaker: subwoofer stacked below
+    filled?: boolean;            // truss: filled/open
+    beamAngle?: number;          // moving head / projector
+    screenAspect?: '16:9' | '4:3' | '21:9';  // screen / led-wall
+    resolution?: string;         // led-wall
+    throw?: 'short' | 'standard' | 'long';   // projector
+    channels?: number;           // mixing desk
+  };
+  ceremonyData?: {
+    mode: 'full-block' | 'row-by-row';
+    seatsPerRow: number;
+    rowCount: number;
+    seatWidthPx: number;
+    seatHeightPx: number;
+    rowGapPx: number;
+    seatGapPx: number;
+    aisleWidthPx: number;
+    showLabels: boolean;
+    // Extended fields (all optional for backward compatibility)
+    removedSeats?: string[];
+    curvature?: number;
+    chairStyle?: 'chiavari' | 'ghost' | 'folding' | 'banquet';
+    aisleType?: 'none' | 'center' | 'sides' | 'double';
+    sectionLabels?: { enabled: boolean; left: string; right: string };
+    reservedRows?: number[];
+    perRowOverrides?: Record<number, number>;
+    // Guest assignments keyed by seatKey ("rowIndex-globalSeatIndex")
+    seatAssignments?: Record<string, { guestId: string; guestName: string; dietaryType?: string | null }>;
+  };
 }
 
 export interface TextElement {
@@ -77,6 +136,9 @@ export interface TextElement {
   text: string;
   fontSize: number;
   fill: string;
+  fontWeight?: 'normal' | 'bold';
+  fontStyle?: 'normal' | 'italic';
+  textAnchor?: 'start' | 'middle' | 'end';
 }
 
 export interface Wall {
@@ -119,6 +181,46 @@ export interface PowerPoint {
 
 export type SyncStatus = 'idle' | 'pending' | 'syncing' | 'saved' | 'error';
 
+export interface SatelliteBackground {
+  center: { lat: number; lng: number };
+  address: string;
+  realWorldWidth: number;   // meters
+  realWorldHeight: number;  // meters
+  orientation: 'landscape' | 'portrait';
+  rotation: number;         // degrees (0-360)
+  pixelsPerMeter: number;    // derived: a4WidthPx / realWorldWidth (or calibrated)
+  aiEnhanced: boolean;
+  imageBase64: string;      // data:image/jpeg;base64,...
+  calibrationLines: CalibrationLine[];  // lines drawn in calibration step (empty = uncalibrated)
+  scaleFactor: number;      // fine-tune multiplier applied on top of calibration (1.0 = none)
+  addedAt: string;          // ISO 8601
+}
+
+export interface CalibrationLine {
+  id: string;
+  // Normalized coords (0–1 relative to image natural dimensions)
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  realWorldMeters: number;  // user-entered real-world length
+  color: string;            // distinct color per line
+}
+
+export interface CustomBackground {
+  fileName: string;
+  fileType: string;             // 'image/jpeg' | 'image/png' | etc.
+  naturalWidth: number;         // original image pixel width
+  naturalHeight: number;        // original image pixel height
+  imageBase64: string;          // data:image/...;base64,...
+  calibrationLines: CalibrationLine[];
+  pixelsPerMeter: number;       // computed from median of calibration lines
+  scaleFactor: number;          // fine-tune multiplier (1.0 = no adjustment, range 0.8–1.2)
+  realWorldWidth: number;       // meters (naturalWidth / naturalPixelsPerMeter)
+  realWorldHeight: number;      // meters
+  addedAt: string;              // ISO 8601
+}
+
 export interface CanvasSnapshot {
   elements: Record<string, Shape>;
   elementOrder: string[];
@@ -130,6 +232,8 @@ export interface CanvasSnapshot {
   drawingOrder: string[];
   textElements: Record<string, TextElement>;
   textOrder: string[];
+  satelliteBackground?: SatelliteBackground;
+  customBackground?: CustomBackground;
 }
 
 // Wall scale info for proportional element sizing
@@ -162,6 +266,21 @@ export interface CanvasState {
   drawingOrder: string[];
   textElements: Record<string, TextElement>;
   textOrder: string[];
+
+  // Satellite background
+  satelliteBackground: SatelliteBackground | null;
+
+  // Custom uploaded background
+  customBackground: CustomBackground | null;
+
+  // Connected notes from workflow
+  notes: Array<{
+    id: string;
+    content: string;
+    color: string;
+    width: number;
+    height: number;
+  }>;
 
   // View state (not persisted to Supabase)
   viewBox: ViewBox;
@@ -230,6 +349,14 @@ export interface CanvasActions {
   setPowerPoints: (powerPoints: PowerPoint[]) => void;
   setTextElements: (texts: TextElement[]) => void;
 
+  // Satellite background operations (mutually exclusive with customBackground)
+  setSatelliteBackground: (bg: SatelliteBackground) => void;
+  clearSatelliteBackground: () => void;
+
+  // Custom uploaded background operations (mutually exclusive with satelliteBackground)
+  setCustomBackground: (bg: CustomBackground) => void;
+  clearCustomBackground: () => void;
+
   // Wall scale operations
   setWallScale: (scale: WallScaleInfo | null) => void;
 
@@ -255,7 +382,19 @@ export interface CanvasActions {
     powerPoints: PowerPoint[];
     viewBox: ViewBox;
     wallScale: WallScaleInfo | null;
+    satelliteBackground: SatelliteBackground | null;
+    customBackground: CustomBackground | null;
+    notes: Array<{
+      id: string;
+      content: string;
+      color: string;
+      width: number;
+      height: number;
+    }>;
   };
+  setNotes: (notes: Array<{ id: string; content: string; color: string; width: number; height: number }>) => void;
+  updateNote: (noteId: string, updates: Partial<{ content: string; color: string; width: number; height: number }>) => void;
+  removeNote: (noteId: string) => void;
 }
 
 function generateId(prefix: string): string {
@@ -267,6 +406,9 @@ const initialState: CanvasState = {
   supabaseLayoutId: null,
   a4Bounds: { x: 0, y: 0, width: 800, height: 1132 },
   wallScale: null,
+  satelliteBackground: null,
+  customBackground: null,
+  notes: [],
   elements: {},
   elementOrder: [],
   walls: {},
@@ -375,6 +517,27 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
             state.wallScale = null;
           }
 
+          // Restore satellite background if provided
+          if ((data as any)?.satelliteBackground) {
+            state.satelliteBackground = (data as any).satelliteBackground;
+          } else {
+            state.satelliteBackground = null;
+          }
+
+          // Restore custom background if provided
+          if ((data as any)?.customBackground) {
+            state.customBackground = (data as any).customBackground;
+          } else {
+            state.customBackground = null;
+          }
+
+          // Restore notes if provided
+          if ((data as any)?.notes && Array.isArray((data as any).notes)) {
+            state.notes = (data as any).notes;
+          } else {
+            state.notes = [];
+          }
+
           state.selectedElementIds = [];
           state.syncStatus = 'idle';
           state.pendingChanges = false;
@@ -394,6 +557,8 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
           state.activeProjectId = null;
           state.supabaseLayoutId = null;
           state.wallScale = null;
+          state.satelliteBackground = null;
+          state.customBackground = null;
           state.elements = {};
           state.elementOrder = [];
           state.walls = {};
@@ -811,6 +976,67 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
         });
       },
 
+      // ========== Satellite Background Operations ==========
+      // IMPORTANT: these actions also write directly to a dedicated localStorage key
+      // so the background survives any overwrite of the main canvas JSON key.
+
+      setSatelliteBackground: (bg) => {
+        set((state) => {
+          state.satelliteBackground = bg;
+          state.customBackground = null; // mutually exclusive
+          state.pendingChanges = true;
+        });
+        // Persist immediately to a dedicated key — immune to initializeProject / handleProjectSelect overwrites
+        const projectId = get().activeProjectId;
+        if (projectId && typeof localStorage !== 'undefined') {
+          try {
+            localStorage.setItem(`layout-maker-bg-${projectId}`, JSON.stringify({ type: 'satellite', data: bg }));
+            console.log('[canvasStore] satellite bg written to dedicated key, projectId:', projectId);
+          } catch (e) {
+            console.warn('[canvasStore] could not write satellite bg dedicated key:', e);
+          }
+        }
+      },
+
+      clearSatelliteBackground: () => {
+        set((state) => {
+          state.satelliteBackground = null;
+          state.pendingChanges = true;
+        });
+        const projectId = get().activeProjectId;
+        if (projectId && typeof localStorage !== 'undefined') {
+          localStorage.removeItem(`layout-maker-bg-${projectId}`);
+        }
+      },
+
+      setCustomBackground: (bg) => {
+        set((state) => {
+          state.customBackground = bg;
+          state.satelliteBackground = null; // mutually exclusive
+          state.pendingChanges = true;
+        });
+        const projectId = get().activeProjectId;
+        if (projectId && typeof localStorage !== 'undefined') {
+          try {
+            localStorage.setItem(`layout-maker-bg-${projectId}`, JSON.stringify({ type: 'custom', data: bg }));
+            console.log('[canvasStore] custom bg written to dedicated key, projectId:', projectId);
+          } catch (e) {
+            console.warn('[canvasStore] could not write custom bg dedicated key:', e);
+          }
+        }
+      },
+
+      clearCustomBackground: () => {
+        set((state) => {
+          state.customBackground = null;
+          state.pendingChanges = true;
+        });
+        const projectId = get().activeProjectId;
+        if (projectId && typeof localStorage !== 'undefined') {
+          localStorage.removeItem(`layout-maker-bg-${projectId}`);
+        }
+      },
+
       // ========== Wall Scale Operations ==========
 
       setWallScale: (scale) => {
@@ -896,7 +1122,44 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
           powerPoints: state.powerPointOrder.map((id) => state.powerPoints[id]).filter((pp): pp is PowerPoint => !!pp),
           viewBox: state.viewBox,
           wallScale: state.wallScale,
+          satelliteBackground: state.satelliteBackground,
+          customBackground: state.customBackground,
+          notes: state.notes,
         };
+      },
+
+      setNotes: (notes) => {
+        set((state) => {
+          state.notes = notes;
+        });
+      },
+
+      updateNote: (noteId, updates) => {
+        set((state) => {
+          const noteIndex = state.notes.findIndex(n => n.id === noteId);
+          if (noteIndex === -1) return state;
+          
+          const newNotes = [...state.notes];
+          const existingNote = newNotes[noteIndex];
+          if (!existingNote) return state;
+          
+          newNotes[noteIndex] = { 
+            ...existingNote, 
+            content: updates.content ?? existingNote.content,
+            color: updates.color ?? existingNote.color,
+            width: updates.width ?? existingNote.width,
+            height: updates.height ?? existingNote.height,
+          };
+          state.notes = newNotes;
+          state.pendingChanges = true;
+        });
+      },
+
+      removeNote: (noteId) => {
+        set((state) => {
+          state.notes = state.notes.filter(n => n.id !== noteId);
+          state.pendingChanges = true;
+        });
       },
     }))
   )

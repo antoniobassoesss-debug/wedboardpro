@@ -109,6 +109,16 @@ export function formatFeet(meters: number, decimals: number = 1): string {
 }
 
 /**
+ * Convert meters to feet + inches display string, e.g. 2.50m → 8'2"
+ */
+export function toImperial(meters: number): string {
+  const totalInches = meters * 39.3701;
+  const feet = Math.floor(totalInches / 12);
+  const inches = Math.round(totalInches % 12);
+  return `${feet}'${inches}"`;
+}
+
+/**
  * Format dimension based on unit preference
  */
 export function formatDimension(

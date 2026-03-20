@@ -1118,16 +1118,387 @@
   background: #f9fafb;
 }
 
-/* Edit Modal Grid */
-.budget-edit-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
+/* ============================================
+   BUDGET TAB MOBILE RESPONSIVE STYLES
+   ============================================ */
+
+@media (max-width: 768px) {
+  /* Container adjustments */
+  .budget-container {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  /* Top section - stack summary and chart */
+  .budget-top-section {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  /* Summary cards - single column */
+  .budget-summary {
+    padding: 12px;
+  }
+
+  .budget-summary-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .budget-summary-cards {
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .budget-stat-card {
+    padding: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .budget-stat-label {
+    font-size: 10px;
+    margin-bottom: 0;
+  }
+
+  .budget-stat-value {
+    font-size: 16px;
+  }
+
+  .budget-stat-secondary {
+    display: none;
+  }
+
+  .budget-progress-section {
+    padding-top: 12px;
+  }
+
+  /* Chart adjustments */
+  .budget-chart-container {
+    padding: 12px;
+  }
+
+  .budget-chart-wrapper {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .budget-chart {
+    flex: none;
+    width: 100%;
+    max-width: 180px;
+    margin: 0 auto;
+  }
+
+  .budget-chart-center-percent {
+    font-size: 20px;
+  }
+
+  .budget-chart-legend {
+    max-height: 150px;
+  }
+
+  /* Main section - stack categories and timeline */
+  .budget-main-section {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  .budget-categories-section,
+  .budget-timeline-section {
+    padding: 12px;
+  }
+
+  .budget-section-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .budget-section-header h3 {
+    font-size: 16px;
+  }
+
+  .budget-add-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Table - make it scrollable horizontally but with better UX */
+  .budget-table-container {
+    margin: 0 -12px;
+    padding: 0 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .budget-table {
+    font-size: 12px;
+    min-width: 600px; /* Force horizontal scroll on mobile */
+  }
+
+  .budget-table th {
+    padding: 8px 6px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .budget-table td {
+    padding: 10px 6px;
+  }
+
+  .budget-category-cell {
+    gap: 8px;
+  }
+
+  .budget-category-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+
+  .budget-category-name {
+    font-size: 12px;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .budget-status-badge {
+    font-size: 10px;
+    padding: 4px 6px;
+  }
+
+  .budget-actions {
+    gap: 4px;
+  }
+
+  .budget-action-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+
+  /* Payment Timeline - mobile friendly */
+  .budget-timeline {
+    padding: 12px;
+  }
+
+  .budget-timeline-header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .budget-timeline-header h3 {
+    font-size: 16px;
+  }
+
+  .budget-toggle-paid {
+    font-size: 12px;
+  }
+
+  .budget-timeline-alert {
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+
+  .budget-timeline-list {
+    gap: 8px;
+  }
+
+  .budget-timeline-month-header {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+
+  .budget-timeline-item {
+    padding: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .budget-timeline-date {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+  }
+
+  .budget-timeline-day {
+    font-size: 16px;
+  }
+
+  .budget-timeline-weekday {
+    font-size: 9px;
+  }
+
+  .budget-timeline-content {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  .budget-timeline-category {
+    font-size: 12px;
+    gap: 6px;
+  }
+
+  .budget-timeline-icon {
+    font-size: 14px;
+  }
+
+  .budget-timeline-desc {
+    font-size: 11px;
+  }
+
+  .budget-timeline-due {
+    font-size: 10px;
+  }
+
+  .budget-timeline-right {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .budget-timeline-amount {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .budget-timeline-toggle {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  /* Empty state */
+  .budget-empty-state {
+    padding: 24px 16px;
+  }
+
+  .budget-empty-icon {
+    font-size: 40px;
+  }
+
+  .budget-empty-state h4 {
+    font-size: 16px;
+  }
+
+  .budget-empty-state p {
+    font-size: 13px;
+  }
+
+  .budget-add-btn-large {
+    width: 100%;
+    padding: 12px;
+  }
+
+  /* Alerts */
+  .budget-alerts {
+    padding: 12px;
+  }
+
+  .budget-alert {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .budget-alert-icon {
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+  }
+
+  .budget-alert-content {
+    flex: 1;
+  }
+
+  .budget-alert-title {
+    font-size: 13px;
+  }
+
+  .budget-alert-message {
+    font-size: 11px;
+  }
 }
 
-@media (max-width: 700px) {
-  .budget-edit-grid {
-    grid-template-columns: 1fr;
+/* Extra small mobile */
+@media (max-width: 480px) {
+  .budget-container {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .budget-stat-card {
+    padding: 8px;
+  }
+
+  .budget-stat-value {
+    font-size: 14px;
+  }
+
+  .budget-chart {
+    max-width: 140px;
+  }
+
+  .budget-table {
+    min-width: 500px;
+  }
+
+  .budget-table th,
+  .budget-table td {
+    padding: 8px 4px;
+  }
+
+  .budget-timeline-item {
+    padding: 8px;
+  }
+
+  .budget-timeline-content {
+    min-width: 100px;
+  }
+}
+
+/* Landscape mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+  .budget-top-section {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .budget-summary-cards {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  .budget-main-section {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+/* Touch-friendly improvements for budget */
+@media (hover: none) and (pointer: coarse) {
+  .budget-table-row:active {
+    background: #f3f4f6;
+  }
+
+  .budget-timeline-item:active {
+    background: #f9fafb;
+  }
+
+  .budget-action-btn:active {
+    background: #f3f4f6;
+  }
+
+  .budget-toggle-paid {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
   }
 }
 
@@ -2016,6 +2387,203 @@
 @media (max-width: 768px) {
   .fcc-summary-bar {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Financial Command Center Mobile Fixes */
+  .fcc-container {
+    padding: 12px !important;
+    gap: 12px !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .fcc-command-bar {
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px !important;
+    align-items: stretch;
+  }
+
+  .fcc-title-section {
+    align-items: flex-start;
+  }
+
+  .fcc-title {
+    font-size: 18px !important;
+  }
+
+  .fcc-subtitle {
+    font-size: 12px !important;
+  }
+
+  .fcc-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .fcc-view-toggle {
+    width: 100%;
+  }
+
+  .fcc-view-btn {
+    flex: 1;
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  .fcc-health-bar {
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px !important;
+  }
+
+  .fcc-health-item {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .fcc-summary-bar {
+    gap: 8px;
+  }
+
+  .fcc-metric-card {
+    padding: 12px !important;
+  }
+
+  .fcc-metric-label {
+    font-size: 10px;
+    margin-bottom: 4px;
+  }
+
+  .fcc-metric-value {
+    font-size: 18px !important;
+  }
+
+  .fcc-metric-change {
+    font-size: 10px;
+  }
+
+  /* Table - make scrollable */
+  .fcc-table-panel {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -12px;
+    padding: 0 12px;
+  }
+
+  .fcc-tree-table {
+    min-width: 500px;
+    font-size: 12px;
+  }
+
+  .fcc-table-head {
+    padding: 8px 10px;
+  }
+
+  .fcc-table-head > div {
+    font-size: 10px;
+    padding: 0 4px;
+  }
+
+  .fcc-table-row {
+    padding: 10px;
+  }
+
+  .fcc-table-row > div {
+    padding: 0 4px;
+    font-size: 11px;
+  }
+
+  .fcc-col-category {
+    min-width: 100px;
+  }
+
+  .fcc-col-budget,
+  .fcc-col-contracted,
+  .fcc-col-status {
+    min-width: 60px;
+  }
+
+  /* Upcoming Payments */
+  .fcc-upcoming-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+  }
+
+  .fcc-upcoming-card {
+    padding: 12px !important;
+  }
+
+  .fcc-upcoming-info {
+    gap: 4px;
+  }
+
+  .fcc-upcoming-category {
+    font-size: 12px;
+  }
+
+  .fcc-upcoming-desc {
+    font-size: 11px;
+  }
+
+  .fcc-upcoming-amount {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .fcc-upcoming-due {
+    font-size: 10px;
+  }
+
+  /* Risk Banner */
+  .fcc-risk-banner {
+    padding: 10px 12px !important;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .fcc-risk-content {
+    width: 100%;
+  }
+
+  .fcc-risk-title {
+    font-size: 13px;
+  }
+
+  .fcc-risk-message {
+    font-size: 11px;
+  }
+
+  .fcc-risk-action {
+    width: 100%;
+  }
+
+  /* Accordion */
+  .fcc-accordion-header {
+    padding: 12px !important;
+  }
+
+  .fcc-accordion-title {
+    font-size: 14px;
+  }
+
+  .fcc-accordion-count {
+    font-size: 11px;
+  }
+
+  /* Add button */
+  .fcc-add-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 12px !important;
+  }
+
+  /* Hide non-essential elements on mobile */
+  .fcc-subtitle,
+  .fcc-metric-bar,
+  .fcc-metric-sublabel {
+    display: none;
   }
 }
 

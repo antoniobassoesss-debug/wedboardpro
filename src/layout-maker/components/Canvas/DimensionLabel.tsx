@@ -9,6 +9,7 @@
 
 import React from 'react';
 import type { TableType } from '../../../types/layout-elements';
+import { toImperial } from '../../constants/viewport';
 
 interface DimensionLabelProps {
   width: number;
@@ -55,12 +56,21 @@ export const DimensionLabel: React.FC<DimensionLabelProps> = ({
 
   const label = formatDimensions();
 
+  // Build imperial secondary label (width × height in feet/inches)
+  const widthM = unit === 'm' ? width : width / 100;
+  const heightM = unit === 'm' ? height : height / 100;
+  const imperialLabel = tableType === 'table-round'
+    ? `Ø${toImperial(widthM)}`
+    : `${toImperial(widthM)} × ${toImperial(heightM)}`;
+
+  const fullLabel = `${label} · ${imperialLabel}`;
+
   return (
     <g className="dimension-label">
       <rect
         x={-24}
         y={position === 'above' ? -18 : 6}
-        width={label.length * 7 + 16}
+        width={fullLabel.length * 6 + 16}
         height={16}
         rx={4}
         fill="white"
@@ -77,6 +87,7 @@ export const DimensionLabel: React.FC<DimensionLabelProps> = ({
         style={{ pointerEvents: 'none', userSelect: 'none' }}
       >
         {label}
+        <tspan fontSize={8} opacity={0.65}> · {imperialLabel}</tspan>
       </text>
     </g>
   );

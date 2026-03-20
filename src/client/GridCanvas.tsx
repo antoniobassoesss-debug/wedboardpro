@@ -137,6 +137,9 @@ interface TextElement {
   text: string;
   fontSize: number;
   fill: string;
+  fontWeight?: 'normal' | 'bold';
+  fontStyle?: 'normal' | 'italic';
+  textAnchor?: 'start' | 'middle' | 'end';
 }
 
 interface A4Dimensions {
@@ -213,6 +216,18 @@ const GridCanvas = forwardRef<{
   const [selectedPowerPointId, setSelectedPowerPointId] = useState<string | null>(null);
   const [isElectricalDrawerOpen, setIsElectricalDrawerOpen] = useState(false);
   const selectedPowerPoint = powerPoints.find(p => p.id === selectedPowerPointId) || null;
+  
+  // Text tool state
+  const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [textInputValue, setTextInputValue] = useState('');
+  const [textSettings, setTextSettings] = useState({
+    fontSize: 16,
+    color: '#000000',
+    bold: false,
+    italic: false,
+    alignment: 'left' as 'left' | 'center' | 'right',
+  });
   
   const [viewBoxState, setViewBoxState] = useState<ViewBox>(() => {
     const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
@@ -420,6 +435,29 @@ const GridCanvas = forwardRef<{
     }
   }, [contextMenu]);
 
+  const handleSaveText = useCallback(() => {
+    if (editingTextId) {
+      // Update existing text element
+      setTextElements(prev => prev.map(t => {
+        if (t.id === editingTextId) {
+          return {
+            ...t,
+            text: textInputValue,
+            fontSize: textSettings.fontSize,
+            fill: textSettings.color,
+            fontWeight: textSettings.bold ? 'bold' : 'normal',
+            fontStyle: textSettings.italic ? 'italic' : 'normal',
+            textAnchor: textSettings.alignment === 'center' ? 'middle' : textSettings.alignment === 'right' ? 'end' : 'start',
+          };
+        }
+        return t;
+      }));
+      saveState();
+    }
+    setEditingTextId(null);
+    setSelectedTextId(null);
+  }, [editingTextId, textInputValue, textSettings, saveState]);
+
   // Calculate current zoom level as percentage
   const getZoomLevel = useCallback(() => {
     const baseWidth = initialViewBoxWidthRef.current;
@@ -593,10 +631,22 @@ const GridCanvas = forwardRef<{
     }
     
     if (activeTool === 'text') {
-      const text = prompt('Enter text:');
-      if (text) {
-        setTextElements(prev => [...prev, { id: `text-${Date.now()}`, x, y, text, fontSize: 16, fill: brushColor }]);
-      }
+      // Create new text element with inline editing
+      const newTextId = `text-${Date.now()}`;
+      setTextElements(prev => [...prev, { 
+        id: newTextId, 
+        x, 
+        y, 
+        text: '', 
+        fontSize: textSettings.fontSize, 
+        fill: textSettings.color,
+        fontWeight: textSettings.bold ? 'bold' : 'normal',
+        fontStyle: textSettings.italic ? 'italic' : 'normal',
+        textAnchor: textSettings.alignment === 'center' ? 'middle' : textSettings.alignment === 'right' ? 'end' : 'start',
+      }]);
+      setEditingTextId(newTextId);
+      setSelectedTextId(newTextId);
+      setTextInputValue('');
       return;
     }
 
@@ -611,7 +661,7 @@ const GridCanvas = forwardRef<{
         setSelectedShapeId(null);
       }
     }
-  }, [activeTool, brushColor, brushSize, viewBoxState, shapes, isPointOnCanvas, closeContextMenu]);
+  }, [activeTool, brushColor, brushSize, viewBoxState, shapes, isPointOnCanvas, closeContextMenu, textSettings]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanningRef.current) {
@@ -1326,7 +1376,37 @@ const GridCanvas = forwardRef<{
             );
           })}
           {textElements.map((el) => (
-            <text key={el.id} x={el.x} y={el.y} fontSize={el.fontSize} fill={el.fill}>{el.text}</text>
+            <text 
+              key={el.id} 
+              x={el.x} 
+              y={el.y} 
+              fontSize={el.fontSize} 
+              fill={el.fill}
+              fontWeight={el.fontWeight || 'normal'}
+              fontStyle={el.fontStyle || 'normal'}
+              textAnchor={el.textAnchor || 'start'}
+              style={{ 
+                cursor: activeTool === 'select' ? 'pointer' : 'text',
+                userSelect: 'none',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (activeTool === 'select') {
+                  setSelectedTextId(el.id);
+                  setEditingTextId(el.id);
+                  setTextInputValue(el.text);
+                  setTextSettings({
+                    fontSize: el.fontSize,
+                    color: el.fill,
+                    bold: el.fontWeight === 'bold',
+                    italic: el.fontStyle === 'italic',
+                    alignment: el.textAnchor === 'middle' ? 'center' : el.textAnchor === 'end' ? 'right' : 'left',
+                  });
+                }
+              }}
+            >
+              {el.text}
+            </text>
           ))}
           {powerPoints.map((point) => (
             <ElectricalIcon
@@ -1342,6 +1422,243 @@ const GridCanvas = forwardRef<{
             />
           ))}
       </svg>
+      
+      {/* Text Toolbar - appears when text tool is active */}
+      {activeTool === 'text' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 16,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 12px',
+            backgroundColor: '#ffffff',
+            borderRadius: 12,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            border: '1px solid #e5e7eb',
+            zIndex: 1000,
+          }}
+        >
+          {/* Font Size */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 12, color: '#6b7280' }}>Size</span>
+            <input
+              type="number"
+              value={textSettings.fontSize}
+              onChange={(e) => setTextSettings(s => ({ ...s, fontSize: parseInt(e.target.value) || 16 }))}
+              min={8}
+              max={72}
+              style={{
+                width: 50,
+                padding: '4px 8px',
+                border: '1px solid #e5e7eb',
+                borderRadius: 6,
+                fontSize: 12,
+              }}
+            />
+          </div>
+          
+          <div style={{ width: 1, height: 24, backgroundColor: '#e5e7eb' }} />
+          
+          {/* Bold */}
+          <button
+            onClick={() => setTextSettings(s => ({ ...s, bold: !s.bold }))}
+            style={{
+              padding: '6px 8px',
+              border: 'none',
+              backgroundColor: textSettings.bold ? '#3b82f6' : 'transparent',
+              color: textSettings.bold ? '#ffffff' : '#374151',
+              borderRadius: 6,
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: 14,
+            }}
+            title="Bold"
+          >
+            B
+          </button>
+          
+          {/* Italic */}
+          <button
+            onClick={() => setTextSettings(s => ({ ...s, italic: !s.italic }))}
+            style={{
+              padding: '6px 8px',
+              border: 'none',
+              backgroundColor: textSettings.italic ? '#3b82f6' : 'transparent',
+              color: textSettings.italic ? '#ffffff' : '#374151',
+              borderRadius: 6,
+              cursor: 'pointer',
+              fontStyle: 'italic',
+              fontSize: 14,
+            }}
+            title="Italic"
+          >
+            I
+          </button>
+          
+          <div style={{ width: 1, height: 24, backgroundColor: '#e5e7eb' }} />
+          
+          {/* Alignment */}
+          <button
+            onClick={() => setTextSettings(s => ({ 
+              ...s, 
+              alignment: s.alignment === 'left' ? 'center' : s.alignment === 'center' ? 'right' : 'left' 
+            }))}
+            style={{
+              padding: '6px 8px',
+              border: 'none',
+              backgroundColor: 'transparent',
+              color: '#374151',
+              borderRadius: 6,
+              cursor: 'pointer',
+              fontSize: 12,
+            }}
+            title="Alignment"
+          >
+            {textSettings.alignment === 'left' && '⇤'}
+            {textSettings.alignment === 'center' && '⇥⇤'}
+            {textSettings.alignment === 'right' && '⇥'}
+          </button>
+          
+          <div style={{ width: 1, height: 24, backgroundColor: '#e5e7eb' }} />
+          
+          {/* Color */}
+          <input
+            type="color"
+            value={textSettings.color}
+            onChange={(e) => setTextSettings(s => ({ ...s, color: e.target.value }))}
+            style={{
+              width: 28,
+              height: 28,
+              padding: 0,
+              border: '1px solid #e5e7eb',
+              borderRadius: 6,
+              cursor: 'pointer',
+            }}
+            title="Text Color"
+          />
+          
+          <div style={{ width: 1, height: 24, backgroundColor: '#e5e7eb' }} />
+          
+          {/* Hint */}
+          <span style={{ fontSize: 11, color: '#9ca3af' }}>
+            Click on canvas to add text
+          </span>
+        </div>
+      )}
+      
+      {/* Inline Text Input - appears when editing a text element */}
+      {editingTextId && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 1001,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <textarea
+            value={textInputValue}
+            onChange={(e) => setTextInputValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSaveText();
+              }
+              if (e.key === 'Escape') {
+                setEditingTextId(null);
+                setSelectedTextId(null);
+              }
+            }}
+            autoFocus
+            style={{
+              minWidth: 200,
+              minHeight: 100,
+              padding: 16,
+              fontSize: textSettings.fontSize,
+              fontWeight: textSettings.bold ? 'bold' : 'normal',
+              fontStyle: textSettings.italic ? 'italic' : 'normal',
+              color: textSettings.color,
+              textAlign: textSettings.alignment === 'center' ? 'center' : textSettings.alignment === 'right' ? 'right' : 'left',
+              backgroundColor: '#ffffff',
+              border: '2px solid #3b82f6',
+              borderRadius: 8,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+              resize: 'both',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+            }}
+            placeholder="Type your text here..."
+          />
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              marginTop: 8,
+              justifyContent: 'center',
+            }}
+          >
+            <button
+              onClick={handleSaveText}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#3b82f6',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: 6,
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: 500,
+              }}
+            >
+              Save
+            </button>
+            <button
+              onClick={() => {
+                setEditingTextId(null);
+                setSelectedTextId(null);
+              }}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#f3f4f6',
+                color: '#374151',
+                border: 'none',
+                borderRadius: 6,
+                cursor: 'pointer',
+                fontSize: 13,
+              }}
+            >
+              Cancel
+            </button>
+            {selectedTextId && (
+              <button
+                onClick={() => {
+                  setTextElements(prev => prev.filter(t => t.id !== selectedTextId));
+                  setEditingTextId(null);
+                  setSelectedTextId(null);
+                  saveState();
+                }}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#fee2e2',
+                  color: '#dc2626',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontSize: 13,
+                }}
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      
       <ElectricalDrawer
         isOpen={isElectricalDrawerOpen}
         onClose={() => {

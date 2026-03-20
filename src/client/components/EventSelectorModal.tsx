@@ -111,8 +111,9 @@ const EventSelectorModal: React.FC<EventSelectorModalProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'rgba(0, 0, 0, 0.5)',
+        background: 'rgba(0, 0, 0, 0.55)',
         backdropFilter: 'blur(4px)',
+        padding: 16,
       }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
@@ -122,31 +123,32 @@ const EventSelectorModal: React.FC<EventSelectorModalProps> = ({
           maxWidth: '560px',
           maxHeight: '80vh',
           background: '#ffffff',
-          borderRadius: '16px',
-          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
+          borderRadius: '20px',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.22)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          border: '1px solid rgba(0, 0, 0, 0.08)',
         }}
       >
         {/* Header */}
         <div style={{
-          padding: '20px 24px',
-          borderBottom: '1px solid #e5e7eb',
-          background: 'linear-gradient(to bottom, #ffffff 0%, #f9fafb 100%)',
+          padding: '18px 24px',
+          borderBottom: '1px solid #f3f4f6',
+          background: '#ffffff',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{
                 width: '40px',
                 height: '40px',
                 borderRadius: '10px',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                background: '#f1f5f9',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="1.5">
                   <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                   <line x1="16" y1="2" x2="16" y2="6" />
                   <line x1="8" y1="2" x2="8" y2="6" />
@@ -154,10 +156,10 @@ const EventSelectorModal: React.FC<EventSelectorModalProps> = ({
                 </svg>
               </div>
               <div>
-                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#111827' }}>
+                <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#0f172a' }}>
                   Select Event
                 </h2>
-                <p style={{ margin: 0, fontSize: '13px', color: '#6b7280' }}>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748b' }}>
                   Choose which event this layout is for
                 </p>
               </div>
@@ -165,18 +167,22 @@ const EventSelectorModal: React.FC<EventSelectorModalProps> = ({
             <button
               onClick={onClose}
               style={{
-                width: '32px',
-                height: '32px',
+                width: '36px',
+                height: '36px',
                 borderRadius: '8px',
                 border: 'none',
-                background: '#f3f4f6',
+                background: '#f1f5f9',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                color: '#64748b',
+                transition: 'background 0.15s',
               }}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
+              onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M18 6L6 18M6 6l12 12" />
               </svg>
             </button>
@@ -189,7 +195,7 @@ const EventSelectorModal: React.FC<EventSelectorModalProps> = ({
               height="16"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#9ca3af"
+              stroke="#64748b"
               strokeWidth="2"
               style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
             >
@@ -205,10 +211,11 @@ const EventSelectorModal: React.FC<EventSelectorModalProps> = ({
                 width: '100%',
                 padding: '10px 12px 10px 40px',
                 fontSize: '14px',
-                border: '1px solid #e5e7eb',
+                border: '1px solid #e2e8f0',
                 borderRadius: '10px',
                 outline: 'none',
                 background: '#ffffff',
+                color: '#1f2937',
               }}
             />
           </div>
@@ -217,12 +224,12 @@ const EventSelectorModal: React.FC<EventSelectorModalProps> = ({
         {/* Event List */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
           {loading ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+            <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
               <div style={{
                 width: '32px',
                 height: '32px',
-                border: '3px solid #e5e7eb',
-                borderTopColor: '#3b82f6',
+                border: '3px solid #e2e8f0',
+                borderTopColor: '#0f172a',
                 borderRadius: '50%',
                 margin: '0 auto 12px',
                 animation: 'spin 1s linear infinite',
@@ -234,7 +241,7 @@ const EventSelectorModal: React.FC<EventSelectorModalProps> = ({
               {error}
             </div>
           ) : filteredEvents.length === 0 ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+            <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
               {searchQuery ? 'No events match your search' : 'No ongoing events found'}
             </div>
           ) : (
@@ -264,24 +271,24 @@ const EventSelectorModal: React.FC<EventSelectorModalProps> = ({
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                        <span style={{ fontSize: '15px', fontWeight: 500, color: '#111827' }}>
+                        <span style={{ fontSize: '15px', fontWeight: 500, color: '#0f172a' }}>
                           {event.title}
                         </span>
                         {event.hasLayout && (
                           <span style={{
                             fontSize: '10px',
-                            fontWeight: 500,
+                            fontWeight: 600,
                             padding: '2px 6px',
                             borderRadius: '4px',
-                            background: '#dbeafe',
-                            color: '#1d4ed8',
+                            background: '#e2e8f0',
+                            color: '#0f172a',
                           }}>
                             Has Layout
                           </span>
                         )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                        <span style={{ fontSize: '13px', color: '#64748b' }}>
                           {formatDate(event.wedding_date)}
                         </span>
                         <span style={{
@@ -302,7 +309,7 @@ const EventSelectorModal: React.FC<EventSelectorModalProps> = ({
                       height="20"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="#9ca3af"
+                      stroke="#94a3b8"
                       strokeWidth="2"
                     >
                       <path d="M9 18l6-6-6-6" />
@@ -317,10 +324,10 @@ const EventSelectorModal: React.FC<EventSelectorModalProps> = ({
         {/* Footer hint */}
         <div style={{
           padding: '12px 16px',
-          borderTop: '1px solid #e5e7eb',
-          background: '#f9fafb',
+          borderTop: '1px solid #f3f4f6',
+          background: '#fafafa',
           fontSize: '12px',
-          color: '#6b7280',
+          color: '#64748b',
           textAlign: 'center',
         }}>
           {events.filter(e => e.hasLayout).length > 0
