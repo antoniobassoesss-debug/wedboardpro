@@ -1747,23 +1747,33 @@ const LayoutMakerPageStore: React.FC = () => {
 
     lastWorkflowSaveRef.current = Date.now();
 
-    // Atomic diff: insert added connections, delete removed ones
-    const added = connections.filter(
-      c => !prev.some(p => p.fromCardId === c.fromCardId && p.toCardId === c.toCardId),
-    );
-    const removed = prev.filter(
-      p => !connections.some(c => c.fromCardId === p.fromCardId && c.toCardId === p.toCardId),
-    );
+    // Count-based diff to handle duplicate pairs in DB
+    const pairKey = (c: Connection) => `${c.fromCardId}→${c.toCardId}`;
+    const prevCounts = new Map<string, number>();
+    prev.forEach(c => prevCounts.set(pairKey(c), (prevCounts.get(pairKey(c)) ?? 0) + 1));
+    const newCounts = new Map<string, number>();
+    connections.forEach(c => newCounts.set(pairKey(c), (newCounts.get(pairKey(c)) ?? 0) + 1));
 
-    added.forEach(c => {
+    // Insert pairs that are new (not present at all in prev)
+    connections.filter(c => !prevCounts.has(pairKey(c))).forEach(c => {
       insertWorkflowConnection(eventIdFromUrl, c).catch(err => {
         console.error('[Workflow] Error inserting connection:', err);
       });
     });
-    removed.forEach(c => {
-      deleteWorkflowConnectionPair(eventIdFromUrl, c.fromCardId, c.toCardId).catch(err => {
-        console.error('[Workflow] Error deleting connection:', err);
-      });
+
+    // Delete pairs whose count decreased — one DB delete per unique pair that shrank
+    const deletedPairs = new Set<string>();
+    prevCounts.forEach((prevCount, k) => {
+      if ((newCounts.get(k) ?? 0) < prevCount) deletedPairs.add(k);
+    });
+    prev.forEach(c => {
+      const k = pairKey(c);
+      if (deletedPairs.has(k)) {
+        deletedPairs.delete(k);
+        deleteWorkflowConnectionPair(eventIdFromUrl, c.fromCardId, c.toCardId).catch(err => {
+          console.error('[Workflow] Error deleting connection:', err);
+        });
+      }
     });
   }, [eventIdFromUrl, workflowConnections]);
 
