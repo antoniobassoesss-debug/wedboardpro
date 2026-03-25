@@ -968,7 +968,13 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   };
 
   const handleDeleteConnection = useCallback((index: number) => {
-    const newConnections = connections.filter((_, i) => i !== index);
+    // Remove ALL instances of this pair (duplicates from legacy batch-save) so the
+    // line disappears immediately. The parent diff will call deleteWorkflowConnectionPair
+    // once, which wipes every matching DB row too.
+    const target = connections[index];
+    const newConnections = connections.filter(
+      c => !(c.fromCardId === target.fromCardId && c.toCardId === target.toCardId),
+    );
     setConnections(newConnections);
     setContextMenu(null);
     if (onConnectionsChange) {
@@ -1167,13 +1173,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  useEffect(() => {
-    if (contextMenu) {
-      const handleClick = () => setContextMenu(null);
-      window.addEventListener('click', handleClick);
-      return () => window.removeEventListener('click', handleClick);
-    }
-  }, [contextMenu]);
+  // Context menu is dismissed via the backdrop div rendered in JSX — no window listener needed.
 
   const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
     if (connectingFrom && e.target === e.currentTarget) {
@@ -1639,40 +1639,103 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
           <p style={{ fontSize: '13px', color: '#999999' }}>Create a new project or right-click to add a note</p>
         </div>
       )}
+      </div>{/* end transform div */}
 
+      {/* Zoom + Tidy toolbar — matches layout canvas ZoomControls */}
       <div style={{
         position: 'fixed',
-        bottom: '24px',
+        bottom: '65px',
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
-        gap: '8px',
-        background: '#ffffff',
-        padding: '8px 12px',
-        borderRadius: '12px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+        alignItems: 'center',
+        gap: '4px',
+        background: 'white',
+        borderRadius: '30px',
+        padding: '6px 8px',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.12), 0 0 1px rgba(0,0,0,0.1)',
         zIndex: 1002,
+        pointerEvents: 'auto',
+        userSelect: 'none',
       }}>
-        <button onClick={handleZoomOut} style={zoomBtnStyle}>−</button>
-        <span style={{ display: 'flex', alignItems: 'center', fontSize: '13px', fontWeight: 500, minWidth: '50px', justifyContent: 'center' }}>
+        {/* Zoom Out */}
+        <button
+          onClick={handleZoomOut}
+          disabled={zoom <= 0.3}
+          style={zoom > 0.3 ? zoomBtnStyle : { ...zoomBtnStyle, cursor: 'not-allowed', opacity: 0.4 }}
+          title="Zoom out"
+          onMouseEnter={(e) => { if (zoom > 0.3) e.currentTarget.style.background = '#f1f5f9'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+
+        {/* Zoom Percentage — click to reset */}
+        <button
+          onClick={handleReset}
+          style={{
+            minWidth: '56px',
+            height: '32px',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '6px',
+            color: '#1e293b',
+            fontWeight: 500,
+            fontSize: '13px',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            transition: 'all 0.15s ease',
+            padding: '0 8px',
+          }}
+          title="Reset to 100%"
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >
           {Math.round(zoom * 100)}%
-        </span>
-        <button onClick={handleZoomIn} style={zoomBtnStyle}>+</button>
-        <div style={{ width: '1px', background: '#e2e8f0', margin: '0 4px' }} />
-        <button onClick={handleReset} style={{ ...zoomBtnStyle, padding: '0 12px' }}>Reset</button>
-        <div style={{ width: '1px', background: '#e2e8f0', margin: '0 4px' }} />
+        </button>
+
+        {/* Zoom In */}
+        <button
+          onClick={handleZoomIn}
+          disabled={zoom >= 2}
+          style={zoom < 2 ? zoomBtnStyle : { ...zoomBtnStyle, cursor: 'not-allowed', opacity: 0.4 }}
+          title="Zoom in"
+          onMouseEnter={(e) => { if (zoom < 2) e.currentTarget.style.background = '#f1f5f9'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+
+        {/* Divider */}
+        <div style={{ width: '1px', height: '20px', background: '#e2e8f0', margin: '0 4px' }} />
+
+        {/* Tidy Up */}
         <button
           onClick={handleTidyUp}
           style={{
             ...zoomBtnStyle,
+            width: 'auto',
             padding: '0 12px',
             gap: '6px',
             display: 'flex',
             alignItems: 'center',
             opacity: isTidying ? 0.6 : 1,
             transition: 'opacity 0.2s',
+            fontSize: '13px',
+            fontWeight: 500,
+            color: '#475569',
           }}
           title="Tidy Up — arrange all cards into a clean grid"
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -1683,28 +1746,33 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
           Tidy
         </button>
       </div>
-      </div>
 
       {/* Right-click context menu */}
       {contextMenu && (
-        <div
-          style={{
-            position: 'fixed',
-            left: contextMenu.x,
-            top: contextMenu.y,
-            zIndex: 10000,
-            background: '#ffffff',
-            borderRadius: '10px',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)',
-            border: '1px solid #e5e7eb',
-            overflow: 'hidden',
-            minWidth: '160px',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
+        <>
+          {/* Backdrop — click anywhere outside to dismiss */}
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 9999 }}
+            onMouseDown={() => setContextMenu(null)}
+            onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }}
+          />
+          <div
+            style={{
+              position: 'fixed',
+              left: contextMenu.x,
+              top: contextMenu.y,
+              zIndex: 10000,
+              background: '#ffffff',
+              borderRadius: '10px',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)',
+              border: '1px solid #e5e7eb',
+              overflow: 'hidden',
+              minWidth: '160px',
+            }}
+          >
           {contextMenu.type === 'connection' && (
             <button
-              onClick={() => handleDeleteConnection(contextMenu.index)}
+              onMouseDown={(e) => { e.stopPropagation(); handleDeleteConnection(contextMenu.index); }}
               style={{
                 width: '100%',
                 padding: '10px 14px',
@@ -1731,7 +1799,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
           {contextMenu.type === 'canvas' && (
             <>
               <button
-                onClick={() => handleCreateNote(contextMenu.wrapperX, contextMenu.wrapperY)}
+                onMouseDown={(e) => { e.stopPropagation(); handleCreateNote(contextMenu.wrapperX, contextMenu.wrapperY); }}
                 style={{
                   width: '100%',
                   padding: '10px 14px',
@@ -1758,7 +1826,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                 New Note
               </button>
               <button
-                onClick={() => handleCreateTask(contextMenu.wrapperX, contextMenu.wrapperY)}
+                onMouseDown={(e) => { e.stopPropagation(); handleCreateTask(contextMenu.wrapperX, contextMenu.wrapperY); }}
                 style={{
                   width: '100%',
                   padding: '10px 14px',
@@ -1784,7 +1852,8 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
               </button>
             </>
           )}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
@@ -1793,16 +1862,15 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 const zoomBtnStyle: React.CSSProperties = {
   width: '32px',
   height: '32px',
-  borderRadius: '8px',
-  border: '1px solid #e2e8f0',
-  background: '#ffffff',
-  fontSize: '18px',
-  fontWeight: 500,
+  border: 'none',
+  background: 'transparent',
   cursor: 'pointer',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
+  borderRadius: '6px',
   color: '#475569',
+  transition: 'all 0.15s ease',
 };
 
 export default WorkflowCanvas;
