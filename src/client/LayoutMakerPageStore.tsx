@@ -60,6 +60,7 @@ import type { Wall, Door } from './types/wall';
 import type { PowerPoint } from './types/powerPoint';
 import type { ElementType } from '../layout-maker/types/elements';
 import type { Connection, WorkflowNote } from './components/WorkflowCanvas';
+import type { LayoutNote } from '../layout-maker/types/buildGuide';
 import type { WorkflowTask } from './components/TaskCard';
 import {
   loadWorkflowData,
@@ -1108,21 +1109,15 @@ const LayoutMakerPageStore: React.FC = () => {
       console.log('[Workflow] Loading from Supabase for event:', eventId);
       const result = await loadWorkflowData(eventId);
 
-      console.log('[DEBUG] Supabase raw result:', JSON.stringify(result));
       if (result.error) {
         console.error('[Workflow] Error loading from Supabase:', result.error);
-      } else if (result.notes.length > 0 || result.connections.length > 0) {
-        console.log('[Workflow] Loaded from Supabase:', {
-          notes: result.notes.length,
-          connections: result.connections.length
-        });
+      } else {
+        // Always sync both arrays unconditionally — the old OR condition was wiping notes
+        // state when connections existed but notes didn't (e.g. after a failed note upsert).
         setWorkflowNotes(result.notes as WorkflowNote[]);
         setWorkflowConnections(result.connections);
-        console.log('[DEBUG] workflowConnections loaded:', result.connections.length);
-        console.log('[DEBUG] workflowNotes loaded:', result.notes.length);
-        // Also save to localStorage as backup
-        localStorage.setItem(eventId ? `workflow-notes-cards-${eventId}` : 'workflow-notes-cards', JSON.stringify(result.notes));
-        localStorage.setItem(eventId ? `workflow-connections-${eventId}` : 'workflow-connections', JSON.stringify(result.connections));
+        localStorage.setItem(`workflow-notes-cards-${eventId}`, JSON.stringify(result.notes));
+        localStorage.setItem(`workflow-connections-${eventId}`, JSON.stringify(result.connections));
       }
       setIsWorkflowLoaded(true);
     };
@@ -1800,13 +1795,6 @@ const LayoutMakerPageStore: React.FC = () => {
     const prevIds = new Set(prev.map(n => n.id));
     const newIds = new Set(notes.map(n => n.id));
 
-    // Created notes — upsert so position is included when available
-    notes.filter(n => !prevIds.has(n.id)).forEach(note => {
-      const pos = workflowPositions[note.id];
-      upsertWorkflowNote(eventIdFromUrl, pos ? { ...note, positionX: pos.x, positionY: pos.y } : note)
-        .catch(err => console.error('[Workflow] Error creating note:', err));
-    });
-
     // Deleted notes
     prev.filter(n => !newIds.has(n.id)).forEach(note => {
       deleteWorkflowNote(note.id)
@@ -1827,6 +1815,29 @@ const LayoutMakerPageStore: React.FC = () => {
           .catch(err => console.error('[Workflow] Error updating note:', err));
       }
     });
+  }, [eventIdFromUrl, workflowNotes, workflowPositions]);
+
+  // Dedicated atomic handler for note creation — called by WorkflowCanvas so the note
+  // and its initial position are saved together in a single upsert (no race with positions).
+  const handleNoteCreate = useCallback((note: WorkflowNote, position: { x: number; y: number }) => {
+    const newNotes = [...workflowNotes, note];
+    setWorkflowNotes(newNotes);
+    localStorage.setItem(
+      eventIdFromUrl ? `workflow-notes-cards-${eventIdFromUrl}` : 'workflow-notes-cards',
+      JSON.stringify(newNotes),
+    );
+
+    const newPositions = { ...workflowPositions, [note.id]: position };
+    setWorkflowPositions(newPositions);
+    localStorage.setItem(
+      eventIdFromUrl ? `workflow-positions-${eventIdFromUrl}` : 'workflow-positions',
+      JSON.stringify(newPositions),
+    );
+
+    if (!eventIdFromUrl) return;
+    lastWorkflowSaveRef.current = Date.now();
+    upsertWorkflowNote(eventIdFromUrl, { ...note, positionX: position.x, positionY: position.y })
+      .catch(err => console.error('[Workflow] Error creating note:', err));
   }, [eventIdFromUrl, workflowNotes, workflowPositions]);
 
   const handleWorkflowTasksChange = useCallback((tasks: WorkflowTask[]) => {
@@ -2709,7 +2720,6 @@ const LayoutMakerPageStore: React.FC = () => {
 
   // Build projects with canvas data for workflow preview and load connected notes
   const projectsWithCanvasData = useMemo(() => {
-    console.log('[DEBUG] memo running — workflowConnections:', workflowConnections.length, 'workflowNotes:', workflowNotes.length);
     const emptyCanvasData = {
       drawings: [],
       shapes: [],
@@ -2722,18 +2732,18 @@ const LayoutMakerPageStore: React.FC = () => {
     };
 
     return projects.map(p => {
-      // Find notes connected to this project from workflow
-      console.log('[DEBUG] checking project', p.id, 'type:', typeof p.id);
-      console.log('[DEBUG] workflowConnections at memo time:', workflowConnections.length, workflowConnections.map(c => ({ from: c.fromCardId, to: c.toCardId })));
-      console.log('[DEBUG] p.id:', p.id, typeof p.id, '| sample toCardId:', workflowConnections[0]?.toCardId, typeof workflowConnections[0]?.toCardId);
-      const connectedNoteIds = workflowConnections
-        .filter(c => c.toCardId === p.id && c.fromCardId.startsWith('note-'))
-        .map(c => c.fromCardId.replace('note-', ''));
-      console.log('[DEBUG] connectedNoteIds:', connectedNoteIds);
-      console.log('[DEBUG] project', p.id, 'connectedNoteIds:', connectedNoteIds);
+      // Collect note IDs connected to this layout card in either direction
+      const connectedNoteIds = new Set(
+        workflowConnections
+          .filter(c =>
+            (c.fromCardId === p.id && c.toCardId.startsWith('note-')) ||
+            (c.toCardId === p.id && c.fromCardId.startsWith('note-'))
+          )
+          .map(c => c.fromCardId === p.id ? c.toCardId : c.fromCardId)
+      );
 
       const connectedNotes = workflowNotes
-        .filter(n => connectedNoteIds.includes(n.id))
+        .filter(n => connectedNoteIds.has(n.id))
         .map(n => ({
           id: n.id,
           content: n.content,
@@ -2758,11 +2768,6 @@ const LayoutMakerPageStore: React.FC = () => {
 
       // For other projects, load from localStorage
       const savedCanvas = loadCanvasFromLocalStorage(p.id);
-      console.log('[BG-DEBUG]', p.name, 'id:', p.id,
-        '| bgimage key len:', localStorage.getItem(`layout-maker-canvas-${p.id}__bgimage`)?.length ?? 0,
-        '| dedicated bg key len:', localStorage.getItem(`layout-maker-bg-${p.id}`)?.length ?? 0,
-        '| satellite in loaded data:', !!savedCanvas?.satelliteBackground?.imageBase64,
-        '| shapes count:', savedCanvas?.shapes?.length ?? 0);
       if (savedCanvas) {
         return {
           ...p,
@@ -3219,16 +3224,12 @@ const LayoutMakerPageStore: React.FC = () => {
               includeDimensions: true,
               includeNotes: (p.canvasData?.notes?.length ?? 0) > 0,
               includeTasks: true,
-              notes: (() => {
-                const n = (p.canvasData?.notes || []).map(note => ({
-                  id: note.id,
-                  content: note.content,
-                  color: note.color,
-                  included: true,
-                }));
-                console.log('[DEBUG] layout notes for', p.id, p.name, n);
-                return n;
-              })(),
+              notes: (p.canvasData?.notes || []).map((note): LayoutNote => ({
+                id: note.id,
+                content: note.content,
+                color: note.color,
+                included: true,
+              })),
               tasks: [],
             }))}
             spaceNames={spaceOptions.map(s => s.label)}
@@ -3540,6 +3541,7 @@ const LayoutMakerPageStore: React.FC = () => {
           onConnectionsChange={handleWorkflowConnectionsChange}
           notes={workflowNotes}
           onNotesChange={handleWorkflowNotesChange}
+          onNoteCreate={handleNoteCreate}
           tasks={workflowTasks}
           onTasksChange={handleWorkflowTasksChange}
           eventId={eventIdFromUrl || ''}

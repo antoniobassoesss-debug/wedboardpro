@@ -68,6 +68,9 @@ interface WorkflowCanvasProps {
   onConnectionsChange?: (connections: Connection[]) => void;
   notes?: WorkflowNote[];
   onNotesChange?: (notes: WorkflowNote[]) => void;
+  /** Atomic creation handler — receives the new note AND its initial position so
+   *  the parent can upsert both in one call instead of two racing state updates. */
+  onNoteCreate?: (note: WorkflowNote, position: { x: number; y: number }) => void;
   tasks?: WorkflowTask[];
   onTasksChange?: (tasks: WorkflowTask[]) => void;
   eventId?: string;
@@ -864,6 +867,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   onConnectionsChange,
   notes: externalNotes = [],
   onNotesChange,
+  onNoteCreate,
   tasks: externalTasks = [],
   onTasksChange,
   eventId,
@@ -1010,14 +1014,15 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     };
     const newNotes = [...notes, newNote];
     setNotes(newNotes);
-    onNotesChange?.(newNotes);
-    // Set its position
-    onPositionsChange({
-      ...positions,
-      [newNote.id]: { x: wrapperX, y: wrapperY },
-    });
     setContextMenu(null);
-  }, [notes, positions, onNotesChange, onPositionsChange]);
+    if (onNoteCreate) {
+      // Atomic: parent saves note + position together in one upsert call
+      onNoteCreate(newNote, { x: wrapperX, y: wrapperY });
+    } else {
+      onNotesChange?.(newNotes);
+      onPositionsChange({ ...positions, [newNote.id]: { x: wrapperX, y: wrapperY } });
+    }
+  }, [notes, positions, onNoteCreate, onNotesChange, onPositionsChange]);
 
   const handleTaskChange = useCallback((updatedTask: WorkflowTask) => {
     const newTasks = tasks.map(t => t.id === updatedTask.id ? updatedTask : t);
