@@ -1556,7 +1556,7 @@ app.get('/api/team', async (req, res) => {
     // 1) Core team members
     const { data: memberRows, error: membersError } = await supabase
       .from('team_members')
-      .select('id, team_id, user_id, role, position, is_active, hourly_rate, notes, joined_at')
+      .select('id, team_id, user_id, role, joined_at')
       .eq('team_id', team.id)
       .order('joined_at', { ascending: true });
 
@@ -1707,10 +1707,10 @@ app.get('/api/team', async (req, res) => {
         user_id: m.user_id,
         team_id: m.team_id,
         role: m.role,
-        position: m.position ?? null,
-        is_active: m.is_active ?? true,
-        hourly_rate: m.hourly_rate !== undefined && m.hourly_rate !== null ? String(m.hourly_rate) : null,
-        notes: m.notes ?? null,
+        position: null,
+        is_active: true,
+        hourly_rate: null,
+        notes: null,
         joined_at: m.joined_at ?? null,
         displayName,
         displayEmail,
@@ -1748,7 +1748,7 @@ app.get('/api/team/:id', async (req, res) => {
     // 1) Member row
     const { data: member, error: memberError } = await supabase
       .from('team_members')
-      .select('id, team_id, user_id, role, position, is_active, hourly_rate, notes, joined_at')
+      .select('id, team_id, user_id, role, joined_at')
       .eq('id', memberId)
       .maybeSingle();
 
@@ -1956,10 +1956,10 @@ app.get('/api/team/:id', async (req, res) => {
       user_id: member.user_id,
       team_id: member.team_id,
       role: member.role,
-      position: member.position ?? null,
-      is_active: member.is_active ?? true,
-      hourly_rate: member.hourly_rate !== undefined && member.hourly_rate !== null ? String(member.hourly_rate) : null,
-      notes: member.notes ?? null,
+      position: null,
+      is_active: true,
+      hourly_rate: null,
+      notes: null,
       joined_at: member.joined_at ?? null,
       displayName,
       displayEmail,

@@ -496,7 +496,7 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           boxShadow: '0 8px 40px rgba(0,0,0,0.12)',
           maxWidth: isMobile ? '100%' : '700px',
           width: isMobile ? '100%' : '90vw',
-          maxHeight: isMobile ? '92vh' : '85vh',
+          height: isMobile ? '92vh' : '600px',
           display: 'flex',
           flexDirection: 'column',
           fontFamily: "'Geist', 'Inter', sans-serif",
@@ -514,6 +514,23 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           @keyframes account-modal-slide-up {
             from { transform: translateY(100%); }
             to { transform: translateY(0); }
+          }
+          .account-modal-scroll::-webkit-scrollbar {
+            width: 4px;
+          }
+          .account-modal-scroll::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .account-modal-scroll::-webkit-scrollbar-thumb {
+            background: #e0e0e0;
+            border-radius: 4px;
+          }
+          .account-modal-scroll::-webkit-scrollbar-thumb:hover {
+            background: #c8c8c8;
+          }
+          .account-modal-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #e0e0e0 transparent;
           }
         `}</style>
         <div style={{ marginBottom: isMobile ? 20 : 24 }}>
@@ -590,16 +607,17 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           ))}
         </div>
 
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          paddingRight: isMobile ? 0 : '8px',
-          marginRight: isMobile ? 0 : '-8px',
-          minHeight: 0,
-          paddingBottom: isMobile ? 40 : 0,
-          WebkitOverflowScrolling: 'touch',
-        }}>
+        <div
+          className="account-modal-scroll"
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            minHeight: 0,
+            paddingBottom: isMobile ? 40 : 0,
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
           {activeTab === "profile" && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 24 : 32, paddingBottom: isMobile ? 100 : 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 16 : 20 }}>
@@ -961,13 +979,13 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
           )}
         </div>
 
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'flex-end', 
-          gap: 12, 
-          marginTop: isMobile ? 24 : 24,
-          paddingTop: isMobile ? 20 : 0,
-          borderTop: isMobile ? '1px solid #f0f0f0' : 'none',
+        <div style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 12,
+          marginTop: 16,
+          paddingTop: 20,
+          borderTop: '1px solid #f0f0f0',
           flexShrink: 0,
           paddingBottom: isMobile ? 'calc(20px + env(safe-area-inset-bottom))' : 0,
         }}>

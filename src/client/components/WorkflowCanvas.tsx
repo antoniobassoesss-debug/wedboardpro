@@ -502,12 +502,13 @@ const DraggableCard: React.FC<{
         style={{ flex: 1, display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
       >
       <div style={{
-        padding: '14px 16px',
-        borderBottom: '1px solid #f5f5f5',
+        padding: '12px 16px',
+        borderRadius: '15px 15px 0 0',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         flexShrink: 0,
+        background: '#D9D9D9',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
@@ -552,8 +553,8 @@ const DraggableCard: React.FC<{
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        background: '#fafafa',
-        borderTop: '1px solid #f0f0f0',
+        background: '#ffffff',
+        borderRadius: '0 0 15px 15px',
       }}>
         <div style={{ width: '100%', height: '100%' }}>
           <MiniPreview project={project} />
