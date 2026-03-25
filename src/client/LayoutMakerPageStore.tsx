@@ -1574,6 +1574,7 @@ const LayoutMakerPageStore: React.FC = () => {
     browserSupabaseClient.auth.getSession().then(({ data }) => {
       console.log('[Realtime] Auth session user:', data.session?.user?.id ?? 'NOT AUTHENTICATED — RLS will block subscription');
     });
+    let layoutReconnectTimer: ReturnType<typeof setTimeout> | null = null;
     const channel = browserSupabaseClient
       .channel(`layout-event-${eventIdFromUrl}`)
       .on(
@@ -1658,9 +1659,13 @@ const LayoutMakerPageStore: React.FC = () => {
       )
       .subscribe((status: string) => {
         console.log('[Realtime] Subscription status:', status);
+        if (status === 'TIMED_OUT' || status === 'CLOSED') {
+          layoutReconnectTimer = setTimeout(() => { channel.subscribe(); }, 2000);
+        }
       });
 
     return () => {
+      if (layoutReconnectTimer) clearTimeout(layoutReconnectTimer);
       channel.unsubscribe();
     };
   }, [eventIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1691,6 +1696,7 @@ const LayoutMakerPageStore: React.FC = () => {
       }
     };
 
+    let workflowReconnectTimer: ReturnType<typeof setTimeout> | null = null;
     const workflowChannel = browserSupabaseClient
       .channel(`workflow-event-${eventIdFromUrl}`)
       .on(
@@ -1703,9 +1709,14 @@ const LayoutMakerPageStore: React.FC = () => {
         { event: '*', schema: 'public', table: 'workflow_connections', filter: `event_id=eq.${eventIdFromUrl}` },
         () => { refetchWorkflow(); }
       )
-      .subscribe();
+      .subscribe((status: string) => {
+        if (status === 'TIMED_OUT' || status === 'CLOSED') {
+          workflowReconnectTimer = setTimeout(() => { workflowChannel.subscribe(); }, 2000);
+        }
+      });
 
     return () => {
+      if (workflowReconnectTimer) clearTimeout(workflowReconnectTimer);
       workflowChannel.unsubscribe();
     };
   }, [eventIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
