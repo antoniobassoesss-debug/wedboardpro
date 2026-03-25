@@ -35,6 +35,7 @@ interface DbWorkflowNote {
   id: string; // TEXT (supports both UUID and local note-xxx format)
   event_id: string;
   content: string;
+  color: string;
   position_x: number;
   position_y: number;
   width: number;
@@ -87,7 +88,7 @@ export async function loadWorkflowNotes(eventId: string): Promise<ApiResponse<Wo
     const notes: WorkflowNote[] = (data || []).map((note: DbWorkflowNote) => ({
       id: note.id,
       content: note.content,
-      color: 'yellow' as const,
+      color: note.color || 'yellow',
       width: note.width,
       height: note.height,
       positionX: note.position_x,
@@ -129,6 +130,7 @@ export async function saveWorkflowNotes(
         id: note.id,
         event_id: eventId,
         content: note.content,
+        color: note.color,
         position_x: note.positionX || 100,
         position_y: note.positionY || 100,
         width: note.width,
@@ -194,6 +196,7 @@ export async function loadWorkflowConnections(eventId: string): Promise<ApiRespo
       return { data: null, error: error.message };
     }
 
+    console.log('[DEBUG] raw connections from Supabase:', data);
     const connections: WorkflowConnection[] = (data || []).map((conn: DbWorkflowConnection) => {
       const fromCardId = conn.from_type === 'note' ? `note-${conn.from_id}` : conn.from_id;
       const toCardId = conn.to_type === 'note' ? `note-${conn.to_id}` : conn.to_id;
@@ -304,4 +307,149 @@ export async function saveWorkflowData(
   }
 
   return { data: true, error: null };
+}
+
+/**
+ * Upsert a single workflow note (used for create; also updates all fields)
+ */
+export async function upsertWorkflowNote(
+  eventId: string,
+  note: WorkflowNote,
+): Promise<ApiResponse<boolean>> {
+  try {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase.from('workflow_notes').upsert(
+      {
+        id: note.id,
+        event_id: eventId,
+        content: note.content,
+        color: note.color,
+        position_x: note.positionX ?? 100,
+        position_y: note.positionY ?? 100,
+        width: note.width,
+        height: note.height,
+      },
+      { onConflict: 'id' },
+    );
+    if (error) {
+      console.error('[WorkflowAPI] Error upserting note:', error);
+      return { data: null, error: error.message };
+    }
+    return { data: true, error: null };
+  } catch (error: any) {
+    return { data: null, error: error.message };
+  }
+}
+
+/**
+ * Update specific fields on an existing workflow note
+ */
+export async function updateWorkflowNoteFields(
+  noteId: string,
+  fields: Partial<{
+    content: string;
+    color: string;
+    position_x: number;
+    position_y: number;
+    width: number;
+    height: number;
+  }>,
+): Promise<ApiResponse<boolean>> {
+  try {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase
+      .from('workflow_notes')
+      .update(fields)
+      .eq('id', noteId);
+    if (error) {
+      console.error('[WorkflowAPI] Error updating note fields:', error);
+      return { data: null, error: error.message };
+    }
+    return { data: true, error: null };
+  } catch (error: any) {
+    return { data: null, error: error.message };
+  }
+}
+
+/**
+ * Insert a single workflow connection
+ */
+export async function insertWorkflowConnection(
+  eventId: string,
+  connection: WorkflowConnection,
+): Promise<ApiResponse<boolean>> {
+  try {
+    const supabase = getSupabaseClient();
+    const fromId = connection.fromCardId.startsWith('note-')
+      ? connection.fromCardId.slice(5)
+      : connection.fromCardId.startsWith('task-')
+      ? connection.fromCardId.slice(5)
+      : connection.fromCardId;
+    const toId = connection.toCardId.startsWith('note-')
+      ? connection.toCardId.slice(5)
+      : connection.toCardId.startsWith('task-')
+      ? connection.toCardId.slice(5)
+      : connection.toCardId;
+    const fromType = connection.fromCardId.startsWith('note-')
+      ? 'note'
+      : connection.fromCardId.startsWith('task-')
+      ? 'task'
+      : 'project';
+    const toType = connection.toCardId.startsWith('note-')
+      ? 'note'
+      : connection.toCardId.startsWith('task-')
+      ? 'task'
+      : 'project';
+    const { error } = await supabase.from('workflow_connections').insert({
+      id: crypto.randomUUID(),
+      event_id: eventId,
+      from_id: fromId,
+      from_type: fromType,
+      to_id: toId,
+      to_type: toType,
+    });
+    if (error) {
+      console.error('[WorkflowAPI] Error inserting connection:', error);
+      return { data: null, error: error.message };
+    }
+    return { data: true, error: null };
+  } catch (error: any) {
+    return { data: null, error: error.message };
+  }
+}
+
+/**
+ * Delete a single workflow connection identified by its two endpoint card IDs
+ */
+export async function deleteWorkflowConnectionPair(
+  eventId: string,
+  fromCardId: string,
+  toCardId: string,
+): Promise<ApiResponse<boolean>> {
+  try {
+    const supabase = getSupabaseClient();
+    const fromId = fromCardId.startsWith('note-')
+      ? fromCardId.slice(5)
+      : fromCardId.startsWith('task-')
+      ? fromCardId.slice(5)
+      : fromCardId;
+    const toId = toCardId.startsWith('note-')
+      ? toCardId.slice(5)
+      : toCardId.startsWith('task-')
+      ? toCardId.slice(5)
+      : toCardId;
+    const { error } = await supabase
+      .from('workflow_connections')
+      .delete()
+      .eq('event_id', eventId)
+      .eq('from_id', fromId)
+      .eq('to_id', toId);
+    if (error) {
+      console.error('[WorkflowAPI] Error deleting connection pair:', error);
+      return { data: null, error: error.message };
+    }
+    return { data: true, error: null };
+  } catch (error: any) {
+    return { data: null, error: error.message };
+  }
 }

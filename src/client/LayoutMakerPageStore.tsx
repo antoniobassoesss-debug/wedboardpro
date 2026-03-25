@@ -7,6 +7,7 @@
  * - Supabase sync happens in background (doesn't affect project switching)
  * - This ensures each project tab always shows its own canvas data
  */
+console.log('[DEBUG] LayoutMakerPageStore module loaded');
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -60,7 +61,17 @@ import type { PowerPoint } from './types/powerPoint';
 import type { ElementType } from '../layout-maker/types/elements';
 import type { Connection, WorkflowNote } from './components/WorkflowCanvas';
 import type { WorkflowTask } from './components/TaskCard';
-import { loadWorkflowData, saveWorkflowData } from './api/workflowApi';
+import {
+  loadWorkflowData,
+  saveWorkflowData,
+  upsertWorkflowNote,
+  updateWorkflowNoteFields,
+  insertWorkflowConnection,
+  deleteWorkflowConnectionPair,
+  deleteWorkflowNote,
+} from './api/workflowApi';
+import { browserSupabaseClient } from './browserSupabaseClient';
+import { listLayoutsForProject, isLayoutFileData } from './api/layoutsApi';
 import { ELEMENT_DEFAULTS, getElementDefault } from '../layout-maker/constants';
 import { generateChairPositions } from '../layout-maker/utils/chairGeneration';
 import { v4 as uuidv4 } from 'uuid';
@@ -78,9 +89,20 @@ export interface Project {
   description?: string;
 }
 
-const STORAGE_KEY = 'layout-maker-projects-v2';
-const STORAGE_ACTIVE_PROJECT_KEY = 'layout-maker-active-project-id';
+const STORAGE_KEY_BASE = 'layout-maker-projects-v2';
+const STORAGE_ACTIVE_PROJECT_KEY_BASE = 'layout-maker-active-project-id';
 const CANVAS_STORAGE_PREFIX = 'layout-maker-canvas-';
+
+// When the URL has an eventId, scope storage to that event so each event
+// has its own independent set of projects and active-project selection.
+const getEventIdFromUrl = (): string | null =>
+  new URLSearchParams(window.location.search).get('eventId');
+
+const getStorageKey = (eventId?: string | null) =>
+  eventId ? `${STORAGE_KEY_BASE}-${eventId}` : STORAGE_KEY_BASE;
+
+const getActiveProjectStorageKey = (eventId?: string | null) =>
+  eventId ? `${STORAGE_ACTIVE_PROJECT_KEY_BASE}-${eventId}` : STORAGE_ACTIVE_PROJECT_KEY_BASE;
 
 // ============ LOCAL STORAGE HELPERS ============
 
@@ -213,9 +235,9 @@ const deleteCanvasFromLocalStorage = (projectId: string) => {
   }
 };
 
-const loadProjectsFromStorage = (): Project[] => {
+const loadProjectsFromStorage = (eventId?: string | null): Project[] => {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(getStorageKey(eventId));
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -228,16 +250,16 @@ const loadProjectsFromStorage = (): Project[] => {
   const defaultA4Dimensions = getInitialA4Dimensions();
   return [
     {
-      id: '1',
+      id: eventId ? `${eventId}-1` : '1',
       name: 'Project 1',
       a4Dimensions: defaultA4Dimensions,
     },
   ];
 };
 
-const saveProjectsToStorage = (projects: Project[]) => {
+const saveProjectsToStorage = (projects: Project[], eventId?: string | null) => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+    localStorage.setItem(getStorageKey(eventId), JSON.stringify(projects));
   } catch (error) {
     console.error('Error saving projects to localStorage:', error);
   }
@@ -329,6 +351,7 @@ const canvasDataToStoreFormat = (canvasData: any) => {
 // ============ MAIN COMPONENT ============
 
 const LayoutMakerPageStore: React.FC = () => {
+  console.log('[DEBUG] LayoutMakerPageStore render/init');
   const [searchParams] = useSearchParams();
   const eventIdFromUrl = searchParams.get('eventId');
 
@@ -338,12 +361,13 @@ const LayoutMakerPageStore: React.FC = () => {
   const [eventInfo, setEventInfo] = useState<{ title: string; weddingDate?: string } | null>(null);
 
   const [projects, setProjects] = useState<Project[]>(() => {
+    const eventId = getEventIdFromUrl();
     try {
-      return loadProjectsFromStorage();
+      return loadProjectsFromStorage(eventId);
     } catch {
       const defaultA4 = getInitialA4Dimensions();
       return [{
-        id: '1',
+        id: eventId ? `${eventId}-1` : '1',
         name: 'Project 1',
         a4Dimensions: defaultA4,
       }];
@@ -351,24 +375,27 @@ const LayoutMakerPageStore: React.FC = () => {
   });
 
   const [activeProjectId, setActiveProjectId] = useState<string>(() => {
+    const eventId = getEventIdFromUrl();
     try {
-      const stored = localStorage.getItem(STORAGE_ACTIVE_PROJECT_KEY);
+      const stored = localStorage.getItem(getActiveProjectStorageKey(eventId));
       if (stored) {
-        const loadedProjects = loadProjectsFromStorage();
+        const loadedProjects = loadProjectsFromStorage(eventId);
         if (loadedProjects.find(p => p.id === stored)) {
           return stored;
         }
       }
     } catch {}
-    return '1';
+    return eventId ? `${eventId}-1` : '1';
   });
 
   const [newlyCreatedProjectId, setNewlyCreatedProjectId] = useState<string | null>(null);
   const [showElectricalDashboard, setShowElectricalDashboard] = useState(false);
   const [showAssociateModal, setShowAssociateModal] = useState(false);
   const [recentlySavedLayoutIds, setRecentlySavedLayoutIds] = useState<string[]>([]);
+  // Single Supabase row ID for the entire event's layout file (all tabs in one row)
+  const [eventLayoutId, setEventLayoutId] = useState<string | undefined>(undefined);
   const [isWorkflowOpen, setIsWorkflowOpen] = useState(false);
-  const [showElementLibrary, setShowElementLibrary] = useState(true);
+  const [showElementLibrary, setShowElementLibrary] = useState(false);
   const [roundTableModalOpen, setRoundTableModalOpen] = useState(false);
   const [rectangularTableModalOpen, setRectangularTableModalOpen] = useState(false);
   const [squareTableModalOpen, setSquareTableModalOpen] = useState(false);
@@ -852,17 +879,22 @@ const LayoutMakerPageStore: React.FC = () => {
       setBarEditShapeId(null);
       return;
     }
-    const x = a4Bounds.x + (a4Bounds.width - widthPx) / 2;
+    const qty = data.quantity ?? 1;
+    const gap = ppm * 0.3;
+    const totalW = widthPx * qty + gap * (qty - 1);
+    const startX = a4Bounds.x + (a4Bounds.width - totalW) / 2;
     const y = a4Bounds.y + (a4Bounds.height - heightPx) / 2;
-    addElement({
-      type: 'rectangle', x, y, width: widthPx, height: heightPx,
-      fill: data.fillColor,
-      stroke: data.borderEnabled ? data.borderColor : 'transparent',
-      strokeWidth: 2, rotation: 0,
-      elementType: 'bar',
-      label: data.labelVisible ? data.label : '',
-      barData: data, color: null,
-    } as any);
+    for (let i = 0; i < qty; i++) {
+      addElement({
+        type: 'rectangle', x: startX + i * (widthPx + gap), y, width: widthPx, height: heightPx,
+        fill: data.fillColor,
+        stroke: data.borderEnabled ? data.borderColor : 'transparent',
+        strokeWidth: 2, rotation: 0,
+        elementType: 'bar',
+        label: data.labelVisible ? data.label : '',
+        barData: data, color: null,
+      } as any);
+    }
   }, [addElement, a4Bounds, barEditShapeId]);
 
   // Place / update cocktail table element
@@ -880,17 +912,22 @@ const LayoutMakerPageStore: React.FC = () => {
       setCocktailEditShapeId(null);
       return;
     }
-    const x = a4Bounds.x + (a4Bounds.width - widthPx) / 2;
+    const qty = data.quantity ?? 1;
+    const gap = ppm * 0.3;
+    const totalW = widthPx * qty + gap * (qty - 1);
+    const startX = a4Bounds.x + (a4Bounds.width - totalW) / 2;
     const y = a4Bounds.y + (a4Bounds.height - heightPx) / 2;
-    addElement({
-      type: 'rectangle', x, y, width: widthPx, height: heightPx,
-      fill: data.fillColor,
-      stroke: data.borderEnabled ? data.borderColor : 'transparent',
-      strokeWidth: 2, rotation: 0,
-      elementType: 'cocktail',
-      label: data.labelVisible ? data.label : '',
-      cocktailData: data, color: null,
-    } as any);
+    for (let i = 0; i < qty; i++) {
+      addElement({
+        type: 'rectangle', x: startX + i * (widthPx + gap), y, width: widthPx, height: heightPx,
+        fill: data.fillColor,
+        stroke: data.borderEnabled ? data.borderColor : 'transparent',
+        strokeWidth: 2, rotation: 0,
+        elementType: 'cocktail',
+        label: data.labelVisible ? data.label : '',
+        cocktailData: data, color: null,
+      } as any);
+    }
   }, [addElement, a4Bounds, cocktailEditShapeId]);
 
   // Place / update pathway element
@@ -926,22 +963,27 @@ const LayoutMakerPageStore: React.FC = () => {
     const ppm = getEffectivePPM();
     const widthPx = data.widthM * ppm;
     const heightPx = data.heightM * ppm;
-    const x = a4Bounds.x + (a4Bounds.width - widthPx) / 2;
+    const qty = data.quantity ?? 1;
+    const gap = ppm * 0.3;
+    const totalW = widthPx * qty + gap * (qty - 1);
+    const startX = a4Bounds.x + (a4Bounds.width - totalW) / 2;
     const y = a4Bounds.y + (a4Bounds.height - heightPx) / 2;
-    addElement({
-      type: 'rectangle',
-      x, y,
-      width: widthPx,
-      height: heightPx,
-      fill: '#1a1a2e',
-      stroke: '#3b82f6',
-      strokeWidth: 1.5,
-      rotation: 0,
-      elementType: data.type,
-      label: data.labelVisible ? data.label : '',
-      avData: data,
-      color: null,
-    } as any);
+    for (let i = 0; i < qty; i++) {
+      addElement({
+        type: 'rectangle',
+        x: startX + i * (widthPx + gap), y,
+        width: widthPx,
+        height: heightPx,
+        fill: '#1a1a2e',
+        stroke: '#3b82f6',
+        strokeWidth: 1.5,
+        rotation: 0,
+        elementType: data.type,
+        label: data.labelVisible ? data.label : '',
+        avData: data,
+        color: null,
+      } as any);
+    }
     setAvEditShapeId(null);
   }, [addElement, a4Bounds]);
 
@@ -1022,24 +1064,27 @@ const LayoutMakerPageStore: React.FC = () => {
   }, []);
 
   const [workflowPositions, setWorkflowPositions] = useState<Record<string, { x: number; y: number }>>(() => {
+    const eid = getEventIdFromUrl();
     try {
-      const stored = localStorage.getItem('workflow-positions');
+      const stored = localStorage.getItem(eid ? `workflow-positions-${eid}` : 'workflow-positions');
       if (stored) return JSON.parse(stored);
     } catch {}
     return {};
   });
 
   const [workflowConnections, setWorkflowConnections] = useState<Connection[]>(() => {
+    const eid = getEventIdFromUrl();
     try {
-      const stored = localStorage.getItem('workflow-connections');
+      const stored = localStorage.getItem(eid ? `workflow-connections-${eid}` : 'workflow-connections');
       if (stored) return JSON.parse(stored);
     } catch {}
     return [];
   });
 
   const [workflowNotes, setWorkflowNotes] = useState<WorkflowNote[]>(() => {
+    const eid = getEventIdFromUrl();
     try {
-      const stored = localStorage.getItem('workflow-notes-cards');
+      const stored = localStorage.getItem(eid ? `workflow-notes-cards-${eid}` : 'workflow-notes-cards');
       if (stored) return JSON.parse(stored);
     } catch {}
     return [];
@@ -1063,6 +1108,7 @@ const LayoutMakerPageStore: React.FC = () => {
       console.log('[Workflow] Loading from Supabase for event:', eventId);
       const result = await loadWorkflowData(eventId);
 
+      console.log('[DEBUG] Supabase raw result:', JSON.stringify(result));
       if (result.error) {
         console.error('[Workflow] Error loading from Supabase:', result.error);
       } else if (result.notes.length > 0 || result.connections.length > 0) {
@@ -1072,9 +1118,11 @@ const LayoutMakerPageStore: React.FC = () => {
         });
         setWorkflowNotes(result.notes as WorkflowNote[]);
         setWorkflowConnections(result.connections);
+        console.log('[DEBUG] workflowConnections loaded:', result.connections.length);
+        console.log('[DEBUG] workflowNotes loaded:', result.notes.length);
         // Also save to localStorage as backup
-        localStorage.setItem('workflow-notes-cards', JSON.stringify(result.notes));
-        localStorage.setItem('workflow-connections', JSON.stringify(result.connections));
+        localStorage.setItem(eventId ? `workflow-notes-cards-${eventId}` : 'workflow-notes-cards', JSON.stringify(result.notes));
+        localStorage.setItem(eventId ? `workflow-connections-${eventId}` : 'workflow-connections', JSON.stringify(result.connections));
       }
       setIsWorkflowLoaded(true);
     };
@@ -1083,13 +1131,21 @@ const LayoutMakerPageStore: React.FC = () => {
   }, [eventIdFromUrl]);
 
   const [workflowTasks, setWorkflowTasks] = useState<WorkflowTask[]>(() => {
+    const eid = getEventIdFromUrl();
     try {
-      const stored = localStorage.getItem('workflow-task-cards');
+      const stored = localStorage.getItem(eid ? `workflow-task-cards-${eid}` : 'workflow-task-cards');
       if (stored) return JSON.parse(stored);
     } catch {}
     return [];
   });
 
+  // Tracks the ms timestamp of our last write to workflow tables.
+  // The Realtime callback skips refetch if we caused the change within 5 s.
+  const lastWorkflowSaveRef = useRef<number>(0);
+  // Debounces the forceSave triggered by layout-card position moves.
+  const layoutCardSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Debounces the per-note position update during drag.
+  const notePositionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSelectCustomTemplate = useCallback((template: CustomElementTemplate) => {
     const PIXELS_PER_METER = getEffectivePPM();
@@ -1164,11 +1220,33 @@ const LayoutMakerPageStore: React.FC = () => {
     a4Dimensions: getInitialA4Dimensions(),
   };
 
-  // Enable auto-sync to Supabase (background sync, doesn't affect switching)
-  const autoSyncOptions = {
+  // Build a snapshot of ALL tabs' canvas data for the multi-tab save.
+  // The active tab is read from the store (most current); all others from localStorage.
+  const getCanvasSnapshot = useCallback(() => {
+    // Flush active canvas to localStorage first so it's consistent with the others.
+    const activeCanvas = getCanvasData();
+    saveCanvasToLocalStorage(activeProjectId, {
+      ...activeCanvas,
+      supabaseLayoutId: storeSupabaseLayoutId,
+    });
+    return projects.map((p) => ({
+      projectId: p.id,
+      canvas: loadCanvasFromLocalStorage(p.id) || {
+        drawings: [], shapes: [], textElements: [], walls: [], doors: [],
+        powerPoints: [], viewBox: { x: 0, y: 0, width: 0, height: 0 },
+      },
+    }));
+  }, [projects, activeProjectId, getCanvasData, storeSupabaseLayoutId]);
+
+  const autoSyncOptions: Parameters<typeof useAutoSync>[0] = {
     enabled: true,
-    projectName: activeProject.name,
-    ...(activeProject.eventId ? { eventId: activeProject.eventId } : {}),
+    projects,
+    getCanvasSnapshot,
+    onLayoutIdReceived: setEventLayoutId,
+    workflowPositions,
+    ...(eventIdFromUrl ? { eventId: eventIdFromUrl } : {}),
+    ...(eventInfo?.title ? { eventName: eventInfo.title } : { eventName: 'Layout' }),
+    ...(eventLayoutId ? { eventLayoutId } : {}),
   };
   const { forceSave } = useAutoSync(autoSyncOptions);
 
@@ -1188,6 +1266,38 @@ const LayoutMakerPageStore: React.FC = () => {
   useEffect(() => {
     forceSaveRef.current = forceSave;
   }, [forceSave]);
+
+  // When the project list structure changes (tab added, deleted, or renamed),
+  // force-save immediately so Supabase reflects the change even if the user
+  // hasn't drawn anything yet (blank tabs never set pendingChanges).
+  // This runs post-render so getCanvasSnapshot's closure already has the updated
+  // projects list — calling forceSave synchronously inside a setProjects callback
+  // would snapshot the stale list before React re-renders.
+  const projectStructureRef = useRef('');
+  useEffect(() => {
+    const structure = JSON.stringify(projects.map(p => ({ id: p.id, name: p.name })));
+    if (projectStructureRef.current === '') {
+      // First render — record baseline, do not save
+      projectStructureRef.current = structure;
+      return;
+    }
+    if (structure !== projectStructureRef.current) {
+      projectStructureRef.current = structure;
+      forceSaveRef.current?.();
+    }
+  }, [projects]);
+
+  // On every page load when an eventId is present, force-save to Supabase after
+  // initialization completes. This migrates layouts that were previously saved
+  // without an event_id so they become queryable by event on any device.
+  useEffect(() => {
+    if (!eventIdFromUrl) return;
+    const timer = setTimeout(() => {
+      console.log('[Migrate] Force-saving layout to attach event_id:', eventIdFromUrl);
+      forceSaveRef.current?.();
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Listen for force sync events (e.g., from satellite picker)
   useEffect(() => {
@@ -1215,11 +1325,8 @@ const LayoutMakerPageStore: React.FC = () => {
             weddingDate: eventResult.data.wedding_date,
           });
 
-          // Update all projects to have this eventId
-          setProjects(prev => prev.map(p => ({
-            ...p,
-            eventId: eventIdFromUrl,
-          })));
+          // Projects are already scoped to this event via event-scoped storage keys;
+          // no need to tag individual projects with eventId.
         }
       } catch (err) {
         console.error('Failed to load event data:', err);
@@ -1355,45 +1462,356 @@ const LayoutMakerPageStore: React.FC = () => {
             ? { ...p, supabaseLayoutId: storeSupabaseLayoutId }
             : p
         );
-        saveProjectsToStorage(updated);
+        saveProjectsToStorage(updated, eventIdFromUrl);
         return updated;
       });
     }
-  }, [storeSupabaseLayoutId, activeProjectId, activeProject.supabaseLayoutId]);
+  }, [storeSupabaseLayoutId, activeProjectId, activeProject.supabaseLayoutId, eventIdFromUrl]);
+
+  // On every mount with an eventId: load the single layout file from Supabase.
+  // Deserializes all tabs from LayoutFileData and restores them into local state.
+  // Also sets up a Supabase Realtime subscription so changes from other clients
+  // are reflected without a full page reload.
+  useEffect(() => {
+    if (!eventIdFromUrl) return;
+
+    const loadFromSupabase = async () => {
+      const result = await listLayoutsForProject(eventIdFromUrl);
+      if (result.error || !result.data || result.data.length === 0) {
+        console.log('[Sync] No layout in Supabase for event:', result.error || 'empty');
+        return;
+      }
+
+      const layoutRecord = result.data[0];
+      if (!layoutRecord) return;
+      const layoutData = layoutRecord.canvas_data;
+
+      // Store the event layout row ID so future saves can upsert by ID
+      setEventLayoutId(layoutRecord.id);
+
+      if (!isLayoutFileData(layoutData)) {
+        // Legacy single-canvas format — treat it as a single tab
+        console.log('[Sync] Legacy canvas_data format, loading as single tab');
+        const projectId = layoutRecord.id;
+        saveCanvasToLocalStorage(projectId, { ...layoutData, supabaseLayoutId: layoutRecord.id });
+        const defaultA4 = getInitialA4Dimensions();
+        const legacyProject = [{
+          id: projectId,
+          name: layoutRecord.name,
+          supabaseLayoutId: layoutRecord.id,
+          eventId: eventIdFromUrl,
+          a4Dimensions: defaultA4,
+        }];
+        saveProjectsToStorage(legacyProject, eventIdFromUrl);
+        setProjects(legacyProject);
+        if (!isInitializedRef.current) {
+          const bounds = { x: defaultA4.a4X, y: defaultA4.a4Y, width: defaultA4.a4WidthPx, height: defaultA4.a4HeightPx };
+          initializeProject(projectId, bounds, canvasDataToStoreFormat({ ...layoutData, supabaseLayoutId: layoutRecord.id }));
+          isInitializedRef.current = true;
+        }
+        return;
+      }
+
+      console.log('[Sync] Restoring', layoutData.tabs.length, 'tab(s) from LayoutFileData');
+
+      const defaultA4 = getInitialA4Dimensions();
+
+      // Write every tab's canvas to localStorage (keyed by tab ID)
+      for (const tab of layoutData.tabs) {
+        saveCanvasToLocalStorage(tab.id, {
+          ...tab.canvas,
+          supabaseLayoutId: layoutRecord.id,
+        });
+      }
+
+      // Map tabs to Project objects — all share the same Supabase row ID
+      const supabaseProjects: Project[] = layoutData.tabs.map((tab) => {
+        const proj: Project = {
+          id: tab.id,
+          name: tab.name,
+          supabaseLayoutId: layoutRecord.id,
+          eventId: eventIdFromUrl,
+          a4Dimensions: tab.a4Dimensions || defaultA4,
+        };
+        if (tab.category) proj.category = tab.category;
+        return proj;
+      });
+
+      saveProjectsToStorage(supabaseProjects, eventIdFromUrl);
+      setProjects(supabaseProjects);
+
+      // Restore the previously active tab, or fall back to the first
+      const targetTabId = layoutData.activeTabId || supabaseProjects[0]?.id;
+      const targetTab = layoutData.tabs.find((t) => t.id === targetTabId) || layoutData.tabs[0];
+
+      if (targetTab && !isInitializedRef.current) {
+        const a4 = targetTab.a4Dimensions || defaultA4;
+        const bounds = { x: a4.a4X, y: a4.a4Y, width: a4.a4WidthPx, height: a4.a4HeightPx };
+        const storeData = canvasDataToStoreFormat({ ...targetTab.canvas, supabaseLayoutId: layoutRecord.id });
+        initializeProject(targetTab.id, bounds, storeData);
+        setActiveProjectId(targetTab.id);
+        currentProjectIdRef.current = targetTab.id;
+        isInitializedRef.current = true;
+        console.log('[Sync] Canvas initialized from tab:', targetTab.id);
+      }
+
+      // Restore workflow card positions if stored in this layout row
+      if (layoutData.workflowPositions && Object.keys(layoutData.workflowPositions).length > 0) {
+        setWorkflowPositions(layoutData.workflowPositions);
+        localStorage.setItem(`workflow-positions-${eventIdFromUrl}`, JSON.stringify(layoutData.workflowPositions));
+      }
+    };
+
+    loadFromSupabase();
+
+    // Realtime: when another client saves, re-fetch from Supabase and update state.
+    // We do NOT read canvas_data from payload.new because Supabase truncates large
+    // JSONB payloads (>8KB), so payload.new.canvas_data is often missing entirely.
+    if (!browserSupabaseClient) return;
+    console.log('[Realtime] Subscribing to layout changes for event:', eventIdFromUrl);
+    console.log('[Realtime] Filter:', `event_id=eq.${eventIdFromUrl}`);
+    // Diagnostic: confirm the Realtime client is authenticated
+    browserSupabaseClient.auth.getSession().then(({ data }) => {
+      console.log('[Realtime] Auth session user:', data.session?.user?.id ?? 'NOT AUTHENTICATED — RLS will block subscription');
+    });
+    const channel = browserSupabaseClient
+      .channel(`layout-event-${eventIdFromUrl}`)
+      .on(
+        'postgres_changes' as any,
+        {
+          event: '*',
+          schema: 'public',
+          table: 'layouts',
+          filter: `event_id=eq.${eventIdFromUrl}`,
+        },
+        async (payload: any) => {
+          console.log('[Realtime] Layout changed — re-fetching from Supabase', payload);
+          // Re-fetch the full row because payload.new may be truncated for large canvas_data
+          const result = await listLayoutsForProject(eventIdFromUrl);
+          if (result.error || !result.data?.length) {
+            console.warn('[Realtime] Re-fetch failed:', result.error);
+            return;
+          }
+          const layoutRecord = result.data[0];
+          const incoming = layoutRecord.canvas_data;
+          if (!isLayoutFileData(incoming)) return;
+
+          const currentActive = currentProjectIdRef.current;
+          const defaultA4 = getInitialA4Dimensions();
+
+          // Detect whether WE caused this update: if our last save timestamp is within
+          // 5 seconds of the row's updated_at, skip canvas reinit to avoid resetting
+          // the canvas while the user is editing.
+          const rowUpdatedAt = layoutRecord.updated_at
+            ? new Date(layoutRecord.updated_at).getTime()
+            : 0;
+          const ourLastSave = useCanvasStore.getState().lastSyncedAt ?? 0;
+          const weCausedThis = Math.abs(rowUpdatedAt - ourLastSave) < 5000;
+          console.log('[Realtime] weCausedThis:', weCausedThis, '| rowUpdatedAt:', rowUpdatedAt, '| ourLastSave:', ourLastSave);
+
+          // Update every tab in localStorage
+          for (const tab of incoming.tabs) {
+            saveCanvasToLocalStorage(tab.id, {
+              ...tab.canvas,
+              supabaseLayoutId: layoutRecord.id,
+            });
+          }
+
+          // Sync the project list (handles tabs added/removed by the other client)
+          const updatedProjects = incoming.tabs.map((tab: any) => ({
+            id: tab.id,
+            name: tab.name,
+            supabaseLayoutId: layoutRecord.id,
+            eventId: eventIdFromUrl,
+            a4Dimensions: tab.a4Dimensions || defaultA4,
+            category: tab.category,
+          }));
+          saveProjectsToStorage(updatedProjects, eventIdFromUrl);
+          setProjects(updatedProjects);
+
+          // Reinitialize the active canvas only when the change came from another client
+          if (!weCausedThis) {
+            const activeTab = incoming.tabs.find((t: any) => t.id === currentActive);
+            if (activeTab) {
+              const a4 = activeTab.a4Dimensions || defaultA4;
+              const bounds = {
+                x: a4.a4X, y: a4.a4Y,
+                width: a4.a4WidthPx, height: a4.a4HeightPx,
+              };
+              const storeData = canvasDataToStoreFormat({
+                ...activeTab.canvas,
+                supabaseLayoutId: layoutRecord.id,
+              });
+              initializeProject(currentActive, bounds, storeData);
+              console.log('[Realtime] Active canvas reinitialized with remote data');
+            }
+          }
+
+          // Sync workflow card positions from remote
+          if (incoming.workflowPositions && Object.keys(incoming.workflowPositions).length > 0) {
+            setWorkflowPositions(incoming.workflowPositions);
+            localStorage.setItem(`workflow-positions-${eventIdFromUrl}`, JSON.stringify(incoming.workflowPositions));
+          }
+
+          console.log('[Realtime] State updated —', updatedProjects.length, 'tab(s)');
+        }
+      )
+      .subscribe((status: string) => {
+        console.log('[Realtime] Subscription status:', status);
+      });
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [eventIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Realtime: sync workflow notes and connections across browsers
+  useEffect(() => {
+    if (!eventIdFromUrl || !browserSupabaseClient) return;
+
+    let refetchInProgress = false;
+    const refetchWorkflow = async () => {
+      // Skip if WE caused this change within the last 5 seconds (self-save guard)
+      if (Date.now() - lastWorkflowSaveRef.current < 5000) {
+        console.log('[Realtime] Workflow: skipping self-echo');
+        return;
+      }
+      if (refetchInProgress) return;
+      refetchInProgress = true;
+      try {
+        const result = await loadWorkflowData(eventIdFromUrl);
+        if (!result.error) {
+          setWorkflowNotes(result.notes as WorkflowNote[]);
+          setWorkflowConnections(result.connections);
+          localStorage.setItem(`workflow-notes-cards-${eventIdFromUrl}`, JSON.stringify(result.notes));
+          localStorage.setItem(`workflow-connections-${eventIdFromUrl}`, JSON.stringify(result.connections));
+        }
+      } finally {
+        refetchInProgress = false;
+      }
+    };
+
+    const workflowChannel = browserSupabaseClient
+      .channel(`workflow-event-${eventIdFromUrl}`)
+      .on(
+        'postgres_changes' as any,
+        { event: '*', schema: 'public', table: 'workflow_notes', filter: `event_id=eq.${eventIdFromUrl}` },
+        () => { refetchWorkflow(); }
+      )
+      .on(
+        'postgres_changes' as any,
+        { event: '*', schema: 'public', table: 'workflow_connections', filter: `event_id=eq.${eventIdFromUrl}` },
+        () => { refetchWorkflow(); }
+      )
+      .subscribe();
+
+    return () => {
+      workflowChannel.unsubscribe();
+    };
+  }, [eventIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleWorkflowPositionsChange = useCallback((positions: Record<string, { x: number; y: number }>) => {
     setWorkflowPositions(positions);
-    localStorage.setItem('workflow-positions', JSON.stringify(positions));
-  }, []);
+    localStorage.setItem(eventIdFromUrl ? `workflow-positions-${eventIdFromUrl}` : 'workflow-positions', JSON.stringify(positions));
 
-  const handleWorkflowConnectionsChange = useCallback((connections: Connection[]) => {
-    setWorkflowConnections(connections);
-    localStorage.setItem('workflow-connections', JSON.stringify(connections));
-    
-    // Also save to Supabase
-    if (eventIdFromUrl) {
-      saveWorkflowData(eventIdFromUrl, workflowNotes, connections).catch(err => {
-        console.error('[Workflow] Error saving connections to Supabase:', err);
+    if (!eventIdFromUrl) return;
+
+    // Debounce note-position writes to avoid flooding Supabase on every drag frame
+    if (notePositionDebounceRef.current) clearTimeout(notePositionDebounceRef.current);
+    notePositionDebounceRef.current = setTimeout(() => {
+      workflowNotes.forEach(note => {
+        const pos = positions[note.id];
+        if (pos) {
+          lastWorkflowSaveRef.current = Date.now();
+          updateWorkflowNoteFields(note.id, { position_x: pos.x, position_y: pos.y }).catch(err => {
+            console.error('[Workflow] Error updating note position:', err);
+          });
+        }
       });
-    }
+    }, 300);
+
+    // Debounce the layouts-row save for layout-card positions.
+    // setTimeout(0) lets React re-render first so forceSaveRef has the updated closure.
+    if (layoutCardSaveDebounceRef.current) clearTimeout(layoutCardSaveDebounceRef.current);
+    layoutCardSaveDebounceRef.current = setTimeout(() => {
+      forceSaveRef.current?.();
+    }, 500);
   }, [eventIdFromUrl, workflowNotes]);
 
-  const handleWorkflowNotesChange = useCallback((notes: WorkflowNote[]) => {
-    setWorkflowNotes(notes);
-    localStorage.setItem('workflow-notes-cards', JSON.stringify(notes));
-    
-    // Also save to Supabase
-    if (eventIdFromUrl) {
-      saveWorkflowData(eventIdFromUrl, notes, workflowConnections).catch(err => {
-        console.error('[Workflow] Error saving notes to Supabase:', err);
+  const handleWorkflowConnectionsChange = useCallback((connections: Connection[]) => {
+    const prev = workflowConnections;
+    setWorkflowConnections(connections);
+    localStorage.setItem(eventIdFromUrl ? `workflow-connections-${eventIdFromUrl}` : 'workflow-connections', JSON.stringify(connections));
+
+    if (!eventIdFromUrl) return;
+
+    lastWorkflowSaveRef.current = Date.now();
+
+    // Atomic diff: insert added connections, delete removed ones
+    const added = connections.filter(
+      c => !prev.some(p => p.fromCardId === c.fromCardId && p.toCardId === c.toCardId),
+    );
+    const removed = prev.filter(
+      p => !connections.some(c => c.fromCardId === p.fromCardId && c.toCardId === p.toCardId),
+    );
+
+    added.forEach(c => {
+      insertWorkflowConnection(eventIdFromUrl, c).catch(err => {
+        console.error('[Workflow] Error inserting connection:', err);
       });
-    }
+    });
+    removed.forEach(c => {
+      deleteWorkflowConnectionPair(eventIdFromUrl, c.fromCardId, c.toCardId).catch(err => {
+        console.error('[Workflow] Error deleting connection:', err);
+      });
+    });
   }, [eventIdFromUrl, workflowConnections]);
+
+  const handleWorkflowNotesChange = useCallback((notes: WorkflowNote[]) => {
+    const prev = workflowNotes;
+    setWorkflowNotes(notes);
+    localStorage.setItem(eventIdFromUrl ? `workflow-notes-cards-${eventIdFromUrl}` : 'workflow-notes-cards', JSON.stringify(notes));
+
+    if (!eventIdFromUrl) return;
+
+    lastWorkflowSaveRef.current = Date.now();
+
+    const prevIds = new Set(prev.map(n => n.id));
+    const newIds = new Set(notes.map(n => n.id));
+
+    // Created notes — upsert so position is included when available
+    notes.filter(n => !prevIds.has(n.id)).forEach(note => {
+      const pos = workflowPositions[note.id];
+      upsertWorkflowNote(eventIdFromUrl, pos ? { ...note, positionX: pos.x, positionY: pos.y } : note)
+        .catch(err => console.error('[Workflow] Error creating note:', err));
+    });
+
+    // Deleted notes
+    prev.filter(n => !newIds.has(n.id)).forEach(note => {
+      deleteWorkflowNote(note.id)
+        .catch(err => console.error('[Workflow] Error deleting note:', err));
+    });
+
+    // Updated notes — only push the fields that actually changed
+    notes.filter(n => prevIds.has(n.id)).forEach(note => {
+      const prevNote = prev.find(p => p.id === note.id);
+      if (!prevNote) return;
+      const fields: Partial<{ content: string; color: string; width: number; height: number }> = {};
+      if (prevNote.content !== note.content) fields.content = note.content;
+      if (prevNote.color !== note.color) fields.color = note.color;
+      if (prevNote.width !== note.width) fields.width = note.width;
+      if (prevNote.height !== note.height) fields.height = note.height;
+      if (Object.keys(fields).length > 0) {
+        updateWorkflowNoteFields(note.id, fields)
+          .catch(err => console.error('[Workflow] Error updating note:', err));
+      }
+    });
+  }, [eventIdFromUrl, workflowNotes, workflowPositions]);
 
   const handleWorkflowTasksChange = useCallback((tasks: WorkflowTask[]) => {
     setWorkflowTasks(tasks);
-    localStorage.setItem('workflow-task-cards', JSON.stringify(tasks));
-  }, []);
+    localStorage.setItem(eventIdFromUrl ? `workflow-task-cards-${eventIdFromUrl}` : 'workflow-task-cards', JSON.stringify(tasks));
+  }, [eventIdFromUrl]);
 
 
   const handleReorderProjects = useCallback((fromIndex: number, toIndex: number) => {
@@ -1403,10 +1821,10 @@ const LayoutMakerPageStore: React.FC = () => {
       if (removed) {
         updated.splice(toIndex, 0, removed);
       }
-      saveProjectsToStorage(updated);
+      saveProjectsToStorage(updated, eventIdFromUrl);
       return updated;
     });
-  }, []);
+  }, [eventIdFromUrl]);
 
   const handleOpenWorkflow = useCallback(() => setIsWorkflowOpen(true), []);
   const handleCloseWorkflow = useCallback(() => setIsWorkflowOpen(false), []);
@@ -1484,8 +1902,8 @@ const LayoutMakerPageStore: React.FC = () => {
     // 3. Update active project
     currentProjectIdRef.current = projectId;
     setActiveProjectId(projectId);
-    localStorage.setItem(STORAGE_ACTIVE_PROJECT_KEY, projectId);
-  }, [activeProjectId, isWorkflowOpen, projects, getCanvasData, storeSupabaseLayoutId, initializeProject, forceSave, workflowNotes, workflowConnections]);
+    localStorage.setItem(getActiveProjectStorageKey(eventIdFromUrl), projectId);
+  }, [activeProjectId, isWorkflowOpen, projects, getCanvasData, storeSupabaseLayoutId, initializeProject, forceSave, workflowNotes, workflowConnections, eventIdFromUrl]);
 
   const handleProjectHighlight = useCallback((projectId: string) => {
     // This is used by workflow canvas - treat same as select
@@ -1510,7 +1928,7 @@ const LayoutMakerPageStore: React.FC = () => {
     };
     const updatedProjects = [...projects, newProject];
     setProjects(updatedProjects);
-    saveProjectsToStorage(updatedProjects);
+    saveProjectsToStorage(updatedProjects, eventIdFromUrl);
 
     // Initialize empty canvas for new project
     const bounds = {
@@ -1523,9 +1941,9 @@ const LayoutMakerPageStore: React.FC = () => {
 
     currentProjectIdRef.current = newProject.id;
     setActiveProjectId(newProject.id);
-    localStorage.setItem(STORAGE_ACTIVE_PROJECT_KEY, newProject.id);
+    localStorage.setItem(getActiveProjectStorageKey(eventIdFromUrl), newProject.id);
     setNewlyCreatedProjectId(newProject.id);
-  }, [projects, activeProjectId, getCanvasData, storeSupabaseLayoutId, initializeProject]);
+  }, [projects, activeProjectId, getCanvasData, storeSupabaseLayoutId, initializeProject, eventIdFromUrl]);
 
   const handleNewLayoutConfirm = useCallback((flow: LayoutFlow) => {
     setNewLayoutModalOpen(false);
@@ -1544,11 +1962,11 @@ const LayoutMakerPageStore: React.FC = () => {
       const updated = prev.map(p =>
         p.id === projectId ? { ...p, name: newName } : p
       );
-      saveProjectsToStorage(updated);
+      saveProjectsToStorage(updated, eventIdFromUrl);
       return updated;
     });
     setNewlyCreatedProjectId(null);
-  }, []);
+  }, [eventIdFromUrl]);
 
   const handleDeleteProject = useCallback((projectId: string) => {
     if (projects.length <= 1) {
@@ -1568,8 +1986,23 @@ const LayoutMakerPageStore: React.FC = () => {
 
     const updatedProjects = projects.filter(p => p.id !== projectId);
     setProjects(updatedProjects);
-    saveProjectsToStorage(updatedProjects);
-  }, [projects, activeProjectId, handleProjectSelect]);
+    saveProjectsToStorage(updatedProjects, eventIdFromUrl);
+
+    // Remove any workflow connections that reference this project
+    const updatedConnections = workflowConnections.filter(
+      c => c.fromCardId !== projectId && c.toCardId !== projectId
+    );
+    if (updatedConnections.length !== workflowConnections.length) {
+      setWorkflowConnections(updatedConnections);
+      localStorage.setItem(
+        eventIdFromUrl ? `workflow-connections-${eventIdFromUrl}` : 'workflow-connections',
+        JSON.stringify(updatedConnections)
+      );
+      if (eventIdFromUrl) {
+        saveWorkflowData(eventIdFromUrl, workflowNotes, updatedConnections).catch(() => {});
+      }
+    }
+  }, [projects, activeProjectId, handleProjectSelect, eventIdFromUrl, workflowConnections, workflowNotes]);
 
   const handleAddSpace = useCallback((widthMeters: number, heightMeters: number) => {
     gridCanvasRef.current?.addSpace(widthMeters, heightMeters);
@@ -1714,32 +2147,32 @@ const LayoutMakerPageStore: React.FC = () => {
       addElement({ type: 'rectangle', x: cx - stageW / 2, y: stageCy - 2 * ppm, width: stageW, height: 0.25 * ppm,
         fill: '#0a0a0a', stroke: '#3b82f6', strokeWidth: 1.5, rotation: 0,
         elementType: 'av-led-wall', label: 'LED Wall',
-        avData: { type: 'av-led-wall', widthM: 6, heightM: 0.25, label: 'LED Wall', labelVisible: true, screenAspect: '16:9' } as any, color: null } as any);
+        avData: { type: 'av-led-wall', widthM: 6, heightM: 0.25, label: 'LED Wall', labelVisible: false, screenAspect: '16:9' } as any, color: null } as any);
       // Truss
       addElement({ type: 'rectangle', x: cx - stageW / 2, y: stageCy - 3.5 * ppm, width: stageW, height: 0.3 * ppm,
         fill: '#aaa', stroke: '#888', strokeWidth: 1.5, rotation: 0,
         elementType: 'av-truss', label: 'Front Truss',
-        avData: { type: 'av-truss', widthM: 6, heightM: 0.3, label: 'Front Truss', labelVisible: true } as any, color: null } as any);
+        avData: { type: 'av-truss', widthM: 6, heightM: 0.3, label: 'Front Truss', labelVisible: false } as any, color: null } as any);
       // Stage platform
       addElement({ type: 'rectangle', x: cx - stageW / 2, y: stageCy, width: stageW, height: stageH,
         fill: '#1a1a1a', stroke: '#555', strokeWidth: 1.5, rotation: 0,
         elementType: 'av-screen', label: 'Stage',
-        avData: { type: 'av-screen', widthM: 6, heightM: 1, label: 'Stage', labelVisible: true } as any, color: null } as any);
+        avData: { type: 'av-screen', widthM: 6, heightM: 1, label: 'Stage', labelVisible: false } as any, color: null } as any);
       // Mixing desk (FOH)
       addElement({ type: 'rectangle', x: cx - 0.6 * ppm, y: stageCy + 3 * ppm, width: 1.2 * ppm, height: 0.8 * ppm,
         fill: '#2a2a2a', stroke: '#3b82f6', strokeWidth: 1.5, rotation: 0,
         elementType: 'av-mixing-desk', label: 'FOH Desk',
-        avData: { type: 'av-mixing-desk', widthM: 1.2, heightM: 0.8, label: 'FOH Desk', labelVisible: true, channels: 24 } as any, color: null } as any);
+        avData: { type: 'av-mixing-desk', widthM: 1.2, heightM: 0.8, label: 'FOH Desk', labelVisible: false, channels: 24 } as any, color: null } as any);
       // Left speaker
       addElement({ type: 'rectangle', x: cx - stageW / 2 - 0.4 * ppm, y: stageCy - 0.2 * ppm, width: 0.4 * ppm, height: 0.6 * ppm,
         fill: '#1a1a1a', stroke: '#555', strokeWidth: 1.5, rotation: 0,
         elementType: 'av-speaker', label: 'PA L',
-        avData: { type: 'av-speaker', widthM: 0.4, heightM: 0.6, label: 'PA L', labelVisible: true } as any, color: null } as any);
+        avData: { type: 'av-speaker', widthM: 0.4, heightM: 0.6, label: 'PA L', labelVisible: false } as any, color: null } as any);
       // Right speaker
       addElement({ type: 'rectangle', x: cx + stageW / 2, y: stageCy - 0.2 * ppm, width: 0.4 * ppm, height: 0.6 * ppm,
         fill: '#1a1a1a', stroke: '#555', strokeWidth: 1.5, rotation: 0,
         elementType: 'av-speaker', label: 'PA R',
-        avData: { type: 'av-speaker', widthM: 0.4, heightM: 0.6, label: 'PA R', labelVisible: true } as any, color: null } as any);
+        avData: { type: 'av-speaker', widthM: 0.4, heightM: 0.6, label: 'PA R', labelVisible: false } as any, color: null } as any);
       setShowElementLibrary(false);
       return;
     }
@@ -2255,6 +2688,7 @@ const LayoutMakerPageStore: React.FC = () => {
 
   // Build projects with canvas data for workflow preview and load connected notes
   const projectsWithCanvasData = useMemo(() => {
+    console.log('[DEBUG] memo running — workflowConnections:', workflowConnections.length, 'workflowNotes:', workflowNotes.length);
     const emptyCanvasData = {
       drawings: [],
       shapes: [],
@@ -2268,10 +2702,15 @@ const LayoutMakerPageStore: React.FC = () => {
 
     return projects.map(p => {
       // Find notes connected to this project from workflow
+      console.log('[DEBUG] checking project', p.id, 'type:', typeof p.id);
+      console.log('[DEBUG] workflowConnections at memo time:', workflowConnections.length, workflowConnections.map(c => ({ from: c.fromCardId, to: c.toCardId })));
+      console.log('[DEBUG] p.id:', p.id, typeof p.id, '| sample toCardId:', workflowConnections[0]?.toCardId, typeof workflowConnections[0]?.toCardId);
       const connectedNoteIds = workflowConnections
         .filter(c => c.toCardId === p.id && c.fromCardId.startsWith('note-'))
         .map(c => c.fromCardId.replace('note-', ''));
-      
+      console.log('[DEBUG] connectedNoteIds:', connectedNoteIds);
+      console.log('[DEBUG] project', p.id, 'connectedNoteIds:', connectedNoteIds);
+
       const connectedNotes = workflowNotes
         .filter(n => connectedNoteIds.includes(n.id))
         .map(n => ({
@@ -2298,6 +2737,11 @@ const LayoutMakerPageStore: React.FC = () => {
 
       // For other projects, load from localStorage
       const savedCanvas = loadCanvasFromLocalStorage(p.id);
+      console.log('[BG-DEBUG]', p.name, 'id:', p.id,
+        '| bgimage key len:', localStorage.getItem(`layout-maker-canvas-${p.id}__bgimage`)?.length ?? 0,
+        '| dedicated bg key len:', localStorage.getItem(`layout-maker-bg-${p.id}`)?.length ?? 0,
+        '| satellite in loaded data:', !!savedCanvas?.satelliteBackground?.imageBase64,
+        '| shapes count:', savedCanvas?.shapes?.length ?? 0);
       if (savedCanvas) {
         return {
           ...p,
@@ -2372,19 +2816,19 @@ const LayoutMakerPageStore: React.FC = () => {
     return gridCanvasRef.current?.getPowerPoints() || [];
   }, [activeProjectId]);
 
-  const handleLayoutsAssociated = useCallback((eventId: string) => {
+  const handleLayoutsAssociated = useCallback((assocEventId: string) => {
     setProjects(prev => {
       const updated = prev.map(p =>
         recentlySavedLayoutIds.includes(p.supabaseLayoutId || '')
-          ? { ...p, eventId }
+          ? { ...p, eventId: assocEventId }
           : p
       );
-      saveProjectsToStorage(updated);
+      saveProjectsToStorage(updated, eventIdFromUrl);
       return updated;
     });
     setShowAssociateModal(false);
     setRecentlySavedLayoutIds([]);
-  }, [recentlySavedLayoutIds]);
+  }, [recentlySavedLayoutIds, eventIdFromUrl]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -2412,8 +2856,8 @@ const LayoutMakerPageStore: React.FC = () => {
   }, [projects, activeProjectId, handleProjectSelect, handleNewProject]);
 
   useEffect(() => {
-    saveProjectsToStorage(projects);
-  }, [projects]);
+    saveProjectsToStorage(projects, eventIdFromUrl);
+  }, [projects, eventIdFromUrl]);
 
   // Save canvas on unmount - use refs to get current values
   useEffect(() => {
@@ -2737,6 +3181,7 @@ const LayoutMakerPageStore: React.FC = () => {
               included: true,
               pageSize: 'half',
               shapes: p.canvasData?.shapes || [],
+              walls: p.canvasData?.walls || [],
               viewBox: p.canvasData?.viewBox || { x: 0, y: 0, width: 800, height: 600 },
               satelliteBackground: (p.canvasData as any)?.satelliteBackground ?? undefined,
               elementVisibility: [
@@ -2751,9 +3196,18 @@ const LayoutMakerPageStore: React.FC = () => {
               ],
               includeLegend: true,
               includeDimensions: true,
-              includeNotes: true,
+              includeNotes: (p.canvasData?.notes?.length ?? 0) > 0,
               includeTasks: true,
-              notes: [],
+              notes: (() => {
+                const n = (p.canvasData?.notes || []).map(note => ({
+                  id: note.id,
+                  content: note.content,
+                  color: note.color,
+                  included: true,
+                }));
+                console.log('[DEBUG] layout notes for', p.id, p.name, n);
+                return n;
+              })(),
               tasks: [],
             }))}
             spaceNames={spaceOptions.map(s => s.label)}
@@ -2820,7 +3274,7 @@ const LayoutMakerPageStore: React.FC = () => {
         </button>
       )}
 
-      <AssistantChat />
+      <AssistantChat eventContext={eventInfo ? { eventName: eventInfo.title, eventDate: eventInfo.weddingDate } : undefined} />
 
       {/* Zoom Controls - only show when not in workflow mode */}
       {!isWorkflowOpen && (
