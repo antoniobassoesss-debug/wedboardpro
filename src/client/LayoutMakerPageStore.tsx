@@ -1109,9 +1109,8 @@ const LayoutMakerPageStore: React.FC = () => {
       console.log('[Workflow] Loading from Supabase for event:', eventId);
       const result = await loadWorkflowData(eventId);
 
-      console.log('[WorkflowLoad] result — notes:', result.notes.length, '| connections:', result.connections.length, '| error:', result.error);
       if (result.error) {
-        console.error('[WorkflowLoad] Error loading from Supabase:', result.error);
+        console.error('[Workflow] Error loading from Supabase:', result.error);
       } else {
         setWorkflowNotes(result.notes as WorkflowNote[]);
         setWorkflowConnections(result.connections);
@@ -1833,21 +1832,10 @@ const LayoutMakerPageStore: React.FC = () => {
       JSON.stringify(newPositions),
     );
 
-    console.log('[NoteCreate] eventIdFromUrl:', eventIdFromUrl, '| note.id:', note.id);
-    if (!eventIdFromUrl) {
-      console.warn('[NoteCreate] No eventIdFromUrl — skipping DB save');
-      return;
-    }
+    if (!eventIdFromUrl) return;
     lastWorkflowSaveRef.current = Date.now();
     upsertWorkflowNote(eventIdFromUrl, { ...note, positionX: position.x, positionY: position.y })
-      .then(result => {
-        if (result.error) {
-          console.error('[NoteCreate] Supabase upsert FAILED:', result.error);
-        } else {
-          console.log('[NoteCreate] Supabase upsert succeeded for note:', note.id);
-        }
-      })
-      .catch(err => console.error('[NoteCreate] Exception:', err));
+      .catch(err => console.error('[Workflow] Error creating note:', err));
   }, [eventIdFromUrl, workflowNotes, workflowPositions]);
 
   const handleWorkflowTasksChange = useCallback((tasks: WorkflowTask[]) => {
