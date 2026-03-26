@@ -1109,6 +1109,7 @@ const LayoutMakerPageStore: React.FC = () => {
       console.log('[Workflow] Loading from Supabase for event:', eventId);
       const result = await loadWorkflowData(eventId);
 
+      console.log('[WorkflowLoad] notes:', result.notes.length, 'connections:', result.connections.length, 'error:', result.error);
       if (result.error) {
         console.error('[Workflow] Error loading from Supabase:', result.error);
       } else {
@@ -1835,7 +1836,8 @@ const LayoutMakerPageStore: React.FC = () => {
     if (!eventIdFromUrl) return;
     lastWorkflowSaveRef.current = Date.now();
     upsertWorkflowNote(eventIdFromUrl, { ...note, positionX: position.x, positionY: position.y })
-      .catch(err => console.error('[Workflow] Error creating note:', err));
+      .then(r => console.log('[NoteCreate]', r.error ? 'FAILED: ' + r.error : 'OK note=' + note.id))
+      .catch(err => console.error('[NoteCreate] exception:', err));
   }, [eventIdFromUrl, workflowNotes, workflowPositions]);
 
   const handleWorkflowTasksChange = useCallback((tasks: WorkflowTask[]) => {
