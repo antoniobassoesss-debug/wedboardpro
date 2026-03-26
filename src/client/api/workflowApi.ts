@@ -85,8 +85,9 @@ export async function loadWorkflowNotes(eventId: string): Promise<ApiResponse<Wo
       return { data: null, error: error.message };
     }
 
+    // DB stores bare UUIDs; frontend uses 'note-{uuid}' as card IDs
     const notes: WorkflowNote[] = (data || []).map((note: DbWorkflowNote) => ({
-      id: note.id,
+      id: note.id.startsWith('note-') ? note.id : `note-${note.id}`,
       content: note.content,
       color: note.color || 'yellow',
       width: note.width,
@@ -160,11 +161,11 @@ export async function saveWorkflowNotes(
 export async function deleteWorkflowNote(noteId: string): Promise<ApiResponse<boolean>> {
   try {
     const supabase = getSupabaseClient();
-    
+    const dbId = noteId.startsWith('note-') ? noteId.slice(5) : noteId;
     const { error } = await supabase
       .from('workflow_notes')
       .delete()
-      .eq('id', noteId);
+      .eq('id', dbId);
 
     if (error) {
       console.error('[WorkflowAPI] Error deleting note:', error);
@@ -318,9 +319,11 @@ export async function upsertWorkflowNote(
 ): Promise<ApiResponse<boolean>> {
   try {
     const supabase = getSupabaseClient();
+    // Strip 'note-' prefix so the DB stores a bare UUID (works with UUID or TEXT column)
+    const dbId = note.id.startsWith('note-') ? note.id.slice(5) : note.id;
     const { error } = await supabase.from('workflow_notes').upsert(
       {
-        id: note.id,
+        id: dbId,
         event_id: eventId,
         content: note.content,
         color: note.color,
@@ -357,10 +360,11 @@ export async function updateWorkflowNoteFields(
 ): Promise<ApiResponse<boolean>> {
   try {
     const supabase = getSupabaseClient();
+    const dbId = noteId.startsWith('note-') ? noteId.slice(5) : noteId;
     const { error } = await supabase
       .from('workflow_notes')
       .update(fields)
-      .eq('id', noteId);
+      .eq('id', dbId);
     if (error) {
       console.error('[WorkflowAPI] Error updating note fields:', error);
       return { data: null, error: error.message };

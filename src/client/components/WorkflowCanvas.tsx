@@ -1006,7 +1006,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
   const handleCreateNote = useCallback((wrapperX: number, wrapperY: number) => {
     const newNote: WorkflowNote = {
-      id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: `note-${crypto.randomUUID()}`,
       content: '',
       color: 'yellow',
       width: NOTE_DEFAULT_WIDTH,
