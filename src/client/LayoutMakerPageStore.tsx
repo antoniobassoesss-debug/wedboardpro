@@ -1109,11 +1109,10 @@ const LayoutMakerPageStore: React.FC = () => {
       console.log('[Workflow] Loading from Supabase for event:', eventId);
       const result = await loadWorkflowData(eventId);
 
+      console.log('[WorkflowLoad] result — notes:', result.notes.length, '| connections:', result.connections.length, '| error:', result.error);
       if (result.error) {
-        console.error('[Workflow] Error loading from Supabase:', result.error);
+        console.error('[WorkflowLoad] Error loading from Supabase:', result.error);
       } else {
-        // Always sync both arrays unconditionally — the old OR condition was wiping notes
-        // state when connections existed but notes didn't (e.g. after a failed note upsert).
         setWorkflowNotes(result.notes as WorkflowNote[]);
         setWorkflowConnections(result.connections);
         localStorage.setItem(`workflow-notes-cards-${eventId}`, JSON.stringify(result.notes));
@@ -1834,10 +1833,21 @@ const LayoutMakerPageStore: React.FC = () => {
       JSON.stringify(newPositions),
     );
 
-    if (!eventIdFromUrl) return;
+    console.log('[NoteCreate] eventIdFromUrl:', eventIdFromUrl, '| note.id:', note.id);
+    if (!eventIdFromUrl) {
+      console.warn('[NoteCreate] No eventIdFromUrl — skipping DB save');
+      return;
+    }
     lastWorkflowSaveRef.current = Date.now();
     upsertWorkflowNote(eventIdFromUrl, { ...note, positionX: position.x, positionY: position.y })
-      .catch(err => console.error('[Workflow] Error creating note:', err));
+      .then(result => {
+        if (result.error) {
+          console.error('[NoteCreate] Supabase upsert FAILED:', result.error);
+        } else {
+          console.log('[NoteCreate] Supabase upsert succeeded for note:', note.id);
+        }
+      })
+      .catch(err => console.error('[NoteCreate] Exception:', err));
   }, [eventIdFromUrl, workflowNotes, workflowPositions]);
 
   const handleWorkflowTasksChange = useCallback((tasks: WorkflowTask[]) => {
